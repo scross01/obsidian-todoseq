@@ -78,6 +78,9 @@ export class TaskDependencyManager {
   private edgeKeys = new Set<string>();
   private dependents = new Map<string, Set<string>>();
   private promotions: ArchivedReferencePromotion[] = [];
+  private idIndex = new Map<string, Task[]>();
+  private anchorIndex = new Map<string, Task[]>();
+  private pathSet = new Set<string>();
 
   constructor(
     private readonly stateManager: TaskStateManager,
@@ -111,6 +114,9 @@ export class TaskDependencyManager {
     this.edgeKeys.clear();
     this.dependents.clear();
     this.promotions = [];
+    this.idIndex.clear();
+    this.anchorIndex.clear();
+    this.pathSet.clear();
     this.validationReady = true;
     this.validationEpoch++;
     this.snapshotValidationEpoch = -1;
@@ -200,9 +206,6 @@ export class TaskDependencyManager {
   ): { dependent: Task; references: string[] }[] {
     this.ensureFresh();
     const targetKey = getTaskKey(target);
-    const targetPath = target.path.replace(/\\/g, '/');
-    const targetAnchor = target.embedReference?.replace(/^\^/, '');
-    const pathSet = new Set(this.cachedTasks.map((task) => task.path));
     const result: { dependent: Task; references: string[] }[] = [];
 
     for (const dependent of this.cachedTasks) {
@@ -213,18 +216,17 @@ export class TaskDependencyManager {
           raw,
           dependent.sourceFormat === 'org' ? 'org' : 'markdown',
         );
-        if (parsed.kind === 'id') {
-          if (target.id && parsed.id === target.id) references.push(raw);
-          continue;
-        }
-        if (parsed.kind !== 'markdown-anchor' || !targetAnchor) continue;
-        if (parsed.anchor !== targetAnchor) continue;
-        const resolvedPath = this.resolveLinkPath(
-          parsed.path,
-          dependent.path,
-          pathSet,
+        if (parsed.kind === 'invalid') continue;
+        const resolved = this.resolveReference(
+          dependent,
+          parsed,
+          this.idIndex,
+          this.anchorIndex,
+          this.pathSet,
         );
-        if (resolvedPath === targetPath) references.push(raw);
+        if (resolved.target && getTaskKey(resolved.target) === targetKey) {
+          references.push(raw);
+        }
       }
       if (references.length > 0) result.push({ dependent, references });
     }
@@ -293,6 +295,9 @@ export class TaskDependencyManager {
         anchorIndex.set(key, list);
       }
     }
+    this.idIndex = idIndex;
+    this.anchorIndex = anchorIndex;
+    this.pathSet = pathSet;
 
     const issues: DependencyIssue[] = [];
     const reasonsByKey = new Map<string, DependencyReason[]>();
@@ -353,9 +358,15 @@ export class TaskDependencyManager {
               true,
             ),
           );
-          blocked.add(key);
-          reasonsByKey.set(key, reasons);
         }
+        if (
+          !task.completed &&
+          !task.noblocking &&
+          reasons.some((reason) => reason.blocking)
+        ) {
+          blocked.add(key);
+        }
+        if (reasons.length > 0) reasonsByKey.set(key, reasons);
         continue;
       }
 
@@ -624,6 +635,35 @@ export class TaskDependencyManager {
     };
 
     if (settings.hierarchy) {
+      // Scan each effective sibling group once, remembering the nearest
+      // unfinished ORDERED predecessor as the group advances in source order.
+      const orderedPredecessorByKey = new Map<string, Task>();
+      const scannedGroups = new Map<string, Map<string, Task>>();
+      for (const task of tasks) {
+        const key = getTaskKey(task);
+        const group = structure.groupByKey.get(key);
+        const bucket = structure.parentByKey.get(key) ?? '';
+        const siblings =
+          (group ? structure.siblingsByGroup.get(group) : undefined) ??
+          structure.siblingsByParent.get(bucket) ??
+          [];
+        if (siblings.length === 0) continue;
+        const cacheKey = group ? `g:${group}` : `p:${bucket}`;
+        let predecessors = scannedGroups.get(cacheKey);
+        if (!predecessors) {
+          predecessors = new Map<string, Task>();
+          let nearest: Task | undefined;
+          for (const siblingKey of siblings) {
+            if (nearest) predecessors.set(siblingKey, nearest);
+            const sibling = this.tasksByKey.get(siblingKey);
+            if (sibling?.ordered && !sibling.completed) nearest = sibling;
+          }
+          scannedGroups.set(cacheKey, predecessors);
+        }
+        const prior = predecessors.get(key);
+        if (prior) orderedPredecessorByKey.set(key, prior);
+      }
+
       for (const child of tasks) {
         if (child.completed) continue;
         const key = getTaskKey(child);
@@ -643,32 +683,22 @@ export class TaskDependencyManager {
 
         // ORDERED constrains every later sibling in the bounded group. The
         // nearest unfinished ordered predecessor is the actionable reason.
-        const group = structure.groupByKey.get(key);
-        const bucket = structure.parentByKey.get(key) ?? '';
-        const siblings =
-          (group ? structure.siblingsByGroup.get(group) : undefined) ??
-          structure.siblingsByParent.get(bucket) ??
-          [];
-        const index = siblings.indexOf(key);
-        for (let i = index - 1; i >= 0; i--) {
-          const prior = this.tasksByKey.get(siblings[i]);
-          if (prior?.ordered && !prior.completed) {
-            const list = result.get(key) ?? [];
-            list.push(
-              this.reason(
-                child,
-                'structural',
-                `Blocked by the earlier ORDERED task ${
-                  prior.text || prior.id || 'in this list'
-                }, which must be completed first.`,
-                'ORDERED',
-                true,
-                prior,
-              ),
-            );
-            result.set(key, list);
-            break;
-          }
+        const prior = orderedPredecessorByKey.get(key);
+        if (prior) {
+          const list = result.get(key) ?? [];
+          list.push(
+            this.reason(
+              child,
+              'structural',
+              `Blocked by the earlier ORDERED task ${
+                prior.text || prior.id || 'in this list'
+              }, which must be completed first.`,
+              'ORDERED',
+              true,
+              prior,
+            ),
+          );
+          result.set(key, list);
         }
       }
     }

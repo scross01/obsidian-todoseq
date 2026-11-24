@@ -1032,9 +1032,13 @@ export class TaskWriter {
 
     for (const reference of references) {
       if (direction === 'to-history') {
+        // The live drawer is authoritative: if the user already removed the
+        // token, do not recreate it in history from a stale inventory.
+        if (!active.includes(reference)) continue;
         remove(active, reference);
         if (!history.includes(reference)) history.push(reference);
       } else {
+        if (!history.includes(reference)) continue;
         remove(history, reference);
         if (!active.includes(reference)) active.push(reference);
       }

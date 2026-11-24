@@ -87,6 +87,37 @@ describe('TaskWriter Instance Methods', () => {
     taskWriter = new TaskWriter(mockPlugin, keywordManager);
   });
 
+  describe('migrateBlockerHistory', () => {
+    it('does not recreate a reference the live drawer no longer contains', async () => {
+      mockApp.vault.read = jest
+        .fn()
+        .mockResolvedValue(
+          ['TODO Task text', ':PROPERTIES:', ':BLOCKER: present', ':END:'].join(
+            '\n',
+          ),
+        );
+      mockApp.vault.process = jest.fn();
+      const task = createBaseTask({
+        path: 'test.md',
+        line: 0,
+        rawText: 'TODO Task text',
+        text: 'Task text',
+        blockedBy: ['present'],
+      });
+
+      const result = await taskWriter.migrateBlockerHistory(
+        task,
+        'to-history',
+        ['removed'],
+      );
+
+      expect(result.status).toBe('success');
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(result.task?.blockedBy).toEqual(['present']);
+      expect(result.task?.archivedBlockers).toBeUndefined();
+    });
+  });
+
   describe('applyLineUpdate', () => {
     it('should apply line update using editor API for active file in source mode', async () => {
       const task: Task = createBaseTask();

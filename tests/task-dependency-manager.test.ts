@@ -293,6 +293,64 @@ describe('TaskDependencyManager', () => {
     expect(engine.getArchivedReferencePromotions()).toHaveLength(1);
   });
 
+  it('inventories only references whose unique target is the archived task', () => {
+    const target = task({
+      path: 'target.md',
+      line: 0,
+      id: 'target',
+      completed: true,
+      state: 'DONE',
+    });
+    const unrelated = task({ path: 'other.md', line: 0, id: 'unrelated' });
+    const dependent = task({
+      path: 'dependent.md',
+      line: 0,
+      id: 'dependent',
+      blockedBy: ['unrelated', 'target'],
+    });
+    const { engine } = managerFor([target, unrelated, dependent]);
+
+    expect(engine.getIncomingActiveReferences(target)).toEqual([
+      { dependent, references: ['target'] },
+    ]);
+  });
+
+  it('leaves duplicate-ID references active during archive inventory', () => {
+    const first = task({ path: 'a.md', line: 0, id: 'dup' });
+    const second = task({ path: 'b.md', line: 0, id: 'dup' });
+    const dependent = task({
+      path: 'dependent.md',
+      line: 0,
+      blockedBy: ['dup'],
+    });
+    const { engine } = managerFor([first, second, dependent]);
+
+    expect(engine.getIncomingActiveReferences(first)).toEqual([]);
+    expect(engine.getIncomingActiveReferences(second)).toEqual([]);
+  });
+
+  it('leaves duplicate-anchor references active during archive inventory', () => {
+    const first = task({
+      path: 'Note.md',
+      line: 0,
+      embedReference: '^dup',
+    });
+    const second = task({
+      path: 'Note.md',
+      line: 1,
+      embedReference: '^dup',
+    });
+    const dependent = task({
+      path: 'dependent.md',
+      line: 0,
+      blockedBy: ['[[Note#^dup]]'],
+    });
+    const { engine } = managerFor([first, second, dependent]);
+
+    expect(engine.getIncomingActiveReferences(first)).toEqual([]);
+    expect(engine.getIncomingActiveReferences(second)).toEqual([]);
+  });
+
   it('reports an excluded file-qualified target distinctly and blocks', () => {
     const keywordManager = createTestKeywordManager();
     const state = new TaskStateManager(keywordManager);

@@ -52,4 +52,24 @@ describe('dependency structural scale', () => {
     expect(engine.getSnapshot().blocked.size).toBe(10_000);
     expect(engine.getIssues()).toEqual([]);
   }, 30_000);
+
+  it('scans a flat 10k-row sibling group without quadratic ORDERED work', () => {
+    const tasks = Array.from({ length: 10_000 }, (_, i) =>
+      createBaseTask({
+        path: 'flat.md',
+        line: i,
+        rawText: `TODO Task ${i}`,
+        text: `Task ${i}`,
+        state: 'TODO',
+      }),
+    );
+    const state = new TaskStateManager(createTestKeywordManager());
+    state.setTasks(tasks);
+    const engine = new TaskDependencyManager(state, {
+      getStructuralSettings: () => ({ hierarchy: true, checkbox: false }),
+    });
+
+    expect(engine.isBlocked('flat.md:9999')).toBe(false);
+    expect(engine.getSnapshot().blocked.size).toBe(0);
+  }, 30_000);
 });

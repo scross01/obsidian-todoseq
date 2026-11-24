@@ -336,6 +336,45 @@ describe('opt-in structural dependencies', () => {
     expect(engine.getBlockingReasons('tree.org:2')[0].code).toBe('checkbox');
   });
 
+  it('keeps known structural reasons while explicit validation is pending', () => {
+    const { engine } = setup([
+      task({ path: 'tree.md', line: 0, text: 'Parent', state: 'TODO' }),
+      task({
+        path: 'tree.md',
+        line: 1,
+        indent: '  ',
+        text: 'Child',
+        state: 'TODO',
+      }),
+      task({
+        path: 'tree.md',
+        line: 2,
+        text: 'Explicit',
+        state: 'TODO',
+        blockedBy: ['missing'],
+      }),
+      task({
+        path: 'tree.md',
+        line: 3,
+        text: 'Never blocked',
+        state: 'TODO',
+        noblocking: true,
+        blockedBy: ['missing'],
+      }),
+    ]);
+
+    engine.setValidationReady(false);
+
+    expect(engine.isBlocked('tree.md:0')).toBe(true);
+    expect(engine.getBlockingReasons('tree.md:0')[0].code).toBe('structural');
+    expect(engine.isBlocked('tree.md:2')).toBe(true);
+    expect(engine.getBlockingReasons('tree.md:2')[0].code).toBe(
+      'pending-validation',
+    );
+    expect(engine.isBlocked('tree.md:3')).toBe(false);
+    expect(engine.getBlockingReasons('tree.md:3')).toEqual([]);
+  });
+
   it('honours local NOBLOCKING, including broken explicit references', () => {
     const { engine } = setup([
       task({
