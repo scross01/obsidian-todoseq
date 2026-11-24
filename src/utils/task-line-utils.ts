@@ -204,6 +204,69 @@ export function findDateLineWithParser(
   return findDateLine(lines, startIndex, dateType, taskIndent, keywordManager);
 }
 
+/** One supported Org planning timestamp inside an entry. */
+export interface OrgPlanningToken {
+  lineIndex: number;
+  /** Keyword start, after the line's leading whitespace. */
+  start: number;
+  /** End of the timestamp token. */
+  end: number;
+  /** `<...>` or `[...]` timestamp text. */
+  dateText: string;
+}
+
+/**
+ * Find one planning token in an Org entry. Unlike findDateLine this searches
+ * inside shared planning lines and stops at the next headline, so SCHEDULED
+ * and DEADLINE can coexist in either order without hiding each other.
+ */
+export function findOrgPlanningToken(
+  lines: string[],
+  startIndex: number,
+  dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'STARTED',
+): OrgPlanningToken | null {
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^\*+\s/.test(line)) break;
+
+    const match = new RegExp(
+      `\\b${dateType}:\\s*(<[^>]+>|\\[[^\\]]+\\])`,
+      'i',
+    ).exec(line);
+    if (!match) continue;
+
+    const start = match.index;
+    return {
+      lineIndex: i,
+      start,
+      end: start + match[0].length,
+      dateText: match[1],
+    };
+  }
+  return null;
+}
+
+/**
+ * Replace or remove one Org planning token without touching the other tokens
+ * or the authored whitespace around them. Returns null when removal leaves an
+ * empty line.
+ */
+export function replaceOrgPlanningToken(
+  line: string,
+  token: OrgPlanningToken,
+  replacement: string | null,
+): string | null {
+  if (replacement !== null) {
+    return line.slice(0, token.start) + replacement + line.slice(token.end);
+  }
+
+  const indent = line.match(/^\s*/)?.[0] ?? '';
+  const before = line.slice(indent.length, token.start).trimEnd();
+  const after = line.slice(token.end).trim();
+  const body = [before, after].filter(Boolean).join(' ');
+  return body ? indent + body : null;
+}
+
 /**
  * Find a DESCRIPTION: line after a task line.
  * Uses the same search pattern as findDateLine.

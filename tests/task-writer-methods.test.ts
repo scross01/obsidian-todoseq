@@ -3091,6 +3091,35 @@ describe('TaskWriter Instance Methods', () => {
       expect(mockApp.vault.process).toHaveBeenCalledTimes(1);
     });
 
+    it('refuses to mutate a line that no longer holds the task', async () => {
+      const original = 'DONE Someone else\n  SCHEDULED: <2026-06-24 Wed +1d>';
+      let content = original;
+      mockApp.vault.process = jest
+        .fn()
+        .mockImplementation(
+          (_file: unknown, updateFn: (data: string) => string) => {
+            content = updateFn(content);
+            return Promise.resolve(content);
+          },
+        );
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        text: 'Task text',
+        scheduledDate: new Date(2026, 5, 24),
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+      });
+
+      await expect(
+        taskWriter.applyRecurrenceUpdate(task, {
+          newScheduledDate: new Date(2026, 5, 25),
+          newState: 'TODO',
+        }),
+      ).rejects.toThrow('Task row changed before recurrence update');
+      expect(content).toBe(original);
+    });
+
     it('should update task state, scheduled date, and deadline in a single write', async () => {
       const task = createBaseTask({
         rawText: 'DONE Task text',

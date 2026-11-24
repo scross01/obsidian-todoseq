@@ -2,7 +2,11 @@
 
 ## Unreleased
 
+- Fixed queued completions and recurrence rollovers following a same-title task with a different block anchor. They now require the requested task's ID or anchor, and a recurrence stops if its date or repeater was edited while it was waiting.
+- Fixed Org recurrence overwriting a fixed DEADLINE that shares a line with a repeating SCHEDULED date, and stopped a delayed rollover from accepting a longer title at the old row.
 - Completing a task now stays blocked until its prerequisite is actually saved, even if another file finishes scanning or the completion is requested again from a row that already looks complete. The dependency check and the write use the same verified row, so a duplicate identity or an unidentifiable row is refused instead of completing a neighbor.
+- Fixed a queued completion after a failed write being applied to a different task that had moved into the original row's position; it now follows its own task or leaves the note unchanged.
+- Fixed a delayed recurrence rollover writing to a task that took its old line, and restored rollover for nested Org tasks by using the note's registered parser.
 - Task updates that are still being saved are no longer overwritten by a vault scan that starts at the same time.
 - Recurring tasks now roll forward after a successful completion even when another edit to the same note is queued, and a delayed recurrence follows the task if that edit moves its row or refuses when the target is removed or ambiguous. Migrated quoted property drawers no longer leave duplicate IDs behind, and transfer notices distinguish notes that could not be scanned from links that failed to update, including when reference discovery failed completely.
 - Adding a scheduled or deadline date from the editor now uses the same date-writing path as other task updates, so ordering, indentation and block anchors stay consistent.

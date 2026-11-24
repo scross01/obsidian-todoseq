@@ -26,6 +26,8 @@ import {
   getDateLineIndent,
   supportsTaskMetadata,
   replaceTableCellContent,
+  findOrgPlanningToken,
+  replaceOrgPlanningToken,
 } from '../utils/task-line-utils';
 import { DateParser } from '../parser/date-parser';
 import type { EditorView } from '@codemirror/view';
@@ -261,6 +263,155 @@ export class TaskWriter {
       );
     }
     return line.includes(task.state) && line.includes(task.text);
+  }
+
+  /**
+   * Recurrence mutation precondition: the verified row must still be the row
+   * the request identified. Exact task content avoids accepting a longer title
+   * that merely contains the original one; table rows compare only the target
+   * cell so unrelated cells may be edited concurrently.
+   */
+  private lineMatchesRecurrenceTarget(
+    line: string | undefined,
+    task: Task,
+  ): boolean {
+    if (typeof line !== 'string') return false;
+    const expected = task.rawText.trim();
+    if (task.isTableTask && task.tableCell) {
+      const cell = parseTableCells(line)[task.tableCell.cellIndex];
+      if (!cell) return false;
+      const taskPart = cell.content.split(/<br\s*\/?>/i)[0]?.trim() ?? '';
+      const body = taskPart
+        .replace(/^[\s>]*(?:[-*+]\s+)?(?:\[[ xX]\]\s+)?/, '')
+        .replace(/^\[#(?:A|B|C)\]\s+/, '');
+      return body === expected || body === `${task.state} ${task.text}`.trim();
+    }
+    return line.trimEnd() === expected;
+  }
+
+  /** Recurrence-specific planning values carried from the queued request. */
+  private recurrencePlanningMatches(
+    lines: string[],
+    task: Task,
+    expected:
+      | {
+          scheduledDate?: Date | null;
+          scheduledDateRepeat?: DateRepeatInfo | null;
+          deadlineDate?: Date | null;
+          deadlineDateRepeat?: DateRepeatInfo | null;
+        }
+      | undefined,
+  ): boolean {
+    if (!expected) return true;
+    return (
+      (expected.scheduledDate === undefined ||
+        this.planningValueMatches(
+          lines,
+          task,
+          'SCHEDULED',
+          expected.scheduledDate,
+          expected.scheduledDateRepeat ?? null,
+        )) &&
+      (expected.deadlineDate === undefined ||
+        this.planningValueMatches(
+          lines,
+          task,
+          'DEADLINE',
+          expected.deadlineDate,
+          expected.deadlineDateRepeat ?? null,
+        ))
+    );
+  }
+
+  private planningValueMatches(
+    lines: string[],
+    task: Task,
+    dateType: 'SCHEDULED' | 'DEADLINE',
+    expectedDate: Date | null,
+    expectedRepeat: DateRepeatInfo | null,
+  ): boolean {
+    let dateText: string | null = null;
+
+    if (task.sourceFormat === 'org') {
+      dateText =
+        findOrgPlanningToken(lines, task.line + 1, dateType)?.dateText ?? null;
+    } else {
+      const lineIndex = findDateLine(
+        lines,
+        task.line + 1,
+        dateType,
+        getTaskIndent(task),
+        this.keywordManager,
+      );
+      const line = lineIndex >= 0 ? lines[lineIndex] : undefined;
+      dateText =
+        line?.match(
+          new RegExp(`\\b${dateType}:\\s*(<[^>]+>|\\[[^\\]]+\\])`, 'i'),
+        )?.[1] ?? null;
+    }
+
+    if (!dateText) return expectedDate === null && expectedRepeat === null;
+    const parsed = DateParser.parseDateWithRepeater(dateText);
+    return (
+      this.sameDate(parsed.date, expectedDate) &&
+      this.sameRepeat(parsed.repeat, expectedRepeat)
+    );
+  }
+
+  private sameDate(a: Date | null, b: Date | null): boolean {
+    if (a === null || b === null) return a === b;
+    return a.getTime() === b.getTime();
+  }
+
+  private sameRepeat(
+    a: DateRepeatInfo | null,
+    b: DateRepeatInfo | null,
+  ): boolean {
+    if (a === null || b === null) return a === b;
+    return a.unit === b.unit && a.value === b.value;
+  }
+
+  private tableCellPlanningMatches(
+    cellContent: string,
+    expected:
+      | {
+          scheduledDate?: Date | null;
+          scheduledDateRepeat?: DateRepeatInfo | null;
+          deadlineDate?: Date | null;
+          deadlineDateRepeat?: DateRepeatInfo | null;
+        }
+      | undefined,
+  ): boolean {
+    if (!expected) return true;
+    const matches = (
+      dateType: 'SCHEDULED' | 'DEADLINE',
+      expectedDate: Date | null | undefined,
+      expectedRepeat: DateRepeatInfo | null | undefined,
+    ): boolean => {
+      if (expectedDate === undefined) return true;
+      const dateText =
+        cellContent.match(
+          new RegExp(
+            `<br\\s*/?>\\s*${dateType}:\\s*(<[^>]+>|\\[[^\\]]+\\])`,
+            'i',
+          ),
+        )?.[1] ?? null;
+      if (!dateText) return expectedDate === null && !expectedRepeat;
+      const parsed = DateParser.parseDateWithRepeater(dateText);
+      return (
+        this.sameDate(parsed.date, expectedDate) &&
+        this.sameRepeat(parsed.repeat, expectedRepeat ?? null)
+      );
+    };
+
+    return (
+      matches(
+        'SCHEDULED',
+        expected.scheduledDate,
+        expected.scheduledDateRepeat,
+      ) &&
+      matches('DEADLINE', expected.deadlineDate, expected.deadlineDateRepeat)
+    );
   }
 
   /**
@@ -1984,11 +2135,15 @@ export class TaskWriter {
   private async modifyTableCell(
     task: Task,
     mutate: (cellContent: string) => string,
+    expected?: Task,
   ): Promise<void> {
     const file = this.app.vault.getAbstractFileByPath(task.path);
     if (!(file instanceof TFile)) return;
 
     const mutateLine = (line: string): string | null => {
+      if (expected && !this.lineMatchesRecurrenceTarget(line, expected)) {
+        throw new Error('Task row changed before recurrence update');
+      }
       const cell = parseTableCells(line)[task.tableCell!.cellIndex];
       if (!cell) return null;
       return replaceTableCellContent(
@@ -2225,90 +2380,105 @@ export class TaskWriter {
       newScheduledWarningPeriod?: WarningPeriodInfo | null;
       newDeadlineWarningPeriod?: WarningPeriodInfo | null;
       newState?: string;
+      expectedRecurrence?: {
+        scheduledDate?: Date | null;
+        scheduledDateRepeat?: DateRepeatInfo | null;
+        deadlineDate?: Date | null;
+        deadlineDateRepeat?: DateRepeatInfo | null;
+      };
     },
     startedReset: { shouldResetStarted: boolean },
   ): Promise<Task & { lineDelta?: number }> {
     let newCellContent = task.rawText;
 
-    await this.modifyTableCell(task, (origCell) => {
-      const brIdx = origCell.indexOf('<br');
-      let textPart = (
-        brIdx >= 0 ? origCell.substring(0, brIdx) : origCell
-      ).trim();
-      let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
-
-      // Swap the keyword (mirrors applyTableCellUpdate: strip indent +
-      // list marker so only keyword + priority + text land in the cell)
-      if (options.newState !== undefined) {
-        const generated = TaskWriter.generateTaskLine(
-          task,
-          options.newState,
-          true,
-          this.keywordManager,
-        );
-        let cellLine = generated.newLine;
-        if (cellLine.startsWith(task.indent)) {
-          cellLine = cellLine.slice(task.indent.length);
+    await this.modifyTableCell(
+      task,
+      (origCell) => {
+        if (
+          !this.tableCellPlanningMatches(origCell, options.expectedRecurrence)
+        ) {
+          throw new Error('Task row changed before recurrence update');
         }
-        if (cellLine.startsWith(task.listMarker)) {
-          cellLine = cellLine.slice(task.listMarker.length);
+        const brIdx = origCell.indexOf('<br');
+        let textPart = (
+          brIdx >= 0 ? origCell.substring(0, brIdx) : origCell
+        ).trim();
+        let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+
+        // Swap the keyword (mirrors applyTableCellUpdate: strip indent +
+        // list marker so only keyword + priority + text land in the cell)
+        if (options.newState !== undefined) {
+          const generated = TaskWriter.generateTaskLine(
+            task,
+            options.newState,
+            true,
+            this.keywordManager,
+          );
+          let cellLine = generated.newLine;
+          if (cellLine.startsWith(task.indent)) {
+            cellLine = cellLine.slice(task.indent.length);
+          }
+          if (cellLine.startsWith(task.listMarker)) {
+            cellLine = cellLine.slice(task.listMarker.length);
+          }
+          textPart = cellLine.trim();
         }
-        textPart = cellLine.trim();
-      }
 
-      // Advance or remove an inline date segment in place; append only
-      // when the rollover adds a date the cell doesn't carry yet.
-      const replaceInlineDate = (
-        dateType: 'SCHEDULED' | 'DEADLINE',
-        dateStr: string | null,
-      ): void => {
-        const existing = new RegExp(
-          `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
-          'i',
-        );
-        if (dateStr === null) {
-          dateSuffix = dateSuffix.replace(existing, '');
-          return;
+        // Advance or remove an inline date segment in place; append only
+        // when the rollover adds a date the cell doesn't carry yet.
+        const replaceInlineDate = (
+          dateType: 'SCHEDULED' | 'DEADLINE',
+          dateStr: string | null,
+        ): void => {
+          const existing = new RegExp(
+            `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
+            'i',
+          );
+          if (dateStr === null) {
+            dateSuffix = dateSuffix.replace(existing, '');
+            return;
+          }
+          const tag = `<br>${dateType}: ${dateStr}`;
+          dateSuffix = existing.test(dateSuffix)
+            ? dateSuffix.replace(existing, tag)
+            : `${dateSuffix}${tag}`;
+        };
+
+        if (options.newScheduledDate !== undefined) {
+          replaceInlineDate(
+            'SCHEDULED',
+            options.newScheduledDate === null
+              ? null
+              : TaskWriter.buildDateLineContent(
+                  options.newScheduledDate,
+                  options.newScheduledRepeat ?? task.scheduledDateRepeat,
+                  options.newScheduledWarningPeriod !== undefined
+                    ? options.newScheduledWarningPeriod
+                    : task.scheduledWarningPeriod,
+                ),
+          );
         }
-        const tag = `<br>${dateType}: ${dateStr}`;
-        dateSuffix = existing.test(dateSuffix)
-          ? dateSuffix.replace(existing, tag)
-          : `${dateSuffix}${tag}`;
-      };
 
-      if (options.newScheduledDate !== undefined) {
-        replaceInlineDate(
-          'SCHEDULED',
-          options.newScheduledDate === null
-            ? null
-            : TaskWriter.buildDateLineContent(
-                options.newScheduledDate,
-                options.newScheduledRepeat ?? task.scheduledDateRepeat,
-                options.newScheduledWarningPeriod !== undefined
-                  ? options.newScheduledWarningPeriod
-                  : task.scheduledWarningPeriod,
-              ),
-        );
-      }
+        if (options.newDeadlineDate !== undefined) {
+          replaceInlineDate(
+            'DEADLINE',
+            options.newDeadlineDate === null
+              ? null
+              : TaskWriter.buildDateLineContent(
+                  options.newDeadlineDate,
+                  options.newDeadlineRepeat ?? task.deadlineDateRepeat,
+                  options.newDeadlineWarningPeriod !== undefined
+                    ? options.newDeadlineWarningPeriod
+                    : task.deadlineWarningPeriod,
+                ),
+          );
+        }
 
-      if (options.newDeadlineDate !== undefined) {
-        replaceInlineDate(
-          'DEADLINE',
-          options.newDeadlineDate === null
-            ? null
-            : TaskWriter.buildDateLineContent(
-                options.newDeadlineDate,
-                options.newDeadlineRepeat ?? task.deadlineDateRepeat,
-                options.newDeadlineWarningPeriod !== undefined
-                  ? options.newDeadlineWarningPeriod
-                  : task.deadlineWarningPeriod,
-              ),
-        );
-      }
-
-      newCellContent = `${textPart}${dateSuffix}`;
-      return newCellContent;
-    });
+        newCellContent = `${textPart}${dateSuffix}`;
+        return newCellContent;
+      },
+      task,
+    );
 
     const completed =
       options.newState !== undefined
@@ -3369,6 +3539,12 @@ export class TaskWriter {
       newScheduledWarningPeriod?: WarningPeriodInfo | null;
       newDeadlineWarningPeriod?: WarningPeriodInfo | null;
       newState?: string;
+      expectedRecurrence?: {
+        scheduledDate?: Date | null;
+        scheduledDateRepeat?: DateRepeatInfo | null;
+        deadlineDate?: Date | null;
+        deadlineDateRepeat?: DateRepeatInfo | null;
+      };
     },
   ): Promise<Task & { lineDelta?: number }> {
     const file = this.app.vault.getAbstractFileByPath(task.path);
@@ -3424,6 +3600,17 @@ export class TaskWriter {
         // Use Editor API to avoid external file modification warning
         const taskIndent = getTaskIndent(task);
         let totalDelta = 0;
+        const editorLines = this.editorLines(editor);
+        if (
+          !this.lineMatchesRecurrenceTarget(editor.getLine(task.line), task) ||
+          !this.recurrencePlanningMatches(
+            editorLines,
+            task,
+            options.expectedRecurrence,
+          )
+        ) {
+          throw new Error('Task row changed before recurrence update');
+        }
 
         // Update task state first if requested
         if (options.newState !== undefined) {
@@ -3508,6 +3695,16 @@ export class TaskWriter {
         // Vault API path for inactive files
         await this.app.vault.process(file, (data) => {
           const lines = data.split('\n');
+          if (
+            !this.lineMatchesRecurrenceTarget(lines[task.line], task) ||
+            !this.recurrencePlanningMatches(
+              lines,
+              task,
+              options.expectedRecurrence,
+            )
+          ) {
+            throw new Error('Task row changed before recurrence update');
+          }
           let totalDelta = 0;
 
           // Update SCHEDULED date if requested
@@ -3684,6 +3881,37 @@ export class TaskWriter {
   ): number {
     const lines = this.editorLines(editor);
     const anchor = this.editorBlockAnchor(editor, task);
+
+    if (task.sourceFormat === 'org') {
+      const token = findOrgPlanningToken(lines, task.line + 1, dateType);
+      if (token) {
+        const replacement = dateStr === null ? null : `${dateType}: ${dateStr}`;
+        const next = replaceOrgPlanningToken(
+          lines[token.lineIndex],
+          token,
+          replacement,
+        );
+        if (dateStr === null && next === null) {
+          editor.replaceRange(
+            '',
+            { line: token.lineIndex, ch: 0 },
+            { line: token.lineIndex + 1, ch: 0 },
+          );
+          this.relocateBlockAnchorInEditor(editor, task, anchor);
+          return -1;
+        }
+        const oldLine = lines[token.lineIndex];
+        editor.replaceRange(
+          next ?? '',
+          { line: token.lineIndex, ch: 0 },
+          { line: token.lineIndex, ch: oldLine.length },
+        );
+        this.relocateBlockAnchorInEditor(editor, task, anchor);
+        return 0;
+      }
+      if (dateStr === null) return 0;
+    }
+
     const existingIdx = findDateLine(
       lines,
       task.line + 1,
@@ -3938,6 +4166,28 @@ export class TaskWriter {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
     const anchor = this.blockAnchorOf(lines, task);
+
+    if (task.sourceFormat === 'org') {
+      const token = findOrgPlanningToken(lines, taskLineIndex + 1, dateType);
+      if (token) {
+        const replacement = dateStr === null ? null : `${dateType}: ${dateStr}`;
+        const next = replaceOrgPlanningToken(
+          lines[token.lineIndex],
+          token,
+          replacement,
+        );
+        if (next === null) {
+          lines.splice(token.lineIndex, 1);
+          this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
+          return { lines, lineDelta: -1 };
+        }
+        lines[token.lineIndex] = next;
+        this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
+        return { lines, lineDelta: 0 };
+      }
+      if (dateStr === null) return { lines, lineDelta: 0 };
+    }
+
     const existingIdx = findDateLine(
       lines,
       taskLineIndex + 1,
@@ -3978,6 +4228,20 @@ export class TaskWriter {
     const kwManager = this.keywordManager;
     const taskIndent = getTaskIndent(task);
     const anchor = this.blockAnchorOf(lines, task);
+
+    if (task.sourceFormat === 'org') {
+      const token = findOrgPlanningToken(lines, taskLineIndex + 1, dateType);
+      if (!token) return { lines, lineDelta: 0 };
+      const next = replaceOrgPlanningToken(lines[token.lineIndex], token, null);
+      if (next === null) {
+        lines.splice(token.lineIndex, 1);
+        this.relocateBlockAnchor(lines, taskLineIndex, taskIndent, anchor);
+        return { lines, lineDelta: -1 };
+      }
+      lines[token.lineIndex] = next;
+      return { lines, lineDelta: 0 };
+    }
+
     const existingIdx = findDateLine(
       lines,
       taskLineIndex + 1,

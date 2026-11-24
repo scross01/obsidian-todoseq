@@ -2,7 +2,7 @@ import { TFile, TAbstractFile } from 'obsidian';
 import { Task, WarningPeriodInfo } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
-import { ParserConfig } from '../parser/types';
+import { ITaskParser, ParserConfig } from '../parser/types';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { taskComparator } from '../utils/task-sort';
 import TodoTracker from '../main';
@@ -484,6 +484,15 @@ export class VaultScanner
   getParser(): TaskParser | null {
     // Return the markdown parser for backward compatibility
     return this.parserRegistry.getParser('markdown') as TaskParser | null;
+  }
+
+  /** Get the registered parser for a vault path without scanning the file. */
+  getParserForPath(filePath: string): ITaskParser | null {
+    const fileName = filePath.slice(filePath.lastIndexOf('/') + 1);
+    const dot = fileName.lastIndexOf('.');
+    return this.parserRegistry.getParserForExtension(
+      dot >= 0 ? fileName.slice(dot + 1) : '',
+    );
   }
 
   // Update settings and update existing parsers with new configuration

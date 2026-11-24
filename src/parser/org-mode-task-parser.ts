@@ -152,6 +152,18 @@ export class OrgModeTaskParser implements ITaskParser {
     return this.tryParseHeadlineTask(line, lineNumber, filePath, [], undefined);
   }
 
+  /** Classify an Org planning line without changing the task parser contract. */
+  getDateLineType(
+    line: string,
+    _taskIndent: string,
+  ): 'scheduled' | 'deadline' | 'closed' | null {
+    const match = line
+      .trimStart()
+      .match(/^(SCHEDULED|DEADLINE|CLOSED):\s*(?:<|\[)/i);
+    if (!match) return null;
+    return match[1].toLowerCase() as 'scheduled' | 'deadline' | 'closed';
+  }
+
   /**
    * Check if a line matches org-mode task pattern.
    */

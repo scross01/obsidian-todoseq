@@ -1,6 +1,8 @@
 import { VaultScanner } from '../src/services/vault-scanner';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { TaskParser } from '../src/parser/task-parser';
+import { OrgModeTaskParser } from '../src/parser/org-mode-task-parser';
+import { getDefaultCoefficients } from '../src/utils/task-urgency';
 import { ParserRegistry } from '../src/parser/parser-registry';
 import {
   createBaseSettings,
@@ -256,6 +258,22 @@ describe('VaultScanner', () => {
       const parser = vaultScanner.getParser();
 
       expect(parser).toBeInstanceOf(TaskParser);
+    });
+
+    it('should resolve a parser from the path extension without scanning', () => {
+      const keywordManager = createTestKeywordManager(settings);
+      const orgParser = OrgModeTaskParser.create(
+        keywordManager,
+        null,
+        getDefaultCoefficients(),
+      );
+      vaultScanner.getParserRegistry().register(orgParser);
+
+      expect(vaultScanner.getParserForPath('folder/note.org')).toBe(orgParser);
+      expect(vaultScanner.getParserForPath('folder/note.md')).toBeInstanceOf(
+        TaskParser,
+      );
+      expect(vaultScanner.getParserForPath('folder/no-extension')).toBeNull();
     });
 
     it('should return null for getParser when no markdown parser registered', () => {

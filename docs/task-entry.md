@@ -601,6 +601,8 @@ When you mark a task with a repeating date as completed (default completed state
 2. The new date is written back to the file
 3. The task is reset to an inactive state (default inactive state, i.e. TODO)
 
+Each date type advances independently. In an Org entry whose SCHEDULED and DEADLINE timestamps share one planning line, only the repeating timestamp changes; a fixed timestamp, its position and the rest of the line are kept. If you edit the occurrence's date or repeater while its rollover is waiting to be written, the rollover stops instead of overwriting your edit.
+
 Tasks with repeating dates display a repeat icon in the task list to indicate they will advance when completed.
 
 ### Inserting dates from the editor
@@ -627,7 +629,7 @@ For first-only warning periods (only affects the first occurrence of a recurring
 SCHEDULED: <2026-06-10 Wed +1w --2d>  # First occurrence delayed 2 days, subsequent weeks on time
 ```
 
-When a recurring task is completed, only the repeating date advances. A one-off date on the same task (for example a repeating `SCHEDULED` with a fixed `DEADLINE`) is left exactly as written. A first-only `--Nd` warning period is removed from the date line when the task rolls to its next occurrence. Rollover resolves the target against the current note, so it follows the task if an edit moved its row. If the target was removed or cannot be identified uniquely, the note is left unchanged rather than advancing a neighboring task.
+When a recurring task is completed, only the repeating date advances. A one-off date on the same task (for example a repeating `SCHEDULED` with a fixed `DEADLINE`) is left exactly as written. A first-only `--Nd` warning period is removed from the date line when the task rolls to its next occurrence. Rollover resolves the target against the current note, so it follows the task if an edit moved its row. That check is repeated after any earlier same-note write finishes, so a queued rollover cannot advance a task that took the old line. Markdown and nested Org headings are read with their registered parser. If the target was removed or cannot be identified uniquely, the note is left unchanged rather than advancing a neighboring task.
 
 #### Behavior by Date Type
 

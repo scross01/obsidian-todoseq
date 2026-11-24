@@ -17,6 +17,11 @@ import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
 import type { DependencyReason } from '../types/task-dependency';
 import { KeywordManager } from '../utils/keyword-manager';
 import { getTaskKey } from '../utils/task-utils';
+import {
+  hasStableTaskIdentity,
+  selectTaskByStableIdentity,
+  taskIdentityMatches,
+} from '../utils/task-identity';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TaskWriter } from './task-writer';
@@ -356,36 +361,19 @@ export class TaskUpdateCoordinator {
     );
 
     const atLine = scoped.filter((candidate) => candidate.line === task.line);
-    if (atLine.length === 1 && this.rowIdentityMatches(atLine[0], task)) {
+    if (atLine.length === 1 && taskIdentityMatches(atLine[0], task)) {
       return atLine[0];
     }
 
-    if (task.id) {
-      const byId = scoped.filter((candidate) => candidate.id === task.id);
-      if (byId.length === 1) return byId[0];
-    }
+    const byIdentity = selectTaskByStableIdentity(scoped, task);
+    if (byIdentity) return byIdentity;
 
-    const anchor = task.embedReference?.replace(/^\^/, '').trim() ?? '';
-    if (anchor) {
-      const byAnchor = scoped.filter(
-        (candidate) =>
-          (candidate.embedReference?.replace(/^\^/, '').trim() ?? '') ===
-            anchor && (task.id ? candidate.id === task.id : true),
-      );
-      if (byAnchor.length === 1) return byAnchor[0];
-    }
+    if (hasStableTaskIdentity(task)) return null;
 
     const byContent = scoped.filter(
-      (candidate) =>
-        candidate.text === task.text && (!task.id || candidate.id === task.id),
+      (candidate) => candidate.text === task.text,
     );
     return byContent.length === 1 ? byContent[0] : null;
-  }
-
-  /** True when the row at this exact line still belongs to the request. */
-  private rowIdentityMatches(candidate: Task, task: Task): boolean {
-    if (task.id || candidate.id) return task.id === candidate.id;
-    return candidate.text === task.text;
   }
 
   /**
@@ -402,7 +390,10 @@ export class TaskUpdateCoordinator {
 
   /** Read the parser's view of the live note, preferring an active editor. */
   private async liveFileTasks(path: string): Promise<Task[] | null> {
-    const parser = this.plugin.vaultScanner?.getParser?.();
+    const scanner = this.plugin.vaultScanner;
+    const parser = scanner?.getParserForPath
+      ? scanner.getParserForPath(path)
+      : scanner?.getParser?.();
     const file = this.plugin.app.vault.getAbstractFileByPath?.(path);
     if (!parser || !(file instanceof TFile)) return null;
 
@@ -424,26 +415,80 @@ export class TaskUpdateCoordinator {
   }
 
   /**
-   * A completion write must use one row for both the dependency gate and the
-   * writer's pre-transition fields. Re-resolve after queued writes, and only
-   * fall back to live content when committed state cannot identify the row.
+   * Re-resolve a queued completion or recurrence against the request's
+   * identity after earlier writes. Recovery, committed state and live content
+   * are all checked with the same verified-row rules; a position alone is not
+   * identity.
    */
-  private async resolveCompletionSourceTask(
+  private async resolveQueuedSourceTask(
     context: ProcessingContext,
-    candidate: Task,
+    identity: Task,
   ): Promise<Task | null> {
-    const committed =
-      context.source === 'editor'
-        ? null
-        : this.selectVerifiedTask(
-            this.taskStateManager.getCommittedTasks(),
-            candidate,
-          );
-    if (committed) return committed;
+    const recovered = this.recoveredFileTasks.get(context.filePath);
+    if (recovered) {
+      return this.selectVerifiedTask(recovered, identity);
+    }
 
-    const live = await this.liveFileTasks(candidate.path);
-    if (!live) return context.source === 'editor' ? candidate : null;
-    return this.selectVerifiedTask(live, candidate);
+    if (context.source !== 'editor') {
+      const committed = this.selectVerifiedTask(
+        this.taskStateManager.getCommittedTasks(),
+        identity,
+      );
+      if (committed) return committed;
+    }
+
+    const live = await this.liveFileTasks(identity.path);
+    if (!live) return context.source === 'editor' ? identity : null;
+    return this.selectVerifiedTask(live, identity);
+  }
+
+  /**
+   * The queued recurrence payload describes one occurrence. If the live row's
+   * date or repeater changed while it waited, rolling it would overwrite the
+   * user's edit or restore an obsolete repeater.
+   */
+  private recurrencePlanningInputMatches(
+    context: ProcessingContext,
+    sourceTask: Task,
+  ): boolean {
+    if (context.type !== 'recurrence') return true;
+    if (
+      context.newScheduledDate !== undefined &&
+      (!this.sameDate(sourceTask.scheduledDate, context.task.scheduledDate) ||
+        !this.sameRepeat(
+          sourceTask.scheduledDateRepeat,
+          context.task.scheduledDateRepeat,
+        ))
+    ) {
+      return false;
+    }
+    if (
+      context.newDeadlineDate !== undefined &&
+      (!this.sameDate(sourceTask.deadlineDate, context.task.deadlineDate) ||
+        !this.sameRepeat(
+          sourceTask.deadlineDateRepeat,
+          context.task.deadlineDateRepeat,
+        ))
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  private sameDate(a: Date | null, b: Date | null): boolean {
+    if (a === null || b === null) return a === b;
+    return a.getTime() === b.getTime();
+  }
+
+  private sameRepeat(
+    a: DateRepeatInfo | null,
+    b: DateRepeatInfo | null,
+  ): boolean {
+    if (a === null || b === null) return a === b;
+    // The note may spell the same interval with a different repeat type
+    // (e.g. a fixture or a converted `. +`/`+` spelling). The occurrence is
+    // still the same if its interval and unit agree.
+    return a.unit === b.unit && a.value === b.value;
   }
 
   /** True when this request would move an incomplete task to completion. */
@@ -918,16 +963,14 @@ export class TaskUpdateCoordinator {
    * Resolve the stored task from the state manager, with content-based fallback.
    * Used for non-editor sources where the line number may have shifted.
    */
-  private resolveStoredTask(context: ProcessingContext): Task {
+  private resolveStoredTask(context: ProcessingContext): Task | null {
     const recovered = this.recoveredFileTasks.get(context.filePath);
     if (recovered) {
-      const match = recovered.find(
-        (task) =>
-          task.line === context.task.line &&
-          (task.tableCell?.cellIndex ?? null) ===
-            (context.task.tableCell?.cellIndex ?? null),
-      );
+      const match = this.selectVerifiedTask(recovered, context.task);
       if (match) return match;
+      // Recovery is persisted truth. If it cannot identify the request, a
+      // position alone must not substitute whatever now occupies the line.
+      return null;
     }
 
     const cellIndex = context.task.tableCell?.cellIndex;
@@ -974,6 +1017,13 @@ export class TaskUpdateCoordinator {
         context.source === 'editor'
           ? context.task
           : this.resolveStoredTask(context);
+      if (!currentTask) {
+        await this.recoverPersistedTasks(context, generation);
+        return {
+          status: 'failed',
+          reason: 'Could not verify the task row before writing.',
+        };
+      }
 
       // The sync phase's optimisticUpdate already replaced the stored task
       // with target-state values (state/completed flipped for instant UI
@@ -984,11 +1034,14 @@ export class TaskUpdateCoordinator {
         !!context.originalNewState &&
         context.source !== 'archive-undo' &&
         this.keywordManager.isCompleted(context.originalNewState);
+      const recurrenceRequest = context.type === 'recurrence';
 
-      if (completionRequest) {
-        const sourceTask = await this.resolveCompletionSourceTask(
+      if (completionRequest || recurrenceRequest) {
+        // Identity comes from the original request, never from a row that a
+        // previous write or recovery left at the captured position.
+        const sourceTask = await this.resolveQueuedSourceTask(
           context,
-          currentTask,
+          context.task,
         );
         if (!sourceTask) {
           await this.recoverPersistedTasks(context, generation);
@@ -1009,6 +1062,16 @@ export class TaskUpdateCoordinator {
           completed: sourceTask.completed,
           closedDate: sourceTask.closedDate,
         };
+        if (
+          recurrenceRequest &&
+          !this.recurrencePlanningInputMatches(context, sourceTask)
+        ) {
+          await this.recoverPersistedTasks(context, generation, currentTask);
+          return {
+            status: 'failed',
+            reason: 'Recurrence input changed before writing.',
+          };
+        }
       } else if (context.originalSourceState) {
         // The file write must classify non-completion transitions from the
         // PRE-transition values captured before the optimistic rewrite.
@@ -1206,6 +1269,24 @@ export class TaskUpdateCoordinator {
             task.deadlineWarningPeriod,
           ),
           newState: context.newStateForRecurrence,
+          expectedRecurrence: {
+            scheduledDate:
+              context.newScheduledDate !== undefined
+                ? context.task.scheduledDate
+                : undefined,
+            scheduledDateRepeat:
+              context.newScheduledDate !== undefined
+                ? context.task.scheduledDateRepeat
+                : undefined,
+            deadlineDate:
+              context.newDeadlineDate !== undefined
+                ? context.task.deadlineDate
+                : undefined,
+            deadlineDateRepeat:
+              context.newDeadlineDate !== undefined
+                ? context.task.deadlineDateRepeat
+                : undefined,
+          },
         });
       }
 

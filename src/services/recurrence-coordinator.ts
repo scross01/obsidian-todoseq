@@ -9,6 +9,11 @@
 
 import { Task, WarningPeriodInfo } from '../types/task';
 import { getTaskKey } from '../utils/task-utils';
+import {
+  hasStableTaskIdentity,
+  selectTaskByStableIdentity,
+  taskIdentityMatches,
+} from '../utils/task-identity';
 import { TaskStateManager } from './task-state-manager';
 import { TaskUpdateCoordinator } from './task-update-coordinator';
 import { App, TFile } from 'obsidian';
@@ -49,7 +54,7 @@ export interface RecurrenceDateLineParser {
     indent: string,
   ) => 'scheduled' | 'deadline' | 'closed' | null;
   /** Full-note parse used to prove which live row the recurrence targets. */
-  parseFile?: (content: string, path: string) => Task[];
+  parseFile?: (content: string, path: string, file?: TFile) => Task[];
 }
 
 /**
@@ -320,38 +325,23 @@ export class RecurrenceCoordinator {
     const atLine = candidates.filter(
       (candidate) => candidate.line === task.line,
     );
-    if (atLine.length === 1) {
-      const candidate = atLine[0];
-      const sameIdentity =
-        task.id || candidate.id
-          ? task.id === candidate.id
-          : candidate.text === task.text;
-      const sameTextCount = candidates.filter(
-        (other) => other.text === task.text,
-      ).length;
-      if (sameIdentity && (task.id !== undefined || sameTextCount === 1)) {
-        return candidate;
-      }
+    if (
+      atLine.length === 1 &&
+      taskIdentityMatches(atLine[0], task) &&
+      (hasStableTaskIdentity(task) ||
+        candidates.filter((candidate) => candidate.text === task.text)
+          .length === 1)
+    ) {
+      return atLine[0];
     }
 
-    if (task.id) {
-      const byId = candidates.filter((candidate) => candidate.id === task.id);
-      if (byId.length === 1) return byId[0];
-    }
+    const byIdentity = selectTaskByStableIdentity(candidates, task);
+    if (byIdentity) return byIdentity;
 
-    const anchor = task.embedReference?.replace(/^\^/, '').trim() ?? '';
-    if (anchor) {
-      const byAnchor = candidates.filter(
-        (candidate) =>
-          (candidate.embedReference?.replace(/^\^/, '').trim() ?? '') ===
-            anchor && (task.id ? candidate.id === task.id : true),
-      );
-      if (byAnchor.length === 1) return byAnchor[0];
-    }
+    if (hasStableTaskIdentity(task)) return null;
 
     const byText = candidates.filter(
-      (candidate) =>
-        candidate.text === task.text && (!task.id || candidate.id === task.id),
+      (candidate) => candidate.text === task.text,
     );
     return byText.length === 1 ? byText[0] : null;
   }
@@ -370,7 +360,11 @@ export class RecurrenceCoordinator {
       (candidate.tableCell?.cellIndex ?? null) ===
         (task.tableCell?.cellIndex ?? null);
 
-    const parsed = parser.parseFile?.(content, task.path);
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    const parsed =
+      file instanceof TFile
+        ? parser.parseFile?.(content, task.path, file)
+        : parser.parseFile?.(content, task.path);
     if (parsed) {
       return this.selectCurrentTask(parsed.filter(scope), task);
     }
@@ -381,6 +375,7 @@ export class RecurrenceCoordinator {
     );
     if (stored) return stored;
 
+    if (hasStableTaskIdentity(task)) return null;
     const capturedLine = content.split('\n')[task.line] ?? '';
     return this.lineMatchesCapturedTask(capturedLine, task) ? task : null;
   }
@@ -418,12 +413,18 @@ export class RecurrenceCoordinator {
             getPlugin: (id: string) => {
               vaultScanner?: {
                 getParser: () => RecurrenceDateLineParser | null;
+                getParserForPath?: (
+                  path: string,
+                ) => RecurrenceDateLineParser | null;
               } | null;
             } | null;
           };
         }
       ).plugins.getPlugin('todoseq');
-      const parser = vaultScanner?.vaultScanner?.getParser();
+      const scanner = vaultScanner?.vaultScanner;
+      const parser = scanner?.getParserForPath
+        ? scanner.getParserForPath(task.path)
+        : scanner?.getParser();
 
       if (!parser) {
         return {
@@ -496,18 +497,33 @@ export class RecurrenceCoordinator {
       // Use TaskUpdateCoordinator to update the task
       // This ensures all updates go through the unified flow
       // Warning periods are determined here (preserves -Nd, strips --Nd)
-      await this.taskUpdateCoordinator.updateTaskRecurrence(taskForUpdate, {
-        // undefined means "this date is unchanged" and null means "delete";
-        // the writer relies on that distinction, so never coerce one to the
-        // other when forwarding the calculation result.
-        newScheduledDate: dateResult.newScheduledDate,
-        newDeadlineDate: dateResult.newDeadlineDate,
-        newScheduledRepeat: taskForUpdate.scheduledDateRepeat,
-        newDeadlineRepeat: taskForUpdate.deadlineDateRepeat,
-        newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod,
-        newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod,
-        newStateForRecurrence: defaultInactive,
-      });
+      const outcome = await this.taskUpdateCoordinator.updateTaskRecurrence(
+        taskForUpdate,
+        {
+          // undefined means "this date is unchanged" and null means "delete";
+          // the writer relies on that distinction, so never coerce one to the
+          // other when forwarding the calculation result.
+          newScheduledDate: dateResult.newScheduledDate,
+          newDeadlineDate: dateResult.newDeadlineDate,
+          newScheduledRepeat: taskForUpdate.scheduledDateRepeat,
+          newDeadlineRepeat: taskForUpdate.deadlineDateRepeat,
+          newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod,
+          newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod,
+          newStateForRecurrence: defaultInactive,
+        },
+      );
+
+      if (outcome.status !== 'applied') {
+        return {
+          success: false,
+          error:
+            outcome.status === 'failed'
+              ? (outcome.reason ?? 'Recurrence update failed')
+              : outcome.status === 'refused'
+                ? 'Recurrence update was refused'
+                : 'Task not found for recurrence update',
+        };
+      }
 
       return {
         success: true,

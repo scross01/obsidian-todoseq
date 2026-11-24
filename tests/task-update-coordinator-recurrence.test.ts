@@ -391,6 +391,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
       };
 
+      taskStateManager.setTasks([task]);
       const newScheduledDate = new Date('2026-03-17');
 
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
@@ -411,6 +412,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         scheduledDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
       };
 
+      taskStateManager.setTasks([task]);
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
         newScheduledDate: null,
       });
@@ -429,6 +431,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
       };
 
+      taskStateManager.setTasks([task]);
       const newDeadlineDate = new Date('2026-03-17');
 
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
@@ -449,6 +452,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
       };
 
+      taskStateManager.setTasks([task]);
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
         newDeadlineDate: null,
       });
@@ -466,6 +470,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         state: 'DONE',
       };
 
+      taskStateManager.setTasks([task]);
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
         newStateForRecurrence: 'TODO',
       });
@@ -487,7 +492,9 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         deadlineDateRepeat: { type: '+', unit: 'w', value: 1, raw: '+1w' },
       };
 
+      taskStateManager.setTasks([task]);
       const newScheduledDate = new Date('2026-03-17');
+      taskStateManager.setTasks([task]);
       const newDeadlineDate = new Date('2026-03-17');
       const newStateForRecurrence = 'TODO';
 
@@ -524,6 +531,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: true },
       };
 
+      taskStateManager.setTasks([task]);
       const newScheduledDate = new Date('2026-03-17');
 
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
@@ -547,6 +555,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         deadlineWarningPeriod: { value: 5, unit: 'd', isFirstOnly: true },
       };
 
+      taskStateManager.setTasks([task]);
       const newDeadlineDate = new Date('2026-03-17');
 
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
@@ -570,6 +579,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: true },
       };
 
+      taskStateManager.setTasks([task]);
       const newScheduledDate = new Date('2026-03-17');
 
       // Don't pass newScheduledWarningPeriod (undefined)
@@ -598,6 +608,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: true },
       };
 
+      taskStateManager.setTasks([task]);
       const newScheduledDate = new Date('2026-03-17');
 
       await taskUpdateCoordinator.updateTaskRecurrence(task, {
@@ -625,6 +636,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         deadlineWarningPeriod: { value: 5, unit: 'd', isFirstOnly: true },
       };
 
+      taskStateManager.setTasks([task]);
       const newDeadlineDate = new Date('2026-03-17');
 
       // Don't pass newDeadlineWarningPeriod (undefined)
@@ -653,6 +665,7 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
         scheduledWarningPeriod: { value: 3, unit: 'd', isFirstOnly: false },
       };
 
+      taskStateManager.setTasks([task]);
       const newScheduledDate = new Date('2026-03-17');
 
       await taskUpdateCoordinator.updateTaskRecurrence(task, {

@@ -80,7 +80,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       {},
     );
     mockUpdateCoordinator = {
-      updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      updateTaskRecurrence: jest.fn().mockResolvedValue({ status: 'applied' }),
     };
     coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator);
   });
@@ -146,6 +146,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(mockParser.parseFile).toHaveBeenCalledWith(
       '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
       'test.md',
+      mockFile,
     );
     expect(mockUpdateCoordinator.updateTaskRecurrence).toHaveBeenCalledTimes(1);
     const [passedTask, _options] =
