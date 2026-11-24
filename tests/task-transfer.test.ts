@@ -27,14 +27,21 @@ interface Harness {
   file: (path: string) => TFile;
 }
 
-function harness(files: Record<string, string>): Harness {
+function harness(
+  files: Record<string, string>,
+  unreadable: string[] = [],
+): Harness {
   const store = new Map(Object.entries(files));
+  const read = async (file: TFile): Promise<string> => {
+    if (unreadable.includes(file.path)) throw new Error('unreadable');
+    return store.get(file.path) ?? '';
+  };
   const app = {
     vault: {
       getAbstractFileByPath: (path: string) =>
         store.has(path) ? new MemoryFile(path) : null,
-      read: async (file: TFile) => store.get(file.path) ?? '',
-      cachedRead: async (file: TFile) => store.get(file.path) ?? '',
+      read,
+      cachedRead: read,
       getFiles: () => [...store.keys()].map((path) => new MemoryFile(path)),
       process: async (file: TFile, fn: (data: string) => string) => {
         const next = fn(store.get(file.path) ?? '');
@@ -640,6 +647,41 @@ describe('TaskWriter transfer reference repair', () => {
     expect(reports[0].applied).toBe(1);
     expect(h.store.get('notes/broken.md')).toBe('B [[notes/today#^water]]');
     expect(h.writer.hasPendingReferenceRepairs()).toBe(false);
+  });
+
+  it('applies readable repairs when another note cannot be scanned or written', async () => {
+    const h = harness(
+      {
+        [SOURCE]: ANCHORED_SOURCE,
+        [DEST]: '',
+        'notes/a.md': 'A [[notes/source#^water]]',
+        'notes/locked.md': 'B [[notes/source#^water]]',
+        'notes/unreadable.md': 'C [[notes/source#^water]]',
+      },
+      ['notes/unreadable.md'],
+    );
+    const app = (h.writer as unknown as { plugin: { app: App } }).plugin.app;
+    const originalProcess = app.vault.process;
+    app.vault.process = async (file: TFile, fn: (data: string) => string) => {
+      if (file.path === 'notes/locked.md') throw new Error('locked');
+      return originalProcess(file, fn);
+    };
+
+    try {
+      const result = await h.writer.transferTask(
+        anchoredTask(),
+        h.file(DEST),
+        'move',
+      );
+
+      expect(result.status).toBe('partial-references');
+      expect(result.reason).toContain('notes/unreadable.md');
+      expect(h.store.get('notes/a.md')).toBe('A [[notes/today#^water]]');
+      expect(h.store.get('notes/locked.md')).toBe('B [[notes/source#^water]]');
+      expect(h.writer.hasPendingReferenceRepairs()).toBe(true);
+    } finally {
+      app.vault.process = originalProcess;
+    }
   });
 
   it('repairs references to nested anchors after a move', async () => {
