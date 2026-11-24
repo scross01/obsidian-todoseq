@@ -109,6 +109,7 @@ describe('queued recovery', () => {
   let task: Task;
   let persisted: Task;
   let reconcile: jest.Mock;
+  let published: boolean[];
   let priorityWrite: jest.Mock;
 
   beforeEach(() => {
@@ -131,13 +132,17 @@ describe('queued recovery', () => {
     });
     manager.setTasks([task]);
 
+    published = [];
     reconcile = jest.fn(
       async (
         _path: string,
         _file: TFile | null,
-        publish: boolean,
+        publish: boolean | (() => boolean),
       ): Promise<Task[]> => {
-        if (publish) manager.setTasks([persisted]);
+        const shouldPublish =
+          typeof publish === 'function' ? publish() : publish;
+        published.push(shouldPublish);
+        if (shouldPublish) manager.setTasks([persisted]);
         return [persisted];
       },
     );
@@ -192,7 +197,8 @@ describe('queued recovery', () => {
 
     expect(reconcile).toHaveBeenCalledTimes(1);
     expect(reconcile.mock.calls[0][0]).toBe('note.md');
-    expect(reconcile.mock.calls[0][2]).toBe(true);
+    expect(typeof reconcile.mock.calls[0][2]).toBe('function');
+    expect(published).toEqual([true]);
     expect(manager.getTasks()[0].state).toBe('TODO');
   });
 
@@ -205,7 +211,8 @@ describe('queued recovery', () => {
 
     // The newer request owned the file, so the older failure supplied a
     // baseline without publishing over the optimistic DONE state.
-    expect(reconcile.mock.calls[0][2]).toBe(false);
+    expect(typeof reconcile.mock.calls[0][2]).toBe('function');
+    expect(published).toEqual([false]);
     expect(priorityWrite).toHaveBeenCalledTimes(1);
     expect(priorityWrite.mock.calls[0][0].state).toBe('TODO');
   });

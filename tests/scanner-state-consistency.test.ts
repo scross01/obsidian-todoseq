@@ -362,6 +362,66 @@ describe('scanner state consistency', () => {
       ).toBe(false);
     });
 
+    it('keeps a newer projection while recovery commits persisted truth', async () => {
+      const fileA = addFile('a.md', 'TODO a');
+      addFile('b.md', 'TODO b');
+      await scanner.scanVault();
+      const taskA = taskStateManager
+        .getTasks()
+        .find((task) => task.path === 'a.md');
+      const pendingA = deferred<string>();
+      cachedReadHook = (file) =>
+        file.path === 'a.md' ? pendingA.promise : undefined;
+
+      let ownsFile = true;
+      const recovery = scanner.reconcileFileAfterFailedWrite(
+        'a.md',
+        fileA,
+        () => ownsFile,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      taskStateManager.optimisticUpdate(taskA!, 'DONE');
+      taskStateManager.optimisticUpdate(taskA!, 'DOING');
+      ownsFile = false;
+
+      pendingA.resolve('TODO a');
+      const recovered = await recovery;
+
+      expect(recovered?.[0]?.state).toBe('TODO');
+      expect(
+        taskStateManager.getTasks().find((task) => task.path === 'a.md')?.state,
+      ).toBe('DOING');
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((task) => task.path === 'a.md')?.state,
+      ).toBe('TODO');
+    });
+
+    it('publishes recovery visibly when no successor owns the file', async () => {
+      const fileA = addFile('a.md', 'TODO a');
+      await scanner.scanVault();
+      const taskA = taskStateManager.getTasks()[0];
+      taskStateManager.optimisticUpdate(taskA, 'DONE');
+      content.set('a.md', 'TODO a');
+
+      const recovered = await scanner.reconcileFileAfterFailedWrite(
+        'a.md',
+        fileA,
+        () => true,
+      );
+
+      expect(recovered?.[0]?.state).toBe('TODO');
+      expect(
+        taskStateManager.getTasks().find((task) => task.path === 'a.md')?.state,
+      ).toBe('TODO');
+      expect(
+        taskStateManager
+          .getCommittedTasks()
+          .find((task) => task.path === 'a.md')?.state,
+      ).toBe('TODO');
+    });
+
     it('keeps a file created after enumeration when it is published', async () => {
       addFile('a.md', 'TODO a');
       const pendingA = deferred<string>();

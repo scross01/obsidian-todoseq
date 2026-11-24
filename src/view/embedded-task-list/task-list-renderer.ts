@@ -153,6 +153,7 @@ export class EmbeddedTaskListRenderer {
           this.plugin.taskEditor,
           failed,
           result.unreadablePaths,
+          result.referenceDiscoveryFailed,
         );
         break;
       }

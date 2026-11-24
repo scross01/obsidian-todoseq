@@ -313,7 +313,12 @@ export class TaskDragDropHandler {
           (total, report) => total + report.failed.length,
           0,
         ) ?? 0;
-      showReferenceRepairNotice(writer, failed, result.unreadablePaths);
+      showReferenceRepairNotice(
+        writer,
+        failed,
+        result.unreadablePaths,
+        result.referenceDiscoveryFailed,
+      );
       return;
     }
     if (result.status !== 'success') {

@@ -48,6 +48,8 @@ export interface RecurrenceDateLineParser {
     line: string,
     indent: string,
   ) => 'scheduled' | 'deadline' | 'closed' | null;
+  /** Full-note parse used to prove which live row the recurrence targets. */
+  parseFile?: (content: string, path: string) => Task[];
 }
 
 /**
@@ -310,44 +312,77 @@ export class RecurrenceCoordinator {
     return normalizeCheckbox(line) === normalizeCheckbox(task.rawText);
   }
 
-  /** Resolve the live row by identity, then by stable text, before line. */
-  private resolveCurrentTask(task: Task): Task | null {
-    const candidates = (this.taskStateManager.getTasks() ?? []).filter(
-      (candidate) =>
-        candidate.path === task.path &&
-        (candidate.tableCell?.cellIndex ?? null) ===
-          (task.tableCell?.cellIndex ?? null),
+  /** Select one live row, requiring uniqueness when identity is absent. */
+  private selectCurrentTask(
+    candidates: readonly Task[],
+    task: Task,
+  ): Task | null {
+    const atLine = candidates.filter(
+      (candidate) => candidate.line === task.line,
     );
+    if (atLine.length === 1) {
+      const candidate = atLine[0];
+      const sameIdentity =
+        task.id || candidate.id
+          ? task.id === candidate.id
+          : candidate.text === task.text;
+      const sameTextCount = candidates.filter(
+        (other) => other.text === task.text,
+      ).length;
+      if (sameIdentity && (task.id !== undefined || sameTextCount === 1)) {
+        return candidate;
+      }
+    }
 
     if (task.id) {
-      const byId = candidates.find((candidate) => candidate.id === task.id);
-      if (byId) return byId;
+      const byId = candidates.filter((candidate) => candidate.id === task.id);
+      if (byId.length === 1) return byId[0];
     }
 
     const anchor = task.embedReference?.replace(/^\^/, '').trim() ?? '';
     if (anchor) {
-      const byAnchor = candidates.find(
+      const byAnchor = candidates.filter(
         (candidate) =>
           (candidate.embedReference?.replace(/^\^/, '').trim() ?? '') ===
-          anchor,
+            anchor && (task.id ? candidate.id === task.id : true),
       );
-      if (byAnchor) return byAnchor;
-    }
-
-    const atLine = this.taskStateManager.findTaskByPathAndLine(
-      task.path,
-      task.line,
-      task.tableCell?.cellIndex,
-    );
-    if (atLine) {
-      const sameIdentity = task.id || atLine.id ? task.id === atLine.id : true;
-      if (sameIdentity) return atLine;
+      if (byAnchor.length === 1) return byAnchor[0];
     }
 
     const byText = candidates.filter(
-      (candidate) => candidate.text === task.text,
+      (candidate) =>
+        candidate.text === task.text && (!task.id || candidate.id === task.id),
     );
     return byText.length === 1 ? byText[0] : null;
+  }
+
+  /**
+   * Resolve the live row. A parser without full-note parsing is a compatibility
+   * fixture only; production parsers always provide parseFile.
+   */
+  private resolveCurrentTask(
+    task: Task,
+    content: string,
+    parser: RecurrenceDateLineParser,
+  ): Task | null {
+    const scope = (candidate: Task): boolean =>
+      candidate.path === task.path &&
+      (candidate.tableCell?.cellIndex ?? null) ===
+        (task.tableCell?.cellIndex ?? null);
+
+    const parsed = parser.parseFile?.(content, task.path);
+    if (parsed) {
+      return this.selectCurrentTask(parsed.filter(scope), task);
+    }
+
+    const stored = this.selectCurrentTask(
+      (this.taskStateManager.getTasks() ?? []).filter(scope),
+      task,
+    );
+    if (stored) return stored;
+
+    const capturedLine = content.split('\n')[task.line] ?? '';
+    return this.lineMatchesCapturedTask(capturedLine, task) ? task : null;
   }
 
   /**
@@ -397,10 +432,17 @@ export class RecurrenceCoordinator {
         };
       }
 
+      if (!parser.parseFile && task.line >= lines.length) {
+        return {
+          success: false,
+          error: 'Task line out of bounds',
+        };
+      }
+
       // Rapid cycling inside the 50 ms recurrence window can stale the closure
       // snapshot, and a queued same-file edit can move the row. Resolve by
       // identity or content before writing, keeping the trigger's date fields.
-      const storedTask = this.resolveCurrentTask(task);
+      const storedTask = this.resolveCurrentTask(task, content, parser);
       let taskForUpdate: Task = task;
       if (
         storedTask &&
@@ -432,12 +474,9 @@ export class RecurrenceCoordinator {
         };
       }
 
-      if (
-        !storedTask &&
-        !this.lineMatchesCapturedTask(lines[task.line] ?? '', task)
-      ) {
-        // Without an identity match, never write at a line that now holds a
-        // different row. Failing here is safer than advancing a sibling.
+      if (!storedTask) {
+        // Never write at a captured line when the live note cannot prove the
+        // target. Failing here is safer than advancing a sibling.
         return {
           success: false,
           error: 'Task moved before recurrence update',

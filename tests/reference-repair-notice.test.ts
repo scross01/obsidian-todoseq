@@ -56,4 +56,45 @@ describe('reference repair notice', () => {
       notices[0].messageEl.querySelector('.todoseq-notice-action-btn'),
     ).not.toBeNull();
   });
+
+  it('explains a complete discovery failure without offering an edit retry', () => {
+    showReferenceRepairNotice(
+      { retryPendingReferenceRepairs: jest.fn() } as never,
+      0,
+      [],
+      true,
+    );
+
+    expect(notices[0].messageEl.textContent).toContain(
+      'References could not be scanned for repair.',
+    );
+    expect(
+      notices[0].messageEl.querySelector('.todoseq-notice-action-btn'),
+    ).toBeNull();
+  });
+
+  it('keeps a discovery failure after known edits are retried successfully', async () => {
+    const retry = jest.fn().mockResolvedValue([]);
+    showReferenceRepairNotice(
+      { retryPendingReferenceRepairs: retry } as never,
+      1,
+      [],
+      true,
+    );
+
+    const button = notices[0].messageEl.querySelector<HTMLButtonElement>(
+      '.todoseq-notice-action-btn',
+    );
+    button?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(notices).toHaveLength(2);
+    expect(notices[1].messageEl.textContent).toContain(
+      'References could not be scanned for repair.',
+    );
+    expect(
+      notices[1].messageEl.querySelector('.todoseq-notice-action-btn'),
+    ).toBeNull();
+  });
 });

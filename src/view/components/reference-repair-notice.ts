@@ -11,6 +11,7 @@ export function showReferenceRepairNotice(
   writer: TaskWriter | null,
   failed: number,
   unreadablePaths: readonly string[] = [],
+  referenceDiscoveryFailed = false,
 ): void {
   const notice = new Notice('', 0);
   const row = notice.messageEl.createDiv({
@@ -24,6 +25,9 @@ export function showReferenceRepairNotice(
     messages.push(
       `${unreadablePaths.join(', ')} could not be scanned for references.`,
     );
+  }
+  if (referenceDiscoveryFailed) {
+    messages.push('References could not be scanned for repair.');
   }
   row.createSpan({
     cls: 'todoseq-notice-message',
@@ -44,10 +48,19 @@ export function showReferenceRepairNotice(
         (total, report) => total + report.failed.length,
         0,
       );
-      if (remaining === 0 && unreadablePaths.length === 0) {
+      if (
+        remaining === 0 &&
+        unreadablePaths.length === 0 &&
+        !referenceDiscoveryFailed
+      ) {
         new Notice('Task reference links repaired');
       } else {
-        showReferenceRepairNotice(writer, remaining, unreadablePaths);
+        showReferenceRepairNotice(
+          writer,
+          remaining,
+          unreadablePaths,
+          referenceDiscoveryFailed,
+        );
       }
     })();
   });

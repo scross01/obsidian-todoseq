@@ -367,8 +367,10 @@ describe('TaskUpdateCoordinator - Recurrence Update Behavior', () => {
 
       it('still rolls forward for a normal completion', async () => {
         // The guard must be specific to the undo, not a blanket disable.
+        const recurring = recurringDone();
+        taskStateManager.setTasks([recurring]);
         await taskUpdateCoordinator.updateTaskState(
-          recurringDone(),
+          recurring,
           'DONE',
           'task-list',
         );

@@ -402,6 +402,91 @@ describe('blocked completion enforcement', () => {
     coordinator.destroy();
   });
 
+  it('rechecks completion after a queued reopen commits', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    const completed = {
+      ...blocked,
+      rawText: 'TODO Blocked',
+      state: 'DONE',
+      completed: true,
+    };
+    state.setTasks([
+      { ...blocker, state: 'TODO', completed: false },
+      completed,
+    ]);
+
+    let releaseReopen = (): void => {};
+    const reopenGate = new Promise<void>((resolve) => {
+      releaseReopen = resolve;
+    });
+    let call = 0;
+    writer.updateTaskState.mockImplementation(
+      async (task: Task, newState: string) => {
+        call += 1;
+        if (call === 1) await reopenGate;
+        return {
+          ...task,
+          rawText: task.rawText.replace(/TODO|DONE/, newState),
+          state: newState,
+          completed: newState === 'DONE',
+        };
+      },
+    );
+
+    const reopen = coordinator.updateTaskState(completed, 'TODO', 'task-list');
+    const completion = coordinator.updateTaskState(
+      {
+        ...completed,
+        rawText: 'TODO Blocked',
+        state: 'TODO',
+        completed: false,
+      },
+      'DONE',
+      'task-list',
+    );
+    releaseReopen();
+
+    await expect(reopen).resolves.toEqual({ status: 'applied' });
+    await expect(completion).resolves.toMatchObject({ status: 'refused' });
+    expect(writer.updateTaskState).toHaveBeenCalledTimes(1);
+    expect(state.findTaskByPathAndLine('blocked.md', 0)?.state).toBe('TODO');
+    coordinator.destroy();
+  });
+
+  it('does not authorize against a completed duplicate with the same ID', async () => {
+    const { blocked, blocker, coordinator, state, writer } = createFixture();
+    const completedDuplicate = {
+      ...blocked,
+      line: 0,
+      rawText: 'TODO Blocked',
+      state: 'DONE',
+      completed: true,
+    };
+    const blockedRow = {
+      ...blocked,
+      line: 1,
+      rawText: 'TODO Blocked',
+      state: 'TODO',
+      completed: false,
+    };
+    state.setTasks([
+      { ...blocker, state: 'TODO', completed: false },
+      completedDuplicate,
+      blockedRow,
+    ]);
+
+    const outcome = await coordinator.updateTaskState(
+      blockedRow,
+      'DONE',
+      'task-list',
+    );
+
+    expect(outcome.status).toBe('refused');
+    expect(writer.updateTaskState).not.toHaveBeenCalled();
+    expect(state.findTaskByPathAndLine('blocked.md', 1)?.state).toBe('TODO');
+    coordinator.destroy();
+  });
+
   it('does not authorize against a different row at the same line', () => {
     const { blocked, blocker, coordinator, state } = createFixture();
     const other = createBaseTask({

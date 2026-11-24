@@ -71,6 +71,8 @@ export interface TaskTransferResult {
   referenceRepairs?: TaskReferenceRepairReport[];
   /** Notes discovery could not read; no edit exists for these paths yet. */
   unreadablePaths?: string[];
+  /** Reference discovery failed as a whole, so no edit retry exists. */
+  referenceDiscoveryFailed?: boolean;
 }
 
 export interface DateLineUpdateResult {
@@ -1226,6 +1228,7 @@ export class TaskWriter {
         status: 'partial-references',
         reason:
           'The task was transferred, but its references could not be scanned.',
+        referenceDiscoveryFailed: true,
       };
     }
     const outcome = await this.applyReferenceEdits(scan.edits);

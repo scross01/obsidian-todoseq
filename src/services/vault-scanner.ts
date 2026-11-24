@@ -538,13 +538,15 @@ export class VaultScanner
   async reconcileFileAfterFailedWrite(
     filePath: string,
     file: TFile | null,
-    publish: boolean,
+    publish: boolean | (() => boolean),
   ): Promise<Task[] | null> {
+    const shouldPublish = (): boolean =>
+      typeof publish === 'function' ? publish() : publish;
     if (this.isExcluded(filePath)) {
       return null;
     }
     if (file === null) {
-      if (!publish) return null;
+      if (!shouldPublish()) return null;
       const updatedTasks = this.taskStateManager
         .getTasks()
         .filter((task) => task.path !== filePath);
@@ -559,7 +561,7 @@ export class VaultScanner
         (task) => !this.keywordManager.isArchived(task.state),
       );
 
-      if (publish) {
+      if (shouldPublish()) {
         const currentTasks = this.taskStateManager.getTasks();
         const updatedTasks = currentTasks.filter(
           (task) => task.path !== file.path,
@@ -568,6 +570,12 @@ export class VaultScanner
         updatedTasks.sort(taskComparator);
         this.taskStateManager.setTasksForPaths(updatedTasks, [filePath]);
         this.emit('tasks-changed', updatedTasks);
+      } else {
+        // A successor owns the visible projection. Still commit persisted
+        // truth so dependency checks and queued resolution see the write.
+        this.taskStateManager.setCommittedTasksForPaths(nonArchivedTasks, [
+          filePath,
+        ]);
       }
 
       return nonArchivedTasks;

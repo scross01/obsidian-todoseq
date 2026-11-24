@@ -88,6 +88,21 @@ export class TaskStateManager {
   }
 
   /**
+   * Advance committed truth for specific paths without replacing a newer
+   * visible projection. Used when a failed-write recovery finishes after a
+   * successor request has taken over the file.
+   */
+  setCommittedTasksForPaths(tasks: Task[], paths: Iterable<string>): void {
+    const replacedPaths = new Set(paths);
+    this._committedTasks = [
+      ...this._committedTasks.filter((task) => !replacedPaths.has(task.path)),
+      ...tasks.filter((task) => replacedPaths.has(task.path)),
+    ];
+    this._committedRevision++;
+    this.notifySubscribers();
+  }
+
+  /**
    * Publish a scanner result while retaining committed rows for paths whose
    * writes were in flight during the scan.
    */

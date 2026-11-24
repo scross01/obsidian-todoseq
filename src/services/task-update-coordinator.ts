@@ -340,38 +340,110 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Resolve one persisted row without trusting an optimistic projection.
+   * The exact line/cell wins when its identity agrees; otherwise identity and
+   * content relocation must be unique. Ambiguity is not a guess.
+   */
+  private selectVerifiedTask(
+    candidates: readonly Task[],
+    task: Task,
+  ): Task | null {
+    const scoped = candidates.filter(
+      (candidate) =>
+        candidate.path === task.path &&
+        (candidate.tableCell?.cellIndex ?? null) ===
+          (task.tableCell?.cellIndex ?? null),
+    );
+
+    const atLine = scoped.filter((candidate) => candidate.line === task.line);
+    if (atLine.length === 1 && this.rowIdentityMatches(atLine[0], task)) {
+      return atLine[0];
+    }
+
+    if (task.id) {
+      const byId = scoped.filter((candidate) => candidate.id === task.id);
+      if (byId.length === 1) return byId[0];
+    }
+
+    const anchor = task.embedReference?.replace(/^\^/, '').trim() ?? '';
+    if (anchor) {
+      const byAnchor = scoped.filter(
+        (candidate) =>
+          (candidate.embedReference?.replace(/^\^/, '').trim() ?? '') ===
+            anchor && (task.id ? candidate.id === task.id : true),
+      );
+      if (byAnchor.length === 1) return byAnchor[0];
+    }
+
+    const byContent = scoped.filter(
+      (candidate) =>
+        candidate.text === task.text && (!task.id || candidate.id === task.id),
+    );
+    return byContent.length === 1 ? byContent[0] : null;
+  }
+
+  /** True when the row at this exact line still belongs to the request. */
+  private rowIdentityMatches(candidate: Task, task: Task): boolean {
+    if (task.id || candidate.id) return task.id === candidate.id;
+    return candidate.text === task.text;
+  }
+
+  /**
    * Resolve the persisted row that a request targets. Optimistic projections
    * change completed/rawText, so identity is matched by id, table cell and
    * stable task text rather than trusting the projected source state.
    */
   private resolveCommittedTask(task: Task): Task | null {
-    const candidates = this.taskStateManager
-      .getCommittedTasks()
-      .filter(
-        (candidate) =>
-          candidate.path === task.path &&
-          (candidate.tableCell?.cellIndex ?? null) ===
-            (task.tableCell?.cellIndex ?? null),
+    return this.selectVerifiedTask(
+      this.taskStateManager.getCommittedTasks(),
+      task,
+    );
+  }
+
+  /** Read the parser's view of the live note, preferring an active editor. */
+  private async liveFileTasks(path: string): Promise<Task[] | null> {
+    const parser = this.plugin.vaultScanner?.getParser?.();
+    const file = this.plugin.app.vault.getAbstractFileByPath?.(path);
+    if (!parser || !(file instanceof TFile)) return null;
+
+    try {
+      const markdownView =
+        this.plugin.app.workspace.getActiveViewOfType?.(MarkdownView);
+      const content =
+        markdownView?.file?.path === path && markdownView.editor
+          ? markdownView.editor.getValue()
+          : await this.plugin.app.vault.read(file);
+      return parser.parseFile(content, path, file);
+    } catch (error) {
+      console.debug(
+        '[TaskUpdateCoordinator] Could not verify the live task row:',
+        error,
       );
-
-    if (task.id) {
-      const byId = candidates.find((candidate) => candidate.id === task.id);
-      if (byId) return byId;
+      return null;
     }
+  }
 
-    const exact = candidates.find(
-      (candidate) =>
-        candidate.line === task.line &&
-        (task.id
-          ? candidate.id === task.id
-          : !candidate.id && candidate.text === task.text),
-    );
-    if (exact) return exact;
+  /**
+   * A completion write must use one row for both the dependency gate and the
+   * writer's pre-transition fields. Re-resolve after queued writes, and only
+   * fall back to live content when committed state cannot identify the row.
+   */
+  private async resolveCompletionSourceTask(
+    context: ProcessingContext,
+    candidate: Task,
+  ): Promise<Task | null> {
+    const committed =
+      context.source === 'editor'
+        ? null
+        : this.selectVerifiedTask(
+            this.taskStateManager.getCommittedTasks(),
+            candidate,
+          );
+    if (committed) return committed;
 
-    const byText = candidates.filter(
-      (candidate) => candidate.text === task.text,
-    );
-    return byText.length === 1 ? byText[0] : null;
+    const live = await this.liveFileTasks(candidate.path);
+    if (!live) return context.source === 'editor' ? candidate : null;
+    return this.selectVerifiedTask(live, candidate);
   }
 
   /** True when this request would move an incomplete task to completion. */
@@ -380,6 +452,7 @@ export class TaskUpdateCoordinator {
     return (
       context.type === 'state' &&
       !!context.newState &&
+      context.source !== 'archive-undo' &&
       !sourceTask.completed &&
       this.keywordManager.isCompleted(context.newState)
     );
@@ -441,7 +514,7 @@ export class TaskUpdateCoordinator {
       !context.originalNewState ||
       context.forceCompletion ||
       context.source === 'archive-undo' ||
-      context.originalSourceState?.completed !== false ||
+      task.completed ||
       this.plugin.settings?.enforceBlockedTasks === false ||
       !this.taskDependencyManager ||
       !this.keywordManager.isCompleted(context.originalNewState)
@@ -449,9 +522,8 @@ export class TaskUpdateCoordinator {
       return null;
     }
 
-    const sourceTask = this.resolveCommittedTask(task) ?? task;
     const reasons = this.taskDependencyManager.getBlockingReasons(
-      getTaskKey(sourceTask),
+      getTaskKey(task),
     );
     if (reasons.length === 0) return null;
     return { status: 'refused', reasons };
@@ -461,25 +533,44 @@ export class TaskUpdateCoordinator {
   private async recoverPersistedTasks(
     context: ProcessingContext,
     generation: number,
+    fallbackTask?: Task,
   ): Promise<void> {
     const vault = this.plugin.app.vault as {
       getAbstractFileByPath?: (path: string) => unknown;
     };
     const file = vault.getAbstractFileByPath?.(context.filePath);
     const scanner = this.plugin.vaultScanner;
-    const isLatest =
-      this.fileWriteGenerations.get(context.filePath) === generation;
     if (scanner?.reconcileFileAfterFailedWrite) {
       const recovered = await scanner.reconcileFileAfterFailedWrite(
         context.filePath,
         file instanceof TFile ? file : null,
-        isLatest,
+        () => this.fileWriteGenerations.get(context.filePath) === generation,
       );
       if (recovered) {
         this.recoveredFileTasks.set(context.filePath, recovered);
       }
     } else if (file instanceof TFile) {
       await scanner?.processIncrementalChange(file);
+    } else if (fallbackTask) {
+      const existing = this.taskStateManager.findTaskByPathAndLine(
+        fallbackTask.path,
+        fallbackTask.line,
+        fallbackTask.tableCell?.cellIndex,
+      );
+      if (existing) {
+        this.taskStateManager.updateTaskByPathAndLine(
+          fallbackTask.path,
+          fallbackTask.line,
+          {
+            rawText: fallbackTask.rawText,
+            state: fallbackTask.state,
+            completed: fallbackTask.completed,
+            closedDate: fallbackTask.closedDate,
+          },
+          fallbackTask.tableCell?.cellIndex,
+        );
+        this.taskStateManager.notifySubscribers();
+      }
     }
   }
 
@@ -886,11 +977,41 @@ export class TaskUpdateCoordinator {
 
       // The sync phase's optimisticUpdate already replaced the stored task
       // with target-state values (state/completed flipped for instant UI
-      // feedback). The file write must classify the transition from the
-      // PRE-transition source state — e.g. to distinguish fresh completion
-      // from completed → completed when stamping CLOSED — so restore the
-      // values buildProcessingContext captured before the optimistic rewrite.
-      if (context.originalSourceState) {
+      // feedback). A completion must resolve one verified row after queued
+      // writes; otherwise a stale closure would authorize the wrong target.
+      const completionRequest =
+        context.type === 'state' &&
+        !!context.originalNewState &&
+        context.source !== 'archive-undo' &&
+        this.keywordManager.isCompleted(context.originalNewState);
+
+      if (completionRequest) {
+        const sourceTask = await this.resolveCompletionSourceTask(
+          context,
+          currentTask,
+        );
+        if (!sourceTask) {
+          await this.recoverPersistedTasks(context, generation);
+          return {
+            status: 'failed',
+            reason: 'Could not verify the task row before writing.',
+          };
+        }
+        currentTask = {
+          ...currentTask,
+          line: sourceTask.line,
+          tableCell: sourceTask.tableCell,
+          id: sourceTask.id,
+          embedReference: sourceTask.embedReference,
+          text: sourceTask.text,
+          rawText: sourceTask.rawText,
+          state: sourceTask.state,
+          completed: sourceTask.completed,
+          closedDate: sourceTask.closedDate,
+        };
+      } else if (context.originalSourceState) {
+        // The file write must classify non-completion transitions from the
+        // PRE-transition values captured before the optimistic rewrite.
         currentTask = {
           ...currentTask,
           state: context.originalSourceState.state,
@@ -904,7 +1025,7 @@ export class TaskUpdateCoordinator {
         // The request was unblocked when it was made, so the sync phase has
         // already flipped the visible state. Restore persisted truth and let
         // the caller's control roll back without a note write.
-        await this.recoverPersistedTasks(context, generation);
+        await this.recoverPersistedTasks(context, generation, currentTask);
         this.announceRefusal(refusal.reasons);
         return refusal;
       }

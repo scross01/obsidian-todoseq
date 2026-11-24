@@ -26,7 +26,7 @@
   "languageCommentSupport": false,
   "weekStartsOn": "Monday",
   "formatTaskKeywords": true,
-  "hideTaskPropertiesInReadingView": true,
+  "hideTaskPropertiesInReadingView": false,
   "additionalFileExtensions": [],
   "detectOrgModeFiles": false,
   "scanCodeFiles": false,

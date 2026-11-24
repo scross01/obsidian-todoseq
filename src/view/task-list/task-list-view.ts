@@ -1919,6 +1919,7 @@ export class TaskListView extends ItemView {
           this.plugin.taskEditor,
           failed,
           result.unreadablePaths,
+          result.referenceDiscoveryFailed,
         );
         break;
       }

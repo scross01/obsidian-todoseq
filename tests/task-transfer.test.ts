@@ -6,6 +6,7 @@
 import { App, TFile } from 'obsidian';
 import TodoTracker from '../src/main';
 import { TaskWriter } from '../src/services/task-writer';
+import { TaskReferenceService } from '../src/services/task-reference-service';
 import { Task } from '../src/types/task';
 import {
   createBaseSettings,
@@ -720,6 +721,29 @@ describe('TaskWriter transfer reference repair', () => {
       expect(h.writer.hasPendingReferenceRepairs()).toBe(true);
     } finally {
       app.vault.process = originalProcess;
+    }
+  });
+
+  it('reports a complete discovery failure without inventing edit retries', async () => {
+    const h = harness({ [SOURCE]: ANCHORED_SOURCE, [DEST]: '' });
+    const collect = jest
+      .spyOn(TaskReferenceService.prototype, 'collectAnchorReferences')
+      .mockRejectedValue(new Error('cache unavailable'));
+
+    try {
+      const result = await h.writer.transferTask(
+        anchoredTask(),
+        h.file(DEST),
+        'move',
+      );
+
+      expect(result.status).toBe('partial-references');
+      expect(result.referenceDiscoveryFailed).toBe(true);
+      expect(result.reason).toContain('could not be scanned');
+      expect(result.unreadablePaths).toBeUndefined();
+      expect(h.writer.hasPendingReferenceRepairs()).toBe(false);
+    } finally {
+      collect.mockRestore();
     }
   });
 
