@@ -48,7 +48,8 @@ Key details:
 - A single Obsidian instance is shared across all test files via CDP (port 9334 by default, overridable via `OBSIDIAN_CDP_PORT`; chosen to avoid collisions with other local apps).
 - A port conflict is an error: the harness never automatically terminates an existing application. Choose an unused `OBSIDIAN_CDP_PORT` or close the known test instance manually. Wrapper commands that leave a detached descendant holding the port fail closed.
 - The runner owns lifecycle control. It holds `test-results/obsidian-owner.lock` and publishes the authenticated endpoint and paths in `test-results/obsidian-owner.json`; the descriptor token is not logged. If a shutdown cannot be confirmed, the lease and fixtures are left for manual recovery after verifying no owned Obsidian process remains.
-- The `obsidian-restart` project tests settings persistence across a real process restart.
+- Each test starts from the complete baseline corpus and workspace. `resetVaultState` saves and detaches dirty markdown leaves, removes every nonbaseline file and empty folder through the Obsidian vault API while preserving `.obsidian/**` and the plugin install, recreates the shared baseline markdown map, restores baseline settings, waits for the rescan to publish the exact baseline task identities, resets Task List controls, and opens `inbox.md` in source mode. Tests must explicitly seed any extra content after this reset.
+- The `obsidian-restart` project tests settings persistence across a real process restart. It deliberately preserves the current `data.json` between close and launch, so it must not run a full reset mid-restart.
 - **No keyboard shortcuts** — all Obsidian commands are invoked via `page.evaluate(() => app.commands.executeCommandById(...))` to avoid triggering unintended actions.
 - DOM selectors are version-specific (e.g. Obsidian 1.12+ uses `.vertical-tab-nav-item`, not `.vertical-tab-list-item`).
 

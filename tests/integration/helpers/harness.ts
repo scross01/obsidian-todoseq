@@ -171,13 +171,11 @@ export function bootstrapFixtures(): void {
 }
 
 /**
- * Reset mutable per-test state without tearing down `.obsidian/` or the plugin
- * install: rewrite the markdown fixtures and restore baseline plugin settings.
- * The caller triggers Obsidian to pick up the file changes (e.g. a rescan).
+ * Restore only the baseline plugin settings file. Markdown content is reset
+ * through the live Obsidian vault API; this helper deliberately never writes
+ * fixture markdown.
  */
-export function resetMutableState(): void {
-  writeVaultMarkdown();
-
+export function restoreBaselinePluginSettings(): void {
   const dataDest = path.join(
     TEST_VAULT_DIR,
     '.obsidian',

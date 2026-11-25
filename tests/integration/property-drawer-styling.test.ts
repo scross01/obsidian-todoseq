@@ -373,13 +373,19 @@ test('a 70-entry drawer stays unfolded beyond the bounded scan', async () => {
   await page.waitForTimeout(250);
 
   const state = await readFoldState();
+  // The tail is below the viewport; CodeMirror virtualizes offscreen lines,
+  // so inspect the live editor buffer rather than requiring every line in DOM.
+  const buffer = await page.evaluate(() => {
+    const app = (window as any).app;
+    return String(app.workspace.activeLeaf?.view?.editor?.getValue?.() ?? '');
+  });
   expect(state.placeholders).toBe(0);
   expect(state.lines.some((text) => text.includes(':PROPERTIES:'))).toBe(true);
   expect(state.lines.some((text) => text.includes(':ID: long-over-01'))).toBe(
     true,
   );
-  expect(state.lines.some((text) => text.includes(':EXTRA_69:'))).toBe(true);
-  expect(state.lines.some((text) => text.trim() === ':END:')).toBe(true);
+  expect(buffer).toContain(':EXTRA_69:');
+  expect(buffer.split('\n').some((text) => text.trim() === ':END:')).toBe(true);
 });
 
 test('a task property drawer collapses and expands in the reading view without writing', async () => {
