@@ -610,6 +610,7 @@ describe('TaskKeywordDecorator date-line decorations (E4 audit)', () => {
     // Simulate a task line immediately before the date line.
     decorator['previousTaskLine'] = 0;
     decorator['previousTaskIndent'] = '';
+    decorator['previousTaskDateIndent'] = '';
     return decorator;
   };
 
@@ -664,6 +665,40 @@ describe('TaskKeywordDecorator date-line decorations (E4 audit)', () => {
 
     expect(added).toHaveLength(2);
     expect(added[0].deco.spec.class).toBe('todoseq-started-line');
+  });
+
+  it('decorates a same-depth nested quoted date line', () => {
+    const decorator = makeDecorator();
+    decorator['previousTaskDateIndent'] = '> > ';
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '> > SCHEDULED: <2026-01-16 Fri>',
+      { from: 0, to: 30 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-scheduled-line');
+    expect(added[1].deco.spec.attributes['data-date-keyword']).toBe(
+      'SCHEDULED:',
+    );
+  });
+
+  it('leaves a date quoted deeper than the task unstyled', () => {
+    const decorator = makeDecorator();
+    decorator['previousTaskDateIndent'] = '> > ';
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '> > > SCHEDULED: <2026-01-16 Fri>',
+      { from: 0, to: 32 },
+      builder,
+    );
+
+    expect(added).toHaveLength(0);
   });
 
   it('leaves a trailing block anchor out of the date-line span', () => {

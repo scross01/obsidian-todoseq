@@ -1,7 +1,11 @@
 import { App, TFile } from 'obsidian';
 import { Task } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX, BULLET_LIST_PATTERN } from './patterns';
-import { getIndentLength } from './task-line-utils';
+import {
+  getIndentLength,
+  getOwnedQuotedDateLineContent,
+  parseDescriptionLineInfo,
+} from './task-line-utils';
 import {
   isPropertiesDrawerStart,
   readTaskPropertiesDrawer,
@@ -41,9 +45,13 @@ export function classifyTaskMetadataLine(
   if (trimmed === '') return null;
 
   if (trimmed.startsWith('>')) {
-    const contentAfterArrow = trimmed.replace(/^>\s*/, '');
+    // DESCRIPTION belongs at every quoted depth, but a date line belongs to
+    // this task only at depth one or the task's own quote depth.
+    if (parseDescriptionLineInfo(line) !== null) return 'description';
+    const content = getOwnedQuotedDateLineContent(line, taskIndent);
+    if (content === null) return null;
     for (const [prefix, type] of METADATA_PREFIXES) {
-      if (contentAfterArrow.startsWith(prefix)) return type;
+      if (type !== 'description' && content.startsWith(prefix)) return type;
     }
     return null;
   }

@@ -36,6 +36,8 @@ import {
   isTableRow,
   isSeparatorCell,
   getCellTaskLine,
+  getOwnedDateLineType,
+  parseDescriptionLineInfo,
 } from '../../utils/task-line-utils';
 import {
   isDrawerEndLine,
@@ -189,6 +191,8 @@ export class TaskKeywordDecorator {
   // Track task lines to detect SCHEDULED/DEADLINE lines that follow them
   private previousTaskLine: number | null = null;
   private previousTaskIndent = '';
+  /** Task prefix used for date-line ownership (whitespace plus quote depth). */
+  private previousTaskDateIndent = '';
   /** True between a task's `:PROPERTIES:` line and its `:END:` line. */
   private inPropertiesDrawer = false;
 
@@ -320,6 +324,7 @@ export class TaskKeywordDecorator {
       this.inFootnote = false;
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.previousTaskDateIndent = '';
       this.inPropertiesDrawer = false;
 
       // Iterate through all lines in the document
@@ -506,6 +511,10 @@ export class TaskKeywordDecorator {
             0,
             lineText.length - lineText.trimStart().length,
           );
+          this.previousTaskDateIndent =
+            lineText.match(/^[ \t]*(?:>[ \t]*)+/)?.[0] ??
+            lineText.match(/^[ \t]*/)?.[0] ??
+            '';
           this.inPropertiesDrawer = false;
 
           // For code blocks with language comment support, we need to find the actual keyword position
@@ -923,6 +932,7 @@ export class TaskKeywordDecorator {
       // Too far from task line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.previousTaskDateIndent = '';
       this.inPropertiesDrawer = false;
       return;
     }
@@ -965,35 +975,12 @@ export class TaskKeywordDecorator {
       this.inPropertiesDrawer = false;
     }
 
-    let dateLineType: 'scheduled' | 'deadline' | 'closed' | 'started' | null =
-      null;
-    let isDescriptionLine = false;
-
-    // Handle callout blocks (lines starting with >)
-    if (lineText.startsWith('>')) {
-      const contentAfterArrow = trimmedLine.substring(1).trim();
-      if (contentAfterArrow.startsWith('SCHEDULED:')) {
-        dateLineType = 'scheduled';
-      } else if (contentAfterArrow.startsWith('DEADLINE:')) {
-        dateLineType = 'deadline';
-      } else if (contentAfterArrow.startsWith('CLOSED:')) {
-        dateLineType = 'closed';
-      } else if (contentAfterArrow.startsWith('STARTED:')) {
-        dateLineType = 'started';
-      } else if (contentAfterArrow.startsWith('DESCRIPTION:')) {
-        isDescriptionLine = true;
-      }
-    } else if (trimmedLine.startsWith('SCHEDULED:')) {
-      dateLineType = 'scheduled';
-    } else if (trimmedLine.startsWith('DEADLINE:')) {
-      dateLineType = 'deadline';
-    } else if (trimmedLine.startsWith('CLOSED:')) {
-      dateLineType = 'closed';
-    } else if (trimmedLine.startsWith('STARTED:')) {
-      dateLineType = 'started';
-    } else if (trimmedLine.startsWith('DESCRIPTION:')) {
-      isDescriptionLine = true;
-    }
+    const dateLineType = getOwnedDateLineType(
+      lineText,
+      this.previousTaskDateIndent,
+    );
+    const isDescriptionLine =
+      dateLineType === null && parseDescriptionLineInfo(lineText) !== null;
 
     // If this is a date line, check if it matches the indent level of the previous task
     if (dateLineType !== null) {
@@ -1128,6 +1115,7 @@ export class TaskKeywordDecorator {
       // Non-empty line that's not a date line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.previousTaskDateIndent = '';
       this.inPropertiesDrawer = false;
     }
   }

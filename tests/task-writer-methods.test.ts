@@ -1,4 +1,5 @@
 import { TaskWriter } from '../src/services/task-writer';
+import { TaskParser } from '../src/parser/task-parser';
 import {
   createBaseTask,
   createCheckboxTask,
@@ -85,6 +86,43 @@ describe('TaskWriter Instance Methods', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
     taskWriter = new TaskWriter(mockPlugin, keywordManager);
+  });
+
+  describe('findPropertiesDrawer date ownership', () => {
+    const makeNestedTask = (): Task =>
+      createBaseTask({
+        rawText: '> > TODO Task text',
+        line: 0,
+        indent: '> > ',
+      });
+
+    it('skips a same-depth nested date and finds the drawer', () => {
+      const lines = [
+        '> > TODO Task text',
+        '> > SCHEDULED: <2026-03-05 Thu>',
+        '> > :PROPERTIES:',
+        '> > :ID: nested-1',
+        '> > :END:',
+      ];
+
+      expect(
+        (taskWriter as any).findPropertiesDrawer(lines, makeNestedTask()),
+      ).not.toBeNull();
+    });
+
+    it('stops at a date quoted deeper than the task', () => {
+      const lines = [
+        '> > TODO Task text',
+        '> > > SCHEDULED: <2026-03-05 Thu>',
+        '> > :PROPERTIES:',
+        '> > :ID: nested-1',
+        '> > :END:',
+      ];
+
+      expect(
+        (taskWriter as any).findPropertiesDrawer(lines, makeNestedTask()),
+      ).toBeNull();
+    });
   });
 
   describe('migrateBlockerHistory', () => {
@@ -2032,6 +2070,11 @@ describe('TaskWriter Instance Methods', () => {
       expect(result).toBe(
         '> > TODO Task text\n> > SCHEDULED: <2026-03-10 Tue>',
       );
+      const reparsed = TaskParser.create(
+        createTestKeywordManager(),
+        null,
+      ).parseFile(result, 'test.md');
+      expect(reparsed[0].scheduledDate).toEqual(newDate);
     });
 
     it('should update existing SCHEDULED for quote block task', async () => {
@@ -2132,9 +2175,7 @@ describe('TaskWriter Instance Methods', () => {
       expect(resultContent).toBe('> TODO Task text');
     });
 
-    it('leaves a double-quoted date line that the parser does not own', async () => {
-      // getDateLineType strips exactly one quote marker, so '> > SCHEDULED:'
-      // is body text to the parser and must not be edited as the task's date.
+    it('removes a same-depth nested-quoted date line', async () => {
       const task: Task = createBaseTask({
         rawText: '> > TODO Task text',
         line: 0,
@@ -2158,6 +2199,37 @@ describe('TaskWriter Instance Methods', () => {
 
       expect(result.scheduledDate).toBeNull();
       const content = '> > TODO Task text\n> > SCHEDULED: <2026-03-05 Thu>';
+      const updateFn = mockApp.vault.process.mock.calls[0][1];
+      expect(updateFn(content)).toBe('> > TODO Task text');
+    });
+
+    it('leaves a date line quoted deeper than the task', async () => {
+      const task: Task = createBaseTask({
+        rawText: '> > TODO Task text',
+        line: 0,
+        indent: '> > ',
+        scheduledDate: new Date(2026, 2, 5),
+      });
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      const mockTFile = new MockTFile();
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(mockTFile);
+      mockApp.vault.process.mockImplementation(
+        (_file: any, updateFn: (content: string) => string) => {
+          return Promise.resolve(
+            updateFn(
+              '> > TODO Task text\n> > > SCHEDULED: <2026-03-05 Thu>',
+            ),
+          );
+        },
+      );
+
+      const result = await taskWriter.removeTaskScheduledDate(task);
+
+      expect(result.scheduledDate).toBeNull();
+      const content =
+        '> > TODO Task text\n> > > SCHEDULED: <2026-03-05 Thu>';
       const updateFn = mockApp.vault.process.mock.calls[0][1];
       expect(updateFn(content)).toBe(content);
     });

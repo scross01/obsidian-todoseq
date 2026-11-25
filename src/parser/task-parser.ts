@@ -17,11 +17,11 @@ import {
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
 import {
-  getIndentLength,
   parseTableCells,
   isSeparatorCell,
   getCellTaskLine,
   parseDescriptionLine,
+  getOwnedDateLineType,
 } from '../utils/task-line-utils';
 import {
   extractTaskProperties,
@@ -715,58 +715,7 @@ export class TaskParser implements ITaskParser {
     line: string,
     taskIndent: string,
   ): 'scheduled' | 'deadline' | 'closed' | 'started' | null {
-    const trimmedLine = line.trim();
-
-    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED:, DEADLINE:, CLOSED:, or STARTED:
-    if (line.startsWith('>')) {
-      const contentAfterArrow = trimmedLine.substring(1).trim();
-      if (
-        contentAfterArrow.startsWith('SCHEDULED:') ||
-        contentAfterArrow.startsWith('DEADLINE:') ||
-        contentAfterArrow.startsWith('CLOSED:') ||
-        contentAfterArrow.startsWith('STARTED:')
-      ) {
-        return contentAfterArrow.startsWith('SCHEDULED:')
-          ? 'scheduled'
-          : contentAfterArrow.startsWith('DEADLINE:')
-            ? 'deadline'
-            : contentAfterArrow.startsWith('STARTED:')
-              ? 'started'
-              : 'closed';
-      }
-    }
-
-    // For regular tasks, check if the trimmed line starts with SCHEDULED:, DEADLINE:, CLOSED:, or STARTED:
-    if (
-      !trimmedLine.startsWith('SCHEDULED:') &&
-      !trimmedLine.startsWith('DEADLINE:') &&
-      !trimmedLine.startsWith('CLOSED:') &&
-      !trimmedLine.startsWith('STARTED:')
-    ) {
-      return null;
-    }
-
-    // For regular tasks, check indent matching
-    const lineIndent = line.substring(0, line.length - trimmedLine.length);
-    const lineIndentLength = getIndentLength(lineIndent);
-
-    // For heading tasks, the task indent is "# " but date lines have no indent
-    // Accept date lines at indent level 0 (no indent) for heading tasks
-    const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
-    const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
-
-    // Date line must be at same or deeper indent level
-    if (lineIndentLength < taskIndentLength) {
-      return null;
-    }
-
-    return trimmedLine.startsWith('SCHEDULED:')
-      ? 'scheduled'
-      : trimmedLine.startsWith('DEADLINE:')
-        ? 'deadline'
-        : trimmedLine.startsWith('STARTED:')
-          ? 'started'
-          : 'closed';
+    return getOwnedDateLineType(line, taskIndent);
   }
 
   /**
@@ -778,8 +727,7 @@ export class TaskParser implements ITaskParser {
     // Remove the SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
     let content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
+      .replace(/^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
 
     // A trailing block anchor is identity, not date content. Strip it before
@@ -809,8 +757,7 @@ export class TaskParser implements ITaskParser {
     // Remove the SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
     let content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
+      .replace(/^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
 
     // A trailing block anchor is identity, not date content. Strip it before

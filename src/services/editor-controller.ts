@@ -23,6 +23,7 @@ import {
   findDescriptionLineInSource,
   parseDescriptionLineInfo,
   getTaskIndent,
+  getOwnedDateLineType,
   getDateLineIndent,
   parseTableCells,
   isTableRow,
@@ -152,10 +153,20 @@ export class EditorController {
 
     if (!isDateLine) return lineNumber;
 
-    // Walk upward to find parent task
+    // Walk upward to find parent task, then confirm this date line is owned by
+    // that task. A date quoted deeper than the task is body text, not one of
+    // its date lines.
     for (let i = lineNumber - 1; i >= 0; i--) {
       const prev = editor.getLine(i);
-      if (parser?.testRegex.test(prev)) return i;
+      if (parser?.testRegex.test(prev)) {
+        const taskIndent =
+          prev.match(/^[ \t]*(?:>[ \t]*)+/)?.[0] ??
+          prev.match(/^[ \t]*/)?.[0] ??
+          '';
+        return getOwnedDateLineType(line, taskIndent) !== null
+          ? i
+          : lineNumber;
+      }
       // Stop at empty line
       if (prev.trim() === '') break;
     }

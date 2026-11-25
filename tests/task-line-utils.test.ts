@@ -1340,6 +1340,89 @@ describe('task-line-utils', () => {
     });
   });
 
+  describe('nested-quoted date ownership', () => {
+    it('finds a date at the task quote depth', () => {
+      const lines = [
+        '> > TODO test',
+        '> > SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '> > ', keywordManager)).toBe(
+        1,
+      );
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(1);
+    });
+
+    it('finds a depth-one date under a nested task', () => {
+      const lines = [
+        '> > TODO test',
+        '> SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '> > ', keywordManager)).toBe(
+        1,
+      );
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(1);
+    });
+
+    it('does not find a date quoted deeper than the task', () => {
+      const lines = [
+        '> > TODO test',
+        '> > > SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '> > ', keywordManager)).toBe(
+        -1,
+      );
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(-1);
+    });
+
+    it('finds a date after an owned DESCRIPTION and drawer', () => {
+      const lines = [
+        '> > TODO test',
+        '> > DESCRIPTION: Still the task',
+        '> > :PROPERTIES:',
+        ':ID: nested-id',
+        ':END:',
+        '> > SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(5);
+    });
+  });
+
   describe('getDateLineIndent', () => {
     it('should return empty string for H1 heading tasks', () => {
       const task = {

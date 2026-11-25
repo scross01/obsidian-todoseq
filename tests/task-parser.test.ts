@@ -1338,6 +1338,9 @@ TODO 🇨🇦 Canadian flag
       // Nested quotes (>>) not supported - returns null
       expect(
         parser.getDateLineType('>> SCHEDULED: <2026-03-10>', '>> '),
+      ).toBe('scheduled');
+      expect(
+        parser.getDateLineType('> > > SCHEDULED: <2026-03-10>', '>> '),
       ).toBeNull();
     });
 
@@ -1455,6 +1458,82 @@ TODO 🇨🇦 Canadian flag
         'deadline',
       );
     });
+  });
+});
+
+describe('nested-quoted date lines', () => {
+  const nestedParser = TaskParser.create(createTestKeywordManager(), null);
+
+  test('parses a scheduled date at the task quote depth', () => {
+    const tasks = nestedParser.parseFile(
+      [
+        '> > - [ ] TODO Nested task',
+        '> > SCHEDULED: <2026-03-10 Tue +1d --2d>',
+      ].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].scheduledDate).toEqual(new Date(2026, 2, 10));
+    expect(tasks[0].scheduledDateRepeat).toEqual({
+      type: '+',
+      unit: 'd',
+      value: 1,
+      raw: '+1d',
+    });
+    expect(tasks[0].scheduledWarningPeriod).toEqual({
+      value: 2,
+      unit: 'd',
+      isFirstOnly: true,
+    });
+  });
+
+  test('parses a deadline at a compact two-marker depth', () => {
+    const tasks = nestedParser.parseFile(
+      ['>> - [ ] TODO Nested task', '>> DEADLINE: <2026-03-12 Thu>'].join(
+        '\n',
+      ),
+      'test.md',
+    );
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].deadlineDate).toEqual(new Date(2026, 2, 12));
+  });
+
+  test('parses a date at three quote levels', () => {
+    const tasks = nestedParser.parseFile(
+      [
+        '> > > - [ ] TODO Nested task',
+        '> > > SCHEDULED: <2026-03-10 Tue>',
+      ].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks[0].scheduledDate).toEqual(new Date(2026, 2, 10));
+  });
+
+  test('does not parse a date quoted deeper than the task', () => {
+    const tasks = nestedParser.parseFile(
+      [
+        '> > - [ ] TODO Nested task',
+        '> > > SCHEDULED: <2026-03-10 Tue>',
+      ].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks[0].scheduledDate).toBeNull();
+  });
+
+  test('still parses a depth-one date under a nested task', () => {
+    const tasks = nestedParser.parseFile(
+      [
+        '> > - [ ] TODO Nested task',
+        '> SCHEDULED: <2026-03-10 Tue>',
+      ].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks[0].scheduledDate).toEqual(new Date(2026, 2, 10));
   });
 });
 

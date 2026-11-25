@@ -446,6 +446,63 @@ describe('Plan 121 indented Markdown recurrence', () => {
   });
 });
 
+describe('Plan 126 nested-quoted recurrence', () => {
+  const source = [
+    '> > DONE Repeat',
+    '> > DESCRIPTION: Keep the reasoning',
+    '> > DEADLINE: <2026-06-26 Fri>',
+    '> > SCHEDULED: <2026-06-24 Wed +1d>',
+    '> > :PROPERTIES:',
+    '> > :ID: nested-repeat',
+    '> > :END: ^nested-anchor',
+    '> > - [ ] TODO sibling',
+  ].join('\n');
+
+  it.each([
+    ['vault', false],
+    ['editor', true],
+  ])('rolls over through the %s path', async (_name, openEditor) => {
+    const harness = createMarkdownHarness(source, { openEditor });
+    const task = harness.parser
+      .parseFile(source, 'test.md')
+      .find((candidate) => candidate.text === 'Repeat');
+    expect(task).toBeDefined();
+    expect(task!.scheduledDate).toEqual(new Date(2026, 5, 24));
+    expect(task!.description).toBe('Keep the reasoning');
+    expect(task!.id).toBe('nested-repeat');
+    expect(task!.embedReference).toBe('^nested-anchor');
+
+    await harness.writer.applyRecurrenceUpdate(task!, {
+      newScheduledDate: new Date(2026, 5, 25),
+      newScheduledRepeat: task!.scheduledDateRepeat,
+      newState: 'TODO',
+    });
+
+    expect(harness.content()).toBe(
+      [
+        '> > TODO Repeat',
+        '> > DESCRIPTION: Keep the reasoning',
+        '> > DEADLINE: <2026-06-26 Fri>',
+        '> > SCHEDULED: <2026-06-25 Thu +1d>',
+        '> > :PROPERTIES:',
+        '> > :ID: nested-repeat',
+        '> > :END: ^nested-anchor',
+        '> > - [ ] TODO sibling',
+      ].join('\n'),
+    );
+    const reparsed = harness.parser.parseFile(harness.content(), 'test.md');
+    const rolled = reparsed.find((candidate) => candidate.text === 'Repeat');
+    expect(rolled?.scheduledDate).toEqual(new Date(2026, 5, 25));
+    expect(rolled?.deadlineDate).toEqual(new Date(2026, 5, 26));
+    expect(rolled?.id).toBe('nested-repeat');
+    expect(rolled?.embedReference).toBe('^nested-anchor');
+    expect(
+      reparsed.find((candidate) => candidate.text === 'sibling')
+        ?.scheduledDate,
+    ).toBeNull();
+  });
+});
+
 describe('Plan 121 mutation-time block identity', () => {
   const source = [
     'TODO Task text',

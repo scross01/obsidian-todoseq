@@ -311,6 +311,33 @@ describe('Editor Controller - Date Line Handling', () => {
       ).toBe(0);
     });
 
+    it('should resolve a same-depth nested quoted date line to its task', () => {
+      setupMockEditor([
+        '> > TODO Parent task',
+        '> > SCHEDULED: <2024-01-15>',
+      ]);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(0);
+    });
+
+    it('should leave a date quoted deeper than the task unresolved', () => {
+      setupMockEditor([
+        '> > TODO Parent task',
+        '> > > SCHEDULED: <2024-01-15>',
+      ]);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(1);
+    });
+
+    it('should leave an unquoted date under a quoted task unresolved', () => {
+      setupMockEditor(['> TODO Parent task', 'SCHEDULED: <2024-01-15>']);
+      expect(
+        editorController['resolveTaskLineFromCursor'](mockEditor as any, 1),
+      ).toBe(1);
+    });
+
     it('should stop at empty line when walking up', () => {
       setupMockEditor(['', 'SCHEDULED: <2024-01-15>']);
       expect(

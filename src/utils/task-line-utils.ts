@@ -31,6 +31,75 @@ export interface DescriptionLineSource {
   getLine(line: number): string;
 }
 
+/**
+ * Count blockquote markers in a leading quote prefix.
+ *
+ * A date line may belong to the task at depth one (the historical allowance)
+ * or at the task's own quote depth. Deeper lines are quoted body text.
+ */
+export function getQuoteDepth(prefix: string): number {
+  const quotePrefix = prefix.match(/^[ \t]*(?:>[ \t]*)+/)?.[0] ?? '';
+  return (quotePrefix.match(/>/g) ?? []).length;
+}
+
+/**
+ * Return the date-line body when a quoted line belongs to the task, or null.
+ * The line must start with '>' in column zero; leading whitespace before '>'
+ * is ordinary quoted text, exactly as the parser treats it.
+ */
+export function getOwnedQuotedDateLineContent(
+  line: string,
+  taskIndent: string,
+): string | null {
+  if (!line.startsWith('>')) return null;
+  const quotePrefix = line.match(/^(?:>[ \t]*)+/)?.[0] ?? '';
+  if (!quotePrefix) return null;
+
+  const lineDepth = getQuoteDepth(quotePrefix);
+  const taskDepth = getQuoteDepth(taskIndent);
+  if (lineDepth !== 1 && lineDepth !== taskDepth) return null;
+
+  return line.slice(quotePrefix.length).trimStart();
+}
+
+/**
+ * Classify a parser-owned date line for a task, using the same depth-one or
+ * same-depth quote rule as getOwnedQuotedDateLineContent and the existing
+ * unquoted/heading indentation rules. Shared by the parser and editor paths so
+ * a line can never be recognized by one and refused by another.
+ */
+export function getOwnedDateLineType(
+  line: string,
+  taskIndent: string,
+): 'scheduled' | 'deadline' | 'closed' | 'started' | null {
+  const quotedContent = getOwnedQuotedDateLineContent(line, taskIndent);
+  if (quotedContent !== null) {
+    if (quotedContent.startsWith('SCHEDULED:')) return 'scheduled';
+    if (quotedContent.startsWith('DEADLINE:')) return 'deadline';
+    if (quotedContent.startsWith('CLOSED:')) return 'closed';
+    if (quotedContent.startsWith('STARTED:')) return 'started';
+    return null;
+  }
+
+  const trimmedLine = line.trim();
+  if (!/^(SCHEDULED|DEADLINE|CLOSED|STARTED):/.test(trimmedLine)) {
+    return null;
+  }
+
+  const lineIndent = line.substring(0, line.length - trimmedLine.length);
+  const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
+  const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
+  if (getIndentLength(lineIndent) < taskIndentLength) return null;
+
+  return trimmedLine.startsWith('SCHEDULED:')
+    ? 'scheduled'
+    : trimmedLine.startsWith('DEADLINE:')
+      ? 'deadline'
+      : trimmedLine.startsWith('STARTED:')
+        ? 'started'
+        : 'closed';
+}
+
 /** Return the closing :END: index for a drawer starting at i, if bounded. */
 function drawerEndAt(
   source: DescriptionLineSource,
@@ -106,7 +175,12 @@ export function findDateLine(
     const line = lines[i];
     const trimmedLine = line.trimStart();
 
-    const drawerEnd = propertiesDrawerEnd(lines, i);
+    const drawerEnd = isOwnedPropertiesDrawerStart(line, taskIndent)
+      ? drawerEndAt(
+          { lineCount: () => lines.length, getLine: (index) => lines[index] },
+          i,
+        )
+      : propertiesDrawerEnd(lines, i);
     if (drawerEnd >= 0) {
       i = drawerEnd;
       continue;
@@ -116,6 +190,8 @@ export function findDateLine(
       return i;
     }
 
+    const dateKeywordLine = isDateKeywordLine(line, taskIndent);
+
     // A date line is never a task boundary — even when a configured
     // keyword collides with a date keyword (e.g. STARTED set as an active
     // keyword, the documented keyword-groups example). Without this, a
@@ -124,13 +200,19 @@ export function findDateLine(
     // duplicate, and recurrence rollovers stacked date lines.
     if (
       isTaskLine(trimmedLine, keywordManager) &&
-      !isDateKeywordLine(trimmedLine)
+      !dateKeywordLine
     ) {
       break;
     }
 
+    // A quoted date the parser does not own is body text, not an invitation
+    // to scan further into a deeper quote level.
+    if (isQuotedDateKeywordLine(line) && !dateKeywordLine) {
+      break;
+    }
+
     // Stop if we hit a non-date, non-empty line at same or lower indent
-    if (trimmedLine !== '' && !isDateKeywordLine(trimmedLine)) {
+    if (trimmedLine !== '' && !dateKeywordLine) {
       const lineIndent = line.substring(0, line.length - trimmedLine.length);
       const effectiveLineIndent =
         line.match(/^(\s*(>\s*)+)/)?.[1] ?? lineIndent;
@@ -154,21 +236,33 @@ export function findDateLine(
  * treating date-looking metadata as a task boundary even when that line is
  * not the selected date type.
  */
-function isDateKeywordLine(line: string): boolean {
+function isDateKeywordLine(
+  line: string,
+  taskIndent?: string,
+): boolean {
   const trimmed = line.trimStart();
-  if (
-    trimmed.startsWith('SCHEDULED:') ||
-    trimmed.startsWith('DEADLINE:') ||
-    trimmed.startsWith('CLOSED:') ||
-    trimmed.startsWith('STARTED:') ||
-    trimmed.startsWith('DESCRIPTION:')
-  ) {
-    return true;
+  const isDateKeyword = /^(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/;
+
+  if (trimmed.startsWith('>')) {
+    if (taskIndent === undefined) {
+      return /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(
+        trimmed,
+      );
+    }
+    const content = getOwnedQuotedDateLineContent(line, taskIndent);
+    if (content !== null && isDateKeyword.test(content)) return true;
+    // DESCRIPTION belongs at every quoted depth (Plan 125), so a deeper
+    // description is still metadata the date scan must walk past.
+    return parseDescriptionLineInfo(line) !== null;
   }
-  return (
-    trimmed.startsWith('>') &&
-    /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(trimmed)
-  );
+
+  return isDateKeyword.test(trimmed);
+}
+
+/** A quoted date keyword, whether or not this task owns it. */
+function isQuotedDateKeywordLine(line: string): boolean {
+  if (!line.startsWith('>')) return false;
+  return /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED):/.test(line.trimStart());
 }
 
 /**
@@ -244,8 +338,27 @@ export function findDateLineWithParser(
     const targetDateType = dateType.toLowerCase() as
       'scheduled' | 'deadline' | 'closed' | 'started';
 
+    const source = {
+      lineCount: () => lines.length,
+      getLine: (index: number) => lines[index],
+    };
+
     for (let i = startIndex; i < maxLines; i++) {
       const line = lines[i];
+      if (line.trim() === '') continue;
+
+      // An owned drawer is metadata, not the end of the date block. Skip it
+      // whole so a repeating date below a drawer remains discoverable.
+      if (isOwnedPropertiesDrawerStart(line, taskIndent)) {
+        const drawerEnd = drawerEndAt(source, i);
+        if (drawerEnd < 0) return -1;
+        i = drawerEnd;
+        continue;
+      }
+
+      // DESCRIPTION lines do not end the task block.
+      if (parseDescriptionLineInfo(line) !== null) continue;
+
       const detectedType = parser.getDateLineType(line, taskIndent);
 
       if (detectedType === targetDateType) {
@@ -253,7 +366,7 @@ export function findDateLineWithParser(
       }
 
       // Stop if this is not a date line (indicates we've moved past the task's date lines)
-      if (detectedType === null && line.trim() !== '') {
+      if (detectedType === null) {
         break;
       }
     }
@@ -540,12 +653,11 @@ function isOwnedPropertiesDrawerStart(
 }
 
 /**
- * Parser-exact date-line ownership (TaskParser.getDateLineType): a line that
- * starts with '>' owns exactly one quote marker, whatever the task's own quote
- * level or indentation; an unquoted date line must be indented at least as far
- * as the task (headings use column 0). Matching this exactly keeps the writer
- * on the line the parser read instead of inserting a duplicate or editing body
- * text.
+ * Parser-exact date-line ownership: a quoted date line is owned at depth one
+ * or the task's own quote depth, while an unquoted date line must be indented
+ * at least as far as the task (headings use column 0). Matching this exactly
+ * keeps the writer on the line the parser read instead of inserting a
+ * duplicate or editing body text.
  */
 function isOwnedDateLine(
   line: string,
@@ -553,7 +665,8 @@ function isOwnedDateLine(
   taskIndent: string,
 ): boolean {
   if (line.startsWith('>')) {
-    return line.trim().substring(1).trim().startsWith(keyword);
+    const content = getOwnedQuotedDateLineContent(line, taskIndent);
+    return content !== null && content.startsWith(keyword);
   }
 
   const trimmed = line.trimStart();

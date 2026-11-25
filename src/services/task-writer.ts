@@ -26,6 +26,7 @@ import {
   getTaskIndent,
   getDateLineIndent,
   getIndentLength,
+  getOwnedQuotedDateLineContent,
   supportsTaskMetadata,
   replaceTableCellContent,
   findOrgPlanningToken,
@@ -752,10 +753,16 @@ export class TaskWriter {
       }
       if (line.trim() === '') continue;
       if (format === 'org' && /^\*/.test(line)) break;
-      if (
-        /^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(
-          line,
-        )
+      if (format === 'org') {
+        if (
+          /^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(
+            line,
+          )
+        ) {
+          continue;
+        }
+      } else if (
+        this.isMarkdownPlanningMetadataLine(line, getTaskIndent(task))
       ) {
         continue;
       }
@@ -780,9 +787,8 @@ export class TaskWriter {
   ): boolean {
     const dateLine = /^(SCHEDULED|DEADLINE|CLOSED|STARTED):/;
     if (line.startsWith('>')) {
-      // A quoted date line is owned at any indent: the parser trims the line
-      // and removes exactly one quote marker before matching.
-      if (dateLine.test(line.trim().substring(1).trim())) return true;
+      const content = getOwnedQuotedDateLineContent(line, taskIndent);
+      if (content !== null && dateLine.test(content)) return true;
     } else {
       const trimmed = line.trimStart();
       if (dateLine.test(trimmed)) {

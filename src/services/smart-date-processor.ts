@@ -20,6 +20,7 @@ import {
   parseTableCells,
   isSeparatorCell,
   getCellTaskLine,
+  getOwnedDateLineType,
 } from '../utils/task-line-utils';
 
 export type InlineDateType = 'SCHEDULED' | 'DEADLINE';
@@ -337,15 +338,11 @@ export class SmartDateProcessor {
    * Uses the parser's getDateLineType for consistency.
    */
   private isDateLine(lineText: string): boolean {
-    const parser = this.plugin.getVaultScanner()?.getParser();
-    if (parser) {
-      const indent = lineText.match(/^(\s*)/)?.[1] ?? '';
-      return parser.getDateLineType(lineText, indent) !== null;
-    }
-    return (
-      /^\s*(SCHEDULED|DEADLINE):\s*[<[]/.test(lineText) ||
-      /^\s*CLOSED:\s*\[/.test(lineText)
-    );
+    const indent =
+      lineText.match(/^[ \t]*(?:>[ \t]*)+/)?.[0] ??
+      lineText.match(/^[ \t]*/)?.[0] ??
+      '';
+    return getOwnedDateLineType(lineText, indent) !== null;
   }
 
   /**
