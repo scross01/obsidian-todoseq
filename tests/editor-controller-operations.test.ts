@@ -815,6 +815,108 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
     });
   });
 
+  describe('Add description ownership and cursor placement', () => {
+    const makeEditableLines = (
+      initial: string[],
+    ): { lines: string[]; editor: any } => {
+      const lines = [...initial];
+      const editor = {
+        lineCount: () => lines.length,
+        getLine: (index: number) => lines[index] ?? '',
+        replaceRange: jest.fn((text: string, from: any, to: any) =>
+          emulateEditorReplaceRange(lines, text, from, to),
+        ),
+        getCursor: () => ({ line: 0, ch: 0 }),
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+      };
+      return { lines, editor };
+    };
+
+    it.each([
+      [
+        'an unquoted task with a nested quoted description',
+        ['> - [ ] TODO Test task', '> > DESCRIPTION: Nested desc'],
+      ],
+      [
+        'an unquoted task with a quoted description',
+        ['- [ ] TODO Test task', '> DESCRIPTION: Quoted desc'],
+      ],
+      [
+        'a quoted task with an unquoted description',
+        ['> - [ ] TODO Test task', 'DESCRIPTION: Plain desc'],
+      ],
+      [
+        'a normal unquoted control',
+        ['- [ ] TODO Test task', 'DESCRIPTION: Normal desc'],
+      ],
+    ])('reuses %s without writing', (_name, initial) => {
+      const { lines, editor } = makeEditableLines(initial);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(editor.replaceRange).not.toHaveBeenCalled();
+      expect(lines).toEqual(initial);
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 1,
+        ch: initial[1].length,
+      });
+    });
+
+    it('finds an existing description beyond the old ten-line window', () => {
+      const initial = [
+        '- [ ] TODO Test task',
+        ...Array(10).fill(''),
+        'DESCRIPTION: Far away',
+      ];
+      const { lines, editor } = makeEditableLines(initial);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(editor.replaceRange).not.toHaveBeenCalled();
+      expect(lines).toEqual(initial);
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 11,
+        ch: initial[11].length,
+      });
+    });
+
+    it('leaves a legacy task anchor alone when an owned description exists', () => {
+      const initial = [
+        '- [ ] TODO Test task ^legacy',
+        'DESCRIPTION: ^descanchor',
+      ];
+      const { lines, editor } = makeEditableLines(initial);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(editor.replaceRange).not.toHaveBeenCalled();
+      expect(lines).toEqual(initial);
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 1,
+        ch: 'DESCRIPTION: '.length,
+      });
+    });
+  });
+
   describe('handleAddDateAtLine', () => {
     it('should return false for non-task lines when not checking', () => {
       mockEditor.getLine = () => 'This is not a task line';

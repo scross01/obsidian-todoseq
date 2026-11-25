@@ -148,6 +148,21 @@ describe('TaskWriter - editor-path date-line insert at end of document', () => {
     expect(lines[1]).toBe('SCHEDULED: <2026-01-20 Tue>');
   });
 
+  test('inserts a date after a quoted description under an unquoted task', () => {
+    lines = ['- [ ] TODO Task text', '> DESCRIPTION: Notes'];
+
+    const result = taskWriter.insertDateLineFromEditor(
+      mockEditor,
+      makeTask({ rawText: '- [ ] TODO Task text' }),
+      'SCHEDULED',
+      '<2026-02-01 Sun>',
+    );
+
+    expect(result.line).toBe(2);
+    expect(lines[1]).toBe('> DESCRIPTION: Notes');
+    expect(lines[2]).toBe('  SCHEDULED: <2026-02-01 Sun>');
+  });
+
   test('public editor entry point returns the actual inserted date row', () => {
     lines = ['TODO Task text', 'DEADLINE: <2026-01-21 Wed>'];
 

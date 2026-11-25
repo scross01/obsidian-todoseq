@@ -21,6 +21,7 @@ import {
   parseTableCells,
   isSeparatorCell,
   getCellTaskLine,
+  parseDescriptionLine,
 } from '../utils/task-line-utils';
 import {
   extractTaskProperties,
@@ -998,19 +999,7 @@ export class TaskParser implements ITaskParser {
    * Extract description text from a DESCRIPTION: line, or null if not a description line.
    */
   private getDescriptionText(line: string): string | null {
-    let contentLine = line;
-    if (line.startsWith('>')) {
-      const quoteMatch = line.match(/^(>\s*)+/);
-      if (quoteMatch) {
-        contentLine = line.substring(quoteMatch[0].length);
-      }
-    }
-    const trimmed = contentLine.trimStart();
-    if (!trimmed.startsWith('DESCRIPTION:')) return null;
-    const value = trimmed.substring('DESCRIPTION:'.length).trim();
-    // The suffix is identity: an anchor-only description is empty, not the
-    // anchor.
-    return splitTrailingBlockAnchor(value).text.trim();
+    return parseDescriptionLine(line);
   }
 
   /**

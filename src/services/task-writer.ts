@@ -4293,7 +4293,12 @@ export class TaskWriter {
     const afterTask = taskLineIndex + 1;
 
     // Find DESCRIPTION position (dates must go after it)
-    const descIdx = findDescriptionLine(lines, afterTask, taskIndent);
+    const descIdx = findDescriptionLine(
+      lines,
+      afterTask,
+      taskIndent,
+      this.keywordManager,
+    );
     const afterDesc = descIdx >= 0 ? descIdx + 1 : afterTask;
 
     if (dateType === 'STARTED') {

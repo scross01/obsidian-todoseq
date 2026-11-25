@@ -49,7 +49,8 @@ SCHEDULED: <2026-01-20>
 
 - Description is a single line (multi-line descriptions are not supported)
 - The `DESCRIPTION:` keyword is case-sensitive
-- DESCRIPTION: is always inserted immediately after the task line
+- A `DESCRIPTION:` line belongs to the task when it is unquoted at any indentation, or quoted with `>` in the first column at any blockquote depth. Leading whitespace before `>` makes it ordinary quoted text, not a description.
+- DESCRIPTION: is always inserted immediately after the task line, and an existing description is reused instead of adding a second line
 - Date lines (SCHEDULED, DEADLINE, CLOSED) appear after DESCRIPTION:
 
 **Example with checkbox:**

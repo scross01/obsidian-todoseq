@@ -20,7 +20,8 @@ import {
 } from '../utils/daily-note-utils';
 import {
   findDateLine,
-  findDescriptionLine,
+  findDescriptionLineInSource,
+  parseDescriptionLineInfo,
   getTaskIndent,
   getDateLineIndent,
   parseTableCells,
@@ -726,8 +727,6 @@ export class EditorController {
 
     if (checking) return true;
 
-    // Inserting DESCRIPTION directly below the task line would otherwise
-    // leave a task-line anchor stranded above the new metadata.
     const taskLineSplit = splitTrailingBlockAnchor(line);
     const taskLineAnchor = taskLineSplit.anchor;
 
@@ -737,31 +736,36 @@ export class EditorController {
       ? getTaskIndent(task)
       : (line.match(/^(\s*)/)?.[1] ?? '');
 
+    // Detect an existing description before touching the task-line anchor: if
+    // one exists, selecting it must leave the editor byte-for-byte unchanged.
+    // The scan reads only through the task's metadata block.
+    const existingIdx = findDescriptionLineInSource(
+      editor,
+      lineNumber + 1,
+      taskIndent,
+      this.keywordManager,
+    );
+
+    if (existingIdx >= 0) {
+      // DESCRIPTION: already exists — move cursor to the end of its value,
+      // before trailing whitespace or a block anchor. Empty values still end
+      // after the DESCRIPTION: prefix.
+      const descInfo = parseDescriptionLineInfo(editor.getLine(existingIdx));
+      editor.setCursor({
+        line: existingIdx,
+        ch: descInfo?.valueEnd ?? editor.getLine(existingIdx).length,
+      });
+      return true;
+    }
+
+    // Inserting DESCRIPTION directly below the task line would otherwise
+    // leave a task-line anchor stranded above the new metadata.
     if (taskLineAnchor) {
       editor.replaceRange(
         taskLineSplit.text,
         { line: lineNumber, ch: 0 },
         { line: lineNumber, ch: line.length },
       );
-    }
-
-    // Build lines array to search for existing DESCRIPTION: (stop early if possible)
-    const totalLines = Math.min(lineNumber + 10, editor.lineCount());
-    const lines: string[] = [];
-    for (let i = 0; i < totalLines; i++) {
-      lines.push(editor.getLine(i));
-    }
-
-    const existingIdx = findDescriptionLine(lines, lineNumber + 1, taskIndent);
-
-    if (existingIdx >= 0) {
-      // DESCRIPTION: already exists — move cursor to end of description text
-      const descLine = editor.getLine(existingIdx);
-      const descContent = descLine.replace(/^[\s>]*DESCRIPTION:\s*/, '');
-      const descText = splitTrailingBlockAnchor(descContent).text;
-      const descEnd = descLine.indexOf(descContent) + descText.length;
-      editor.setCursor({ line: existingIdx, ch: descEnd });
-      return true;
     }
 
     // Insert new DESCRIPTION: line after the task line

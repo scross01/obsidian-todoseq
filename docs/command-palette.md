@@ -112,7 +112,7 @@ DEADLINE: <2026-01-16>
 
 ### Add description
 
-Add a description line to the task at the current cursor position. If the task already has a description, the cursor moves to the end of the existing description text for editing.
+Add a description line to the task at the current cursor position. If the task already has a description, the cursor moves to the end of the existing description text for editing. An existing description is reused whether it is unquoted at any indentation or quoted at any blockquote depth with `>` in the first column, so the command does not add a duplicate line.
 
 ```txt
 TODO example task

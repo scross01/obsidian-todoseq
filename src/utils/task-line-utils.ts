@@ -4,8 +4,9 @@
  */
 
 import { Task } from '../types/task';
-import { isDrawerEndLine } from './block-anchor';
+import { isDrawerEndLine, splitTrailingBlockAnchor } from './block-anchor';
 import { KeywordManager } from './keyword-manager';
+import { CHECKBOX_DETECTION_REGEX } from './patterns';
 
 /**
  * Calculate the total indentation length (treating tabs as 2 spaces).
@@ -25,25 +26,55 @@ export function getIndentLength(indent: string): number {
   return length;
 }
 
+export interface DescriptionLineSource {
+  lineCount(): number;
+  getLine(line: number): string;
+}
+
 /** Return the closing :END: index for a drawer starting at i, if bounded. */
+function drawerEndAt(
+  source: DescriptionLineSource,
+  i: number,
+  format: 'markdown' | 'org' = 'markdown',
+  isBoundary?: (line: string) => boolean,
+): number {
+  for (let j = i + 1; j < source.lineCount(); j++) {
+    const line = source.getLine(j);
+    // Quoted drawers close with `> :END:`; parse the metadata body before
+    // looking for the drawer end. The anchored form is accepted too.
+    const body = line.match(/^([ \t]*)((?:>[ \t]*)*)(.*)$/)?.[3] ?? line;
+    if (isDrawerEndLine(body, format)) return j;
+    // Blank lines and metadata-like lines (including unknown keys) continue
+    // the drawer, exactly as readTaskPropertiesDrawer does.
+    if (line.trim() === '') continue;
+    // A task, heading task or checkbox boundary means the parser would stop
+    // with this drawer unclosed rather than scan past it.
+    if (isBoundary?.(line)) return -1;
+    // The Org parser ends an entry at any line whose first character is '*',
+    // including a body line such as '*bold*'. Markdown has no such rule: a
+    // '* item: value' line is drawer content, not a heading.
+    if (format === 'org' && /^\*/.test(line)) {
+      return -1;
+    }
+    // Prose without a colon is not drawer content; the parser stops here with
+    // the drawer unclosed, so a later :END: must not revive it.
+    if (!line.includes(':')) return -1;
+  }
+  return -1;
+}
+
+/** Return the closing :END: index for an array-backed drawer, if bounded. */
 function propertiesDrawerEnd(
   lines: string[],
   i: number,
   format: 'markdown' | 'org' = 'markdown',
 ): number {
   if (lines[i]?.trim() !== ':PROPERTIES:') return -1;
-  for (let j = i + 1; j < lines.length; j++) {
-    // The Markdown anchored form is accepted here too: this helper only
-    // locates the drawer to skip it during date/description discovery, and a
-    // newline-terminated `:END: ^anchor` would otherwise look unclosed.
-    if (isDrawerEndLine(lines[j], format)) return j;
-    // The Org parser ends an entry at any line whose first character is '*',
-    // including a body line such as '*bold*'; Markdown keeps its heading rule.
-    if (format === 'org' ? /^\*/.test(lines[j]) : /^\*+\s/.test(lines[j])) {
-      return -1;
-    }
-  }
-  return -1;
+  return drawerEndAt(
+    { lineCount: () => lines.length, getLine: (line) => lines[line] },
+    i,
+    format,
+  );
 }
 
 /**
@@ -116,6 +147,28 @@ export function findDateLine(
   }
 
   return -1;
+}
+
+/**
+ * Check if a line is a date keyword line. Date lookup uses this to avoid
+ * treating date-looking metadata as a task boundary even when that line is
+ * not the selected date type.
+ */
+function isDateKeywordLine(line: string): boolean {
+  const trimmed = line.trimStart();
+  if (
+    trimmed.startsWith('SCHEDULED:') ||
+    trimmed.startsWith('DEADLINE:') ||
+    trimmed.startsWith('CLOSED:') ||
+    trimmed.startsWith('STARTED:') ||
+    trimmed.startsWith('DESCRIPTION:')
+  ) {
+    return true;
+  }
+  return (
+    trimmed.startsWith('>') &&
+    /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(trimmed)
+  );
 }
 
 /**
@@ -293,8 +346,55 @@ export function replaceOrgPlanningToken(
 }
 
 /**
- * Find a DESCRIPTION: line after a task line.
- * Uses the same search pattern as findDateLine.
+ * Location details for a parser-owned DESCRIPTION line. The offsets are
+ * character indices in the original line and let editor commands place the
+ * cursor without searching for the value text again.
+ */
+export interface DescriptionLineInfo {
+  value: string;
+  /** First character of the trimmed value, after any whitespace. */
+  valueStart: number;
+  /** End of the trimmed value, before trailing whitespace or an anchor. */
+  valueEnd: number;
+}
+
+/**
+ * Parse a DESCRIPTION: line exactly as TaskParser.getDescriptionText does:
+ * only a quote marker in column zero starts the quoted branch, and all quote
+ * markers are stripped before indentation is ignored. Returns null when the
+ * line is not a description.
+ */
+export function parseDescriptionLineInfo(
+  line: string,
+): DescriptionLineInfo | null {
+  const quotePrefix = line.startsWith('>')
+    ? (line.match(/^(>\s*)+/)?.[0] ?? '')
+    : '';
+  const afterQuotes = line.slice(quotePrefix.length);
+  const indentation = afterQuotes.match(/^\s*/)?.[0].length ?? 0;
+  const prefixStart = quotePrefix.length + indentation;
+  if (!line.slice(prefixStart).startsWith('DESCRIPTION:')) return null;
+
+  const prefixEnd = prefixStart + 'DESCRIPTION:'.length;
+  const rest = line.slice(prefixEnd);
+  const valueStart = prefixEnd + (rest.match(/^\s*/)?.[0].length ?? 0);
+  const value = splitTrailingBlockAnchor(rest).text.trim();
+  return {
+    value,
+    valueStart,
+    valueEnd: valueStart + value.length,
+  };
+}
+
+/** Value of a parser-owned DESCRIPTION line, or null for any other line. */
+export function parseDescriptionLine(line: string): string | null {
+  return parseDescriptionLineInfo(line)?.value ?? null;
+}
+
+/**
+ * Find a DESCRIPTION: line after a task line. Ownership mirrors
+ * TaskParser.getDescriptionText; the search follows the task's metadata block
+ * and stops at prose, a heading or the next task.
  *
  * @param lines - Array of lines to search
  * @param startIndex - Starting line index (typically task.line + 1)
@@ -305,65 +405,138 @@ export function findDescriptionLine(
   lines: string[],
   startIndex: number,
   taskIndent: string,
+  keywordManager?: KeywordManager,
 ): number {
-  return findKeywordLine(lines, startIndex, 'DESCRIPTION:', taskIndent);
+  return findDescriptionLineInSource(
+    { lineCount: () => lines.length, getLine: (line) => lines[line] },
+    startIndex,
+    taskIndent,
+    keywordManager,
+  );
 }
 
 /**
- * Find a keyword line after a task line, handling quoted lines.
+ * Find a parser-owned DESCRIPTION line through a line source. This lets the
+ * editor read only the task's metadata block instead of materialising the rest
+ * of the note before the same bounded scan runs.
  */
-function findKeywordLine(
-  lines: string[],
+export function findDescriptionLineInSource(
+  source: DescriptionLineSource,
   startIndex: number,
-  keyword: string,
   taskIndent: string,
+  keywordManager?: KeywordManager,
 ): number {
-  const maxLines = Math.min(startIndex + 9, lines.length);
+  const lineCount = source.lineCount();
+  const keywords = keywordManager?.getAllKeywords() ?? [];
+  const isBoundary = (line: string): boolean => {
+    const withoutQuote = line.replace(/^\s*(?:>\s*)+/, '');
+    // A callout is only a parser prefix immediately after one quote marker.
+    // `> > [!note] …` is quoted content, not a callout task.
+    const hasCalloutPrefix = /^\s*>\s*\[![^\]]+\]-?\s+/.test(line);
+    const withoutCallout = hasCalloutPrefix
+      ? withoutQuote.replace(/^\s*\[![^\]]+\]-?\s+/, '')
+      : withoutQuote;
+    // Strip the parser's optional heading, list and checkbox prefixes so
+    // numbered, letter and custom-list tasks are recognised just like bullet
+    // tasks. A keyword followed immediately by ':' is drawer metadata, not a
+    // task line; the parser accepts it as drawer content.
+    // Heading syntax is column-zero-only for the parser; a quoted or callout
+    // line that happens to contain `# TODO` is not a heading task.
+    const hasHeadingPrefix = /^#{1,6}\s+/.test(line);
+    const withoutHeading = hasHeadingPrefix
+      ? withoutCallout.replace(/^#{1,6}\s+/, '')
+      : withoutCallout;
+    const listMarker = /^\s*(?:[-*+]|\d+[.)]|[A-Za-z][.)]|\([A-Za-z0-9]+\))\s+/;
+    const hadList = listMarker.test(withoutHeading);
+    const withoutList = hadList
+      ? withoutHeading.replace(listMarker, '')
+      : withoutHeading;
+    const checkboxMarker = /^\s*\[[ xX\-/]\]\s+/;
+    const hadCheckbox = checkboxMarker.test(withoutList);
+    const taskCandidate = hadCheckbox
+      ? withoutList.replace(checkboxMarker, '')
+      : withoutList;
+    const isMetadataLike = /^\s*[^:\s]+:/.test(taskCandidate);
+    // The parser accepts at most one list marker, followed only by an optional
+    // checkbox and the keyword. Quote/heading syntax left after that point is
+    // prose, not a second task prefix.
+    const hasResidualTaskPrefix =
+      listMarker.test(withoutList) ||
+      listMarker.test(taskCandidate) ||
+      /^\s*>/.test(taskCandidate) ||
+      /^#{1,6}\s+/.test(taskCandidate);
+    // A non-heading task needs whitespace after its keyword. Heading tasks may
+    // end at the keyword, but only when they have no list/checkbox prefix.
+    const allowKeywordAtEnd = hasHeadingPrefix && !hadList && !hadCheckbox;
+    const keywordContent = taskCandidate.replace(/^\s*/, '');
+    // TaskParser's keyword regex is case-sensitive; lowercase `todo` is prose.
+    const hasKeywordPrefix = keywords.some((keyword) => {
+      if (!keywordContent.startsWith(keyword)) return false;
+      const next = keywordContent.charAt(keyword.length);
+      return next === '' ? allowKeywordAtEnd : /\s/.test(next);
+    });
+    return (
+      CHECKBOX_DETECTION_REGEX.test(line) ||
+      (hasKeywordPrefix && !isMetadataLike && !hasResidualTaskPrefix)
+    );
+  };
 
-  for (let i = startIndex; i < maxLines; i++) {
-    const line = lines[i];
-    const trimmedLine = line.trimStart();
+  for (let i = startIndex; i < lineCount; i++) {
+    const line = source.getLine(i);
+    if (line.trim() === '') continue;
 
-    const drawerEnd = propertiesDrawerEnd(lines, i);
-    if (drawerEnd >= 0) {
+    if (isOwnedPropertiesDrawerStart(line, taskIndent)) {
+      const drawerEnd = drawerEndAt(source, i, 'markdown', isBoundary);
+      if (drawerEnd < 0) return -1;
       i = drawerEnd;
       continue;
     }
 
-    if (lineStartsWithKeyword(line, keyword, taskIndent)) {
-      return i;
+    if (parseDescriptionLineInfo(line) !== null) return i;
+
+    if (
+      isOwnedDateLine(line, 'SCHEDULED:', taskIndent) ||
+      isOwnedDateLine(line, 'DEADLINE:', taskIndent) ||
+      isOwnedDateLine(line, 'CLOSED:', taskIndent) ||
+      isOwnedDateLine(line, 'STARTED:', taskIndent)
+    ) {
+      continue;
     }
 
-    // Stop at non-empty, non-date/keyword lines
-    if (trimmedLine !== '' && !isDateKeywordLine(trimmedLine)) {
-      break;
-    }
+    return -1;
   }
 
   return -1;
 }
 
 /**
- * Check if a line is a date keyword line (SCHEDULED:, DEADLINE:, CLOSED:, STARTED:, DESCRIPTION:).
- * Handles both bare and quoted (>, > >) forms.
+ * Whether a Markdown properties drawer starts on this line for this task.
+ * Mirrors TaskParser's drawer ownership: quoted drawers must share the task's
+ * quote prefix, and indentation must reach the task's indentation.
  */
-function isDateKeywordLine(line: string): boolean {
-  const trimmed = line.trimStart();
-  // Fast path: bare keywords (most common in vault-scan hot path)
-  if (
-    trimmed.startsWith('SCHEDULED:') ||
-    trimmed.startsWith('DEADLINE:') ||
-    trimmed.startsWith('CLOSED:') ||
-    trimmed.startsWith('STARTED:') ||
-    trimmed.startsWith('DESCRIPTION:')
-  ) {
-    return true;
+function isOwnedPropertiesDrawerStart(
+  line: string,
+  taskIndent: string,
+): boolean {
+  const parts = line.match(/^([ \t]*)((?:>[ \t]*)*)(.*)$/);
+  if (!parts) return false;
+  const lineIndent = parts[1] ?? '';
+  const lineQuotePrefix = parts[2] ?? '';
+  if ((parts[3] ?? '').trim() !== ':PROPERTIES:') return false;
+
+  const taskQuotePrefix = taskIndent.match(/(?:>[ \t]*)+/)?.[0] ?? '';
+  if (taskQuotePrefix && !lineQuotePrefix.startsWith(taskQuotePrefix)) {
+    return false;
   }
-  // Slow path: quoted keywords (only test regex for lines starting with >)
-  return (
-    trimmed.startsWith('>') &&
-    /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(trimmed)
-  );
+  if (!taskQuotePrefix && lineQuotePrefix.trim() !== '') return false;
+
+  const taskWhitespace = taskQuotePrefix
+    ? taskIndent.slice(0, taskIndent.indexOf(taskQuotePrefix))
+    : taskIndent;
+  const taskIndentLength = /^#{1,6}\s+$/.test(taskIndent)
+    ? 0
+    : getIndentLength(taskWhitespace);
+  return getIndentLength(lineIndent) >= taskIndentLength;
 }
 
 /**
@@ -389,31 +562,6 @@ function isOwnedDateLine(
   const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
   const lineIndent = line.substring(0, line.length - trimmed.length);
   return getIndentLength(lineIndent) >= taskIndentLength;
-}
-
-/**
- * Shared quote-aware keyword matcher. Returns true if `line` starts with
- * `keyword` after stripping quote prefixes, respecting `taskIndent` quote level.
- */
-function lineStartsWithKeyword(
-  line: string,
-  keyword: string,
-  taskIndent: string,
-): boolean {
-  const trimmedLine = line.trimStart();
-
-  if (trimmedLine.startsWith('>')) {
-    const quotePrefix = trimmedLine.match(/^(>\s*)+/)?.[0] ?? '';
-    const contentAfterQuotes = trimmedLine.substring(quotePrefix.length).trim();
-    if (contentAfterQuotes.startsWith(keyword)) {
-      const taskQuotePrefix = taskIndent.match(/(\s*(>\s*)+)/)?.[1] ?? '';
-      return taskQuotePrefix !== '' && quotePrefix.startsWith(taskQuotePrefix);
-    }
-    return false;
-  }
-
-  const taskHasQuotes = taskIndent.match(/(>\s*)+/)?.[0] ?? '';
-  return taskHasQuotes === '' && trimmedLine.startsWith(keyword);
 }
 
 /**
