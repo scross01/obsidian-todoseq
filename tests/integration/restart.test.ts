@@ -1,8 +1,16 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
 import { getPage, releaseSession, saveCoverage } from './helpers/session';
-import { launchObsidian, closeObsidian } from './helpers/obsidian-launcher';
+import { REPO_ROOT } from './helpers/harness';
+import { requestOwnerOperation } from './helpers/process-owner';
 import { openSettings, navigateToPluginTab } from './helpers/assertions';
 import { Page } from 'playwright';
+
+const OWNER_DESCRIPTOR_PATH = path.join(
+  REPO_ROOT,
+  'test-results',
+  'obsidian-owner.json',
+);
 
 /**
  * Verifies plugin settings survive a real Obsidian process restart.
@@ -44,15 +52,22 @@ test('settings persist across Obsidian restart', async () => {
   // 2. Save coverage from the first Obsidian instance before closing it.
   await saveCoverage();
 
-  // 3. Disconnect Playwright, then close Obsidian (kills the isolated process
-  //    only, via the CDP-port-scoped kill).
+  // 3. Disconnect Playwright, then ask the runner that actually spawned the
+  //    instance to stop it. A CDP port is not ownership.
   await releaseSession();
-  await closeObsidian();
+  const stopped = await requestOwnerOperation(OWNER_DESCRIPTOR_PATH, 'stop', {
+    timeoutMs: 15_000,
+  });
+  expect(stopped.running).toBe(false);
 
-  // 4. Relaunch a fresh isolated instance — same --user-data-dir, so the
-  //    persisted data.json is read back in.
-  const relaunched = await launchObsidian();
-  page = relaunched.page;
+  // 4. Ask the same owner to relaunch — same --user-data-dir, so the persisted
+  //    data.json is read back in.
+  const started = await requestOwnerOperation(OWNER_DESCRIPTOR_PATH, 'start', {
+    timeoutMs: 90_000,
+  });
+  expect(started.running).toBe(true);
+  expect(started.runId).toBe(stopped.runId);
+  page = await getPage();
 
   // 5. Verify the value survived.
   const settingsPage2 = await openSettings(page);

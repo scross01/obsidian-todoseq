@@ -1,6 +1,7 @@
 import { Browser, Page } from 'playwright';
-import { spawn, execSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import http from 'http';
+import { assertPortAvailable } from './process-owner';
 import {
   USER_DATA_DIR,
   TEST_VAULT_DIR,
@@ -42,11 +43,16 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function httpGet(url: string): Promise<number> {
+function httpGet(url: string, timeoutMs = 2_000): Promise<number> {
   return new Promise((resolve, reject) => {
     const req = http.get(url, (res) => {
       resolve(res.statusCode ?? 0);
       res.resume();
+    });
+    // A listener can accept TCP and never answer. Without a per-probe timeout,
+    // the waitForCDP deadline never gets a chance to run.
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`CDP probe timed out after ${timeoutMs}ms`));
     });
     req.on('error', reject);
     req.end();
@@ -62,6 +68,14 @@ function httpGet(url: string): Promise<number> {
  * captured stdio is *not* a renderer-crash stack — killing the renderer
  * produces no stderr at all (verified), so do not expect one here.
  */
+function hasExited(proc: ChildProcess): boolean {
+  // A failed spawn has no pid and emits no usable exit event. Treat it as
+  // gone so the lease can be released instead of waiting out SIGKILL.
+  return (
+    proc.pid === undefined || proc.exitCode !== null || proc.signalCode !== null
+  );
+}
+
 async function waitForCDP(timeoutMs = 60_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -71,6 +85,14 @@ async function waitForCDP(timeoutMs = 60_000): Promise<void> {
     if (processLog.hasFailedToSpawn()) {
       throw launchFailure(
         `Obsidian failed to launch (${processLog.describeExit()})`,
+      );
+    }
+    // If the wrapper command exited, a listener that remains on the port is a
+    // detached descendant. We do not own a handle for it and must not adopt
+    // it by port discovery.
+    if (obsidianProcess && hasExited(obsidianProcess)) {
+      throw launchFailure(
+        `Obsidian process ${obsidianProcess.pid ?? 'unknown'} exited while waiting for CDP (${processLog.describeExit()}). Refusing to connect to a listener that may belong to an unowned descendant.`,
       );
     }
     try {
@@ -103,71 +125,80 @@ function launchFailure(message: string): Error {
   );
 }
 
-async function isCDPUp(): Promise<boolean> {
-  try {
-    const status = await httpGet(`http://127.0.0.1:${CDP_PORT}/json/version`);
-    return status === 200;
-  } catch {
-    return false;
-  }
+interface SpawnedShutdown {
+  hadHandle: boolean;
+  stopped: boolean;
 }
 
 /**
- * Kill the process we spawned (SIGTERM, then SIGKILL fallback).
+ * Stop the process this launcher spawned (SIGTERM, then SIGKILL fallback).
+ * A process killed by signal reports `exitCode === null`; both fields decide
+ * whether a handle is gone.
  */
-async function killSpawned(): Promise<void> {
+async function killSpawned(): Promise<SpawnedShutdown> {
   const proc = obsidianProcess;
-  obsidianProcess = null;
-  if (!proc || proc.exitCode !== null) return;
+  if (!proc) return { hadHandle: false, stopped: true };
+  if (hasExited(proc)) {
+    if (obsidianProcess === proc) obsidianProcess = null;
+    return { hadHandle: true, stopped: true };
+  }
 
   // Distinguish a harness-initiated shutdown in the log from a process that
   // died on its own: the exit record reads "exited on signal SIGTERM" either
   // way, and that ambiguity is exactly what makes a crash hard to spot.
-  processLog.note('stopping Obsidian (SIGTERM)');
+  processLog.note('stopping owned Obsidian (SIGTERM)');
 
-  await new Promise<void>((resolve) => {
-    const onGone = () => resolve();
-    proc.once('exit', onGone);
+  const stopped = await new Promise<boolean>((resolve) => {
+    let settled = false;
+    let force: NodeJS.Timeout | null = null;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (force) clearTimeout(force);
+      resolve(value);
+    };
+
+    proc.once('exit', () => finish(true));
+    proc.once('error', () => finish(false));
     proc.kill('SIGTERM');
-    const force = setTimeout(() => {
+
+    force = setTimeout(() => {
       proc.kill('SIGKILL');
-      resolve();
+      setTimeout(() => {
+        finish(hasExited(proc));
+      }, 500);
     }, 5_000);
-    proc.once('exit', () => clearTimeout(force));
   });
+
+  // Keep the only handle to a process that did not exit: a later stop (or the
+  // setup failure path) must be able to retry instead of leaking it.
+  if (stopped) {
+    if (obsidianProcess === proc) obsidianProcess = null;
+  } else if (obsidianProcess === null) {
+    obsidianProcess = proc;
+  }
+
+  return { hadHandle: true, stopped };
 }
 
-/**
- * Kill any Obsidian process listening on our isolated CDP port.
- *
- * Scoped to the port so it can never touch the user's real Obsidian instance
- * (which is not on this port). Used when this module must take over an instance
- * it didn't spawn — e.g. the restart test, where globalSetup launched Obsidian
- * in a different Node process.
- */
-async function killObsidianOnCDP(): Promise<void> {
-  if (!(await isCDPUp())) return;
-
-  try {
-    // lsof finds the PID listening on the CDP port; scoped, never global.
-    const pid = execSync(`lsof -ti tcp:${CDP_PORT} -sTCP:LISTEN`, {
-      encoding: 'utf8',
-    }).trim();
-    if (pid) {
-      try {
-        process.kill(Number(pid), 'SIGTERM');
-      } catch {
-        // already gone
-      }
-      // Wait for the port to free up.
-      const deadline = Date.now() + 10_000;
-      while (Date.now() < deadline && (await isCDPUp())) {
-        await sleep(200);
-      }
+/** Refuse to treat an occupied owned port as a successful shutdown. */
+async function confirmOwnedPortReleased(): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      await assertPortAvailable(CDP_PORT);
+      return;
+    } catch (error) {
+      lastError = error;
+      await sleep(100);
     }
-  } catch {
-    // lsof found nothing — already gone.
   }
+  const detail =
+    lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(
+    `Owned Obsidian exited but its CDP listener is still present. ${detail}`,
+  );
 }
 
 /**
@@ -189,11 +220,18 @@ export async function launchObsidian(): Promise<{
   browser: Browser;
   page: Page;
 }> {
-  // Kill our tracked process, and any instance on our CDP port that we didn't
-  // spawn (e.g. one launched by globalSetup in another Node process). Scoped to
-  // the port — never kills the user's real Obsidian.
-  await killSpawned();
-  await killObsidianOnCDP();
+  // Stop only a process this module actually spawned. An occupied port that
+  // remains after that is not ours to identify or terminate.
+  const previous = await killSpawned();
+  if (!previous.stopped) {
+    throw new Error(
+      'The previously spawned Obsidian process did not exit; refusing to launch another instance.',
+    );
+  }
+  if (previous.hadHandle) {
+    await confirmOwnedPortReleased();
+  }
+  await assertPortAvailable(CDP_PORT);
 
   // Truncate only once the outgoing instance has exited, so its shutdown note
   // and exit record are written before the file is emptied rather than landing
@@ -237,6 +275,12 @@ export async function launchObsidian(): Promise<{
   await waitForCDP();
 
   const { browser, page } = await connectOverCDP(CDP_PORT);
+  if (obsidianProcess && hasExited(obsidianProcess)) {
+    await browser.close().catch(() => {});
+    throw launchFailure(
+      `Obsidian process ${obsidianProcess.pid ?? 'unknown'} exited while CDP became available (${processLog.describeExit()}). Refusing to use a listener that may belong to an unowned descendant.`,
+    );
+  }
 
   // Resize the actual Electron window via electron.remote.
   // Fallback to window.resizeTo if remote is unavailable (e.g. after update).
@@ -324,14 +368,21 @@ async function waitForPlugin(
 /**
  * Close the Obsidian instance and disconnect Playwright.
  *
- * Kills our tracked process if we spawned one; otherwise falls back to killing
- * whatever is on our CDP port (scoped — never the user's real instance). The
- * fallback lets the restart test close an instance launched by globalSetup.
+ * Stops only a handle retained by this module. Callers that need to stop an
+ * instance launched by another process must use the authenticated owner
+ * control endpoint instead; a CDP port alone is never permission to signal.
  */
 export async function closeObsidian(browser?: Browser): Promise<void> {
   if (browser) {
     await browser.close().catch(() => {});
   }
-  await killSpawned();
-  await killObsidianOnCDP();
+  const shutdown = await killSpawned();
+  if (!shutdown.stopped) {
+    throw new Error(
+      'The owned Obsidian process did not exit; refusing to treat the CDP port as free or delete its fixtures.',
+    );
+  }
+  if (shutdown.hadHandle) {
+    await confirmOwnedPortReleased();
+  }
 }
