@@ -209,6 +209,13 @@ interface PendingFileQueue {
   timestamp: number;
 }
 
+/**
+ * Re-resolved queued target: a task when identified, null when a parsed live
+ * file verified that it is absent, and undefined when verification was
+ * unavailable. Only the last case may fall back to an already-resolved row.
+ */
+type QueuedSourceResolution = Task | null | undefined;
+
 export class TaskUpdateCoordinator {
   private recurrenceCoordinator: RecurrenceCoordinator;
   private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
@@ -370,8 +377,8 @@ export class TaskUpdateCoordinator {
 
     if (hasStableTaskIdentity(task)) return null;
 
-    const byContent = scoped.filter(
-      (candidate) => candidate.text === task.text,
+    const byContent = scoped.filter((candidate) =>
+      taskIdentityMatches(candidate, task),
     );
     return byContent.length === 1 ? byContent[0] : null;
   }
@@ -423,7 +430,7 @@ export class TaskUpdateCoordinator {
   private async resolveQueuedSourceTask(
     context: ProcessingContext,
     identity: Task,
-  ): Promise<Task | null> {
+  ): Promise<QueuedSourceResolution> {
     const recovered = this.recoveredFileTasks.get(context.filePath);
     if (recovered) {
       return this.selectVerifiedTask(recovered, identity);
@@ -438,7 +445,7 @@ export class TaskUpdateCoordinator {
     }
 
     const live = await this.liveFileTasks(identity.path);
-    if (!live) return context.source === 'editor' ? identity : null;
+    if (!live) return context.source === 'editor' ? identity : undefined;
     return this.selectVerifiedTask(live, identity);
   }
 
@@ -458,6 +465,10 @@ export class TaskUpdateCoordinator {
         !this.sameRepeat(
           sourceTask.scheduledDateRepeat,
           context.task.scheduledDateRepeat,
+        ) ||
+        !this.sameWarningPeriod(
+          sourceTask.scheduledWarningPeriod,
+          context.task.scheduledWarningPeriod,
         ))
     ) {
       return false;
@@ -468,6 +479,10 @@ export class TaskUpdateCoordinator {
         !this.sameRepeat(
           sourceTask.deadlineDateRepeat,
           context.task.deadlineDateRepeat,
+        ) ||
+        !this.sameWarningPeriod(
+          sourceTask.deadlineWarningPeriod,
+          context.task.deadlineWarningPeriod,
         ))
     ) {
       return false;
@@ -485,10 +500,19 @@ export class TaskUpdateCoordinator {
     b: DateRepeatInfo | null,
   ): boolean {
     if (a === null || b === null) return a === b;
-    // The note may spell the same interval with a different repeat type
-    // (e.g. a fixture or a converted `. +`/`+` spelling). The occurrence is
-    // still the same if its interval and unit agree.
-    return a.unit === b.unit && a.value === b.value;
+    return a.type === b.type && a.unit === b.unit && a.value === b.value;
+  }
+
+  private sameWarningPeriod(
+    a: WarningPeriodInfo | null,
+    b: WarningPeriodInfo | null,
+  ): boolean {
+    if (a === null || b === null) return a === b;
+    return (
+      a.value === b.value &&
+      a.unit === b.unit &&
+      a.isFirstOnly === b.isFirstOnly
+    );
   }
 
   /** True when this request would move an incomplete task to completion. */
@@ -1035,14 +1059,32 @@ export class TaskUpdateCoordinator {
         context.source !== 'archive-undo' &&
         this.keywordManager.isCompleted(context.originalNewState);
       const recurrenceRequest = context.type === 'recurrence';
+      const queuedTargetRequest =
+        context.source !== 'archive-undo' &&
+        (context.type === 'state' ||
+          context.type === 'scheduled-date' ||
+          context.type === 'deadline-date' ||
+          context.type === 'priority');
 
-      if (completionRequest || recurrenceRequest) {
+      if (completionRequest || recurrenceRequest || queuedTargetRequest) {
         // Identity comes from the original request, never from a row that a
-        // previous write or recovery left at the captured position.
-        const sourceTask = await this.resolveQueuedSourceTask(
+        // previous write or recovery left at the captured position. A
+        // non-completion request may fall back to the already-resolved row
+        // only when that row still matches the request's identity.
+        const resolved = await this.resolveQueuedSourceTask(
           context,
           context.task,
         );
+        let sourceTask = resolved ?? null;
+        if (
+          !sourceTask &&
+          resolved === undefined &&
+          !completionRequest &&
+          !recurrenceRequest &&
+          taskIdentityMatches(currentTask, context.task)
+        ) {
+          sourceTask = currentTask;
+        }
         if (!sourceTask) {
           await this.recoverPersistedTasks(context, generation);
           return {
@@ -1278,6 +1320,10 @@ export class TaskUpdateCoordinator {
               context.newScheduledDate !== undefined
                 ? context.task.scheduledDateRepeat
                 : undefined,
+            scheduledWarningPeriod:
+              context.newScheduledDate !== undefined
+                ? context.task.scheduledWarningPeriod
+                : undefined,
             deadlineDate:
               context.newDeadlineDate !== undefined
                 ? context.task.deadlineDate
@@ -1285,6 +1331,10 @@ export class TaskUpdateCoordinator {
             deadlineDateRepeat:
               context.newDeadlineDate !== undefined
                 ? context.task.deadlineDateRepeat
+                : undefined,
+            deadlineWarningPeriod:
+              context.newDeadlineDate !== undefined
+                ? context.task.deadlineWarningPeriod
                 : undefined,
           },
         });

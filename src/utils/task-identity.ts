@@ -19,7 +19,7 @@ export function taskIdentityMatches(candidate: Task, task: Task): boolean {
   }
 
   const expectedAnchor = taskAnchor(task);
-  if (expectedAnchor && taskAnchor(candidate) !== expectedAnchor) {
+  if (taskAnchor(candidate) !== expectedAnchor) {
     return false;
   }
 

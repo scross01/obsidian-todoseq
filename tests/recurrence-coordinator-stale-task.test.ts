@@ -443,4 +443,27 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(result.success).toBe(false);
     expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
   });
+
+  it('refuses an identified sibling when the anonymous target is gone', async () => {
+    const staleTask = createBaseTask();
+    const identified: Task = {
+      ...staleTask,
+      line: 0,
+      id: 'sibling',
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([identified]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      identified,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
+    );
+
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
+
+    expect(result.success).toBe(false);
+    expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
+  });
 });

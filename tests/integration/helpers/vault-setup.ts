@@ -176,6 +176,49 @@ due: ${dateStr}
 `,
   );
 
+  // Two same-title recurring rows with distinct IDs. Completing the first
+  // must advance only that row, never the same-title decoy.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-identity.md'),
+    `# Recurrence Identity Test
+
+- [ ] TODO Identity target
+  SCHEDULED: <${todayStr} +1d>
+  :PROPERTIES:
+  :ID: identity-target
+  :END:
+
+- [ ] TODO Identity target
+  SCHEDULED: <${todayStr} +1d>
+  :PROPERTIES:
+  :ID: identity-decoy
+  :END:
+`,
+  );
+
+  // Table-cell recurrence with a regular warning period. The rollover must
+  // advance the inline date and keep the warning while preserving the row.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-table-warning.md'),
+    `# Recurrence Table Warning Test
+
+| Task | Note |
+|------|------|
+| TODO Table warning task<br>SCHEDULED: <${todayStr} .+1d -3d> | keep |
+`,
+  );
+
+  // Warning-period edit before completion: the edited value must survive the
+  // rollover instead of restoring the old period.
+  fs.writeFileSync(
+    path.join(TEST_VAULT_DIR, 'recurrence-warning-edit.md'),
+    `# Recurrence Warning Edit Test
+
+- [ ] TODO Warning edit task
+  SCHEDULED: <${todayStr} +1d -3d>
+`,
+  );
+
   // Empty file for external-change testing (will be modified by test)
   fs.writeFileSync(
     path.join(TEST_VAULT_DIR, 'external-change.md'),

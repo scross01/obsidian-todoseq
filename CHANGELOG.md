@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Scheduled and deadline changes from a table date picker now leave the table unchanged and report a failure if the task row is replaced while the picker is open. A unique moved row is still followed.
+- A recurring task now recognises its own ID drawer anywhere in its block instead of stopping at a fixed distance; prose, a heading or the next task still ends the block, and a description line with extra quote markers or no indentation no longer ends it early.
+- Table-cell editor actions now show the reason when an update cannot be verified instead of failing silently, and leave the table unchanged.
+- A repeating task whose date line sits in a blockquote under an unquoted task now rolls that line over in place, instead of refusing the rollover or adding a second date line.
+- Completing an Org task no longer rewrites `CLOSED:` or `STARTED:` text that appears inside the note's prose, and a properties drawer below a line carrying an inline schedule still identifies the entry for rollover.
+- Changing a scheduled or deadline date from the date picker now keeps the task's warning period, and a warning chosen in the picker is saved instead of ignored.
+- Anonymous queued updates and recurrence rollovers no longer adopt a same-title row that has its own ID or block anchor. A drawer quoted separately from the task is also no longer treated as the task's identity.
+- Cycling a recurring task in a Markdown table cell from the editor now advances its inline SCHEDULED/DEADLINE date and preserves warning periods. Previously the command dropped the inline recurrence metadata and left the completed occurrence unchanged.
+- Queued state, priority and date changes now stay with the task you edited when another change moves it, instead of changing a same-title task that took its old line. A row that cannot be matched to the task or its ID/anchor is left unchanged.
+- Recurrence rollovers now refuse a same-title replacement block that has gained an ID or block anchor, and a delayed rollover no longer overwrites a warning-period edit made while it was waiting. A valid drawer ID with trailing whitespace now rolls over normally.
+- Fixed recurrence rollovers on indented tasks and stopped a delayed rollover from overwriting a repeater mode changed to `.+` or `++` while it was waiting. Org recurrence now ignores planning-looking property values, and a property drawer below description or other body text is no longer taken as the entry's identity, so such entries roll over normally.
 - Fixed queued completions and recurrence rollovers following a same-title task with a different block anchor. They now require the requested task's ID or anchor, and a recurrence stops if its date or repeater was edited while it was waiting.
 - Fixed Org recurrence overwriting a fixed DEADLINE that shares a line with a repeating SCHEDULED date, and stopped a delayed rollover from accepting a longer title at the old row.
 - Completing a task now stays blocked until its prerequisite is actually saved, even if another file finishes scanning or the completion is requested again from a row that already looks complete. The dependency check and the write use the same verified row, so a duplicate identity or an unidentifiable row is refused instead of completing a neighbor.

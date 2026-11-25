@@ -26,14 +26,22 @@ export function getIndentLength(indent: string): number {
 }
 
 /** Return the closing :END: index for a drawer starting at i, if bounded. */
-function propertiesDrawerEnd(lines: string[], i: number): number {
+function propertiesDrawerEnd(
+  lines: string[],
+  i: number,
+  format: 'markdown' | 'org' = 'markdown',
+): number {
   if (lines[i]?.trim() !== ':PROPERTIES:') return -1;
   for (let j = i + 1; j < lines.length; j++) {
     // The Markdown anchored form is accepted here too: this helper only
     // locates the drawer to skip it during date/description discovery, and a
     // newline-terminated `:END: ^anchor` would otherwise look unclosed.
-    if (isDrawerEndLine(lines[j], 'markdown')) return j;
-    if (/^\*+\s/.test(lines[j])) return -1;
+    if (isDrawerEndLine(lines[j], format)) return j;
+    // The Org parser ends an entry at any line whose first character is '*',
+    // including a body line such as '*bold*'; Markdown keeps its heading rule.
+    if (format === 'org' ? /^\*/.test(lines[j]) : /^\*+\s/.test(lines[j])) {
+      return -1;
+    }
   }
   return -1;
 }
@@ -73,7 +81,7 @@ export function findDateLine(
       continue;
     }
 
-    if (lineStartsWithKeyword(line, keyword, taskIndent)) {
+    if (isOwnedDateLine(line, keyword, taskIndent)) {
       return i;
     }
 
@@ -227,10 +235,27 @@ export function findOrgPlanningToken(
 ): OrgPlanningToken | null {
   for (let i = startIndex; i < lines.length; i++) {
     const line = lines[i];
-    if (/^\*+\s/.test(line)) break;
+    // Mirror extractTaskDates: any leading '*' ends the entry, not just a
+    // heading-shaped '* ' line, so '*bold*' body text is a boundary too.
+    if (/^\*/.test(line)) break;
 
+    // Property values are not planning metadata. A closed drawer is skipped
+    // whole; an unclosed one stops the entry exactly as the Org parser does.
+    if (line.trim() === ':PROPERTIES:') {
+      const drawerEnd = propertiesDrawerEnd(lines, i, 'org');
+      if (drawerEnd < 0) break;
+      i = drawerEnd;
+      continue;
+    }
+
+    // Mirror OrgModeTaskParser.extractTaskDates: CLOSED and STARTED are
+    // anchored to the start of the line; a matching token inside prose is
+    // body text, not history metadata.
+    const anchored = dateType === 'CLOSED' || dateType === 'STARTED';
     const match = new RegExp(
-      `\\b${dateType}:\\s*(<[^>]+>|\\[[^\\]]+\\])`,
+      anchored
+        ? `^\\s*${dateType}:\\s*(<[^>]+>|\\[[^\\]]+\\])`
+        : `\\b${dateType}:\\s*(<[^>]+>|\\[[^\\]]+\\])`,
       'i',
     ).exec(line);
     if (!match) continue;
@@ -339,6 +364,31 @@ function isDateKeywordLine(line: string): boolean {
     trimmed.startsWith('>') &&
     /^(>\s*)+(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(trimmed)
   );
+}
+
+/**
+ * Parser-exact date-line ownership (TaskParser.getDateLineType): a line that
+ * starts with '>' owns exactly one quote marker, whatever the task's own quote
+ * level or indentation; an unquoted date line must be indented at least as far
+ * as the task (headings use column 0). Matching this exactly keeps the writer
+ * on the line the parser read instead of inserting a duplicate or editing body
+ * text.
+ */
+function isOwnedDateLine(
+  line: string,
+  keyword: string,
+  taskIndent: string,
+): boolean {
+  if (line.startsWith('>')) {
+    return line.trim().substring(1).trim().startsWith(keyword);
+  }
+
+  const trimmed = line.trimStart();
+  if (!trimmed.startsWith(keyword)) return false;
+  const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
+  const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
+  const lineIndent = line.substring(0, line.length - trimmed.length);
+  return getIndentLength(lineIndent) >= taskIndentLength;
 }
 
 /**

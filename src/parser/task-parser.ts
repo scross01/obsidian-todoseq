@@ -1433,92 +1433,114 @@ export class TaskParser implements ITaskParser {
     const tasks: Task[] = [];
 
     for (let i = 0; i < cells.length; i++) {
-      const { content } = cells[i];
-      if (!content || isSeparatorCell(content)) continue;
-
-      const taskLine = getCellTaskLine(content);
-      if (!taskLine || !this.testRegex.test(taskLine)) continue;
-
-      const match = this.captureRegex.exec(taskLine);
-      if (!match) continue;
-
-      const { priority, cleanedText, embedReference, footnoteReference } =
-        this.extractPriority(match[5] || '');
-
-      const task: Task = {
-        path: filePath,
-        line: rowIndex,
-        rawText: taskLine,
-        sourceFormat: 'markdown',
-        indent: match[1] || '',
-        listMarker: (match[2] || '') + (match[3] || ''),
-        text: cleanedText,
-        state: match[4],
-        completed: this.keywordManager.isCompleted(match[4]),
-        priority,
-        scheduledDate: null,
-        scheduledDateRepeat: null,
-        deadlineDate: null,
-        deadlineDateRepeat: null,
-        closedDate: null,
-        startedDate: null,
-        scheduledWarningPeriod: null,
-        deadlineWarningPeriod: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-        embedReference,
-        footnoteReference,
-        quoteNestingLevel: 0,
-        subtaskCount: 0,
-        subtaskCompletedCount: 0,
-        isTableTask: true,
-        tableCell: { cellIndex: i },
-      };
-
-      // Parse inline dates and description from <br>-separated parts
-      const parts = content.split(/<br\s*\/?>/i);
-      for (let j = 1; j < parts.length; j++) {
-        const part = parts[j].trim();
-        const dateContent = part
-          .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/i, '')
-          .trim();
-        if (/^SCHEDULED:/i.test(part)) {
-          const p = DateParser.parseDateWithRepeater(dateContent);
-          if (p.date) {
-            task.scheduledDate = p.date;
-            task.scheduledDateRepeat = p.repeat;
-            task.scheduledWarningPeriod = p.warningPeriod;
-          }
-        } else if (/^DEADLINE:/i.test(part)) {
-          const p = DateParser.parseDateWithRepeater(dateContent);
-          if (p.date) {
-            task.deadlineDate = p.date;
-            task.deadlineDateRepeat = p.repeat;
-            task.deadlineWarningPeriod = p.warningPeriod;
-          }
-        } else if (/^CLOSED:/i.test(part)) {
-          // CLOSED dates use [date] brackets (inactive-date convention, same
-          // as non-cell CLOSED lines). DateParser only matches <date>, so
-          // normalize — tolerating historic bracket depths ([date], [[date]],
-          // [[[date]]] from an earlier double-wrapping writer bug) by
-          // stripping ALL leading/trailing brackets first.
-          const content = dateContent.replace(/^\[+/, '').replace(/\]+$/, '');
-          const p = DateParser.parseDateWithRepeater(`<${content}>`);
-          if (p.date) {
-            task.closedDate = p.date;
-          }
-        } else if (task.description === undefined) {
-          const descText = this.getDescriptionText(part);
-          if (descText !== null) {
-            task.description = descText || undefined;
-          }
-        }
-      }
-
-      tasks.push(task);
+      const task = this.parseTableTaskFromCell(
+        cells[i].content,
+        rowIndex,
+        filePath,
+        i,
+      );
+      if (task) tasks.push(task);
     }
     return tasks;
+  }
+
+  /**
+   * Parse one table cell as a task, including its inline dates and description.
+   *
+   * The cell's first `<br>` segment is the task line; later segments carry
+   * `SCHEDULED`/`DEADLINE`/`CLOSED` and `DESCRIPTION:`. Editor commands must
+   * use this rather than parsing only the first segment, otherwise recurrence
+   * and warning metadata are lost before the update reaches the coordinator.
+   */
+  public parseTableTaskFromCell(
+    content: string,
+    rowIndex: number,
+    filePath: string,
+    cellIndex: number,
+  ): Task | null {
+    if (!content || isSeparatorCell(content)) return null;
+
+    const taskLine = getCellTaskLine(content);
+    if (!taskLine || !this.testRegex.test(taskLine)) return null;
+
+    const match = this.captureRegex.exec(taskLine);
+    if (!match) return null;
+
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      this.extractPriority(match[5] || '');
+
+    const task: Task = {
+      path: filePath,
+      line: rowIndex,
+      rawText: taskLine,
+      sourceFormat: 'markdown',
+      indent: match[1] || '',
+      listMarker: (match[2] || '') + (match[3] || ''),
+      text: cleanedText,
+      state: match[4],
+      completed: this.keywordManager.isCompleted(match[4]),
+      priority,
+      scheduledDate: null,
+      scheduledDateRepeat: null,
+      deadlineDate: null,
+      deadlineDateRepeat: null,
+      closedDate: null,
+      startedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+      embedReference,
+      footnoteReference,
+      quoteNestingLevel: 0,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
+      isTableTask: true,
+      tableCell: { cellIndex },
+    };
+
+    // Parse inline dates and description from <br>-separated parts
+    const parts = content.split(/<br\s*\/?>/i);
+    for (let j = 1; j < parts.length; j++) {
+      const part = parts[j].trim();
+      const dateContent = part
+        .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/i, '')
+        .trim();
+      if (/^SCHEDULED:/i.test(part)) {
+        const p = DateParser.parseDateWithRepeater(dateContent);
+        if (p.date) {
+          task.scheduledDate = p.date;
+          task.scheduledDateRepeat = p.repeat;
+          task.scheduledWarningPeriod = p.warningPeriod;
+        }
+      } else if (/^DEADLINE:/i.test(part)) {
+        const p = DateParser.parseDateWithRepeater(dateContent);
+        if (p.date) {
+          task.deadlineDate = p.date;
+          task.deadlineDateRepeat = p.repeat;
+          task.deadlineWarningPeriod = p.warningPeriod;
+        }
+      } else if (/^CLOSED:/i.test(part)) {
+        // CLOSED dates use [date] brackets (inactive-date convention, same
+        // as non-cell CLOSED lines). DateParser only matches <date>, so
+        // normalize — tolerating historic bracket depths ([date], [[date]],
+        // [[[date]]] from an earlier double-wrapping writer bug) by
+        // stripping ALL leading/trailing brackets first.
+        const content = dateContent.replace(/^\[+/, '').replace(/\]+$/, '');
+        const p = DateParser.parseDateWithRepeater(`<${content}>`);
+        if (p.date) {
+          task.closedDate = p.date;
+        }
+      } else if (task.description === undefined) {
+        const descText = this.getDescriptionText(part);
+        if (descText !== null) {
+          task.description = descText || undefined;
+        }
+      }
+    }
+
+    return task;
   }
 
   /**

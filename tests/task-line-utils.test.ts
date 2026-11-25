@@ -7,6 +7,7 @@ import {
   findDateLine,
   findDateLineWithParser,
   findDescriptionLine,
+  findOrgPlanningToken,
   getIndentLength,
   getDateLineIndent,
 } from '../src/utils/task-line-utils';
@@ -378,23 +379,23 @@ describe('task-line-utils', () => {
       expect(result).toBe(-1);
     });
 
-    it('should not find date line at wrong quote level', () => {
+    it('finds an unquoted date line at the quoted task indent', () => {
+      // getDateLineType compares lengths only: '> ' and two spaces are equal.
       const lines = ['> TODO task c', '  SCHEDULED: <2026-03-10>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '> ', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should not find an unquoted date line shallower than the task', () => {
+      const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
-    it('should find date line at any indent level', () => {
-      // With new behavior, any indent level is allowed for non-quoted lines
-      const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
+    it('should not find an unindented date line under an indented bullet task', () => {
+      const lines = ['  - TODO task e', 'SCHEDULED: <2026-03-10>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(1);
-    });
-
-    it('should not find date line without indent for bullet task', () => {
-      const lines = ['- TODO task e', 'SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(1);
+      expect(result).toBe(-1);
     });
 
     it('should find CLOSED date line', () => {
@@ -421,11 +422,10 @@ describe('task-line-utils', () => {
       expect(result).toBe(1);
     });
 
-    // New behavior tests - any indent level is allowed for non-quoted lines
-    it('should find date line at any indent level for non-quoted task', () => {
+    it('should not find an unindented date line under an indented task', () => {
       const lines = ['   TODO test 1', 'SCHEDULED: <2026-03-20>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '   ', keywordManager);
-      expect(result).toBe(1);
+      expect(result).toBe(-1);
     });
 
     it('should find date line at deeper indent for non-quoted task', () => {
@@ -440,10 +440,12 @@ describe('task-line-utils', () => {
       expect(result).toBe(1);
     });
 
-    it('should not find date line at different quote level', () => {
+    it('should find a quoted date line under an unquoted task, as the parser owns it', () => {
+      // TaskParser.getDateLineType strips one quote marker and ignores the
+      // task's own quote level, so this line is the task's date.
       const lines = ['TODO test 1', '> SCHEDULED: <2026-03-20>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
-      expect(result).toBe(-1);
+      expect(result).toBe(1);
     });
 
     it('should not find date line without quotes when task has quotes', () => {
@@ -452,8 +454,30 @@ describe('task-line-utils', () => {
       expect(result).toBe(-1);
     });
 
-    it('should not find date line with quotes when task has no quotes', () => {
-      const lines = ['TODO test 1', '> SCHEDULED: <2026-03-20>'];
+    it('should find a quoted date line under a double-quoted task', () => {
+      // getDateLineType strips exactly one marker, so this is the task's date.
+      const lines = ['> > TODO test 3', '> SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(
+        lines,
+        1,
+        'SCHEDULED',
+        '> > ',
+        keywordManager,
+      );
+      expect(result).toBe(1);
+    });
+
+    it('should not find a date line whose quote is indented', () => {
+      // The parser only treats '>' in the first column as a quote marker.
+      const lines = ['TODO test 1', '  > SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
+      expect(result).toBe(-1);
+    });
+
+    it('should not find a double-quoted date line the parser does not own', () => {
+      // getDateLineType removes exactly one quote marker, so the remaining
+      // '> SCHEDULED:' is body text, not a date.
+      const lines = ['TODO test 1', '> > SCHEDULED: <2026-03-20>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
       expect(result).toBe(-1);
     });
@@ -749,6 +773,77 @@ describe('task-line-utils', () => {
         '  DESCRIPTION: details',
       ];
       expect(findDescriptionLine(lines, 1, '')).toBe(4);
+    });
+  });
+
+  describe('findOrgPlanningToken', () => {
+    it('skips a bounded properties drawer', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':SCHEDULED: <2026-06-30 Tue>',
+        ':END:',
+        '   SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')?.dateText).toBe(
+        '<2026-06-24 Wed +1d>',
+      );
+    });
+
+    it('does not read an unclosed drawer across the next headline', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':SCHEDULED: <2026-06-24 Wed +1d>',
+        '* TODO Next',
+        '   SCHEDULED: <2026-06-25 Thu +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+
+    it('does not accept a Markdown-only anchored :END: in Org', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':SCHEDULED: <2026-06-30 Tue>',
+        ':END: ^anchor',
+        '   SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+
+    it('finds CLOSED only at the start of a line', () => {
+      // The Org parser anchors CLOSED to the line start; prose is body text.
+      const lines = [
+        '* TODO Task',
+        'Archived note CLOSED: [2026-06-20 Sat]',
+        '   CLOSED: [2026-06-21 Sun]',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'CLOSED')?.dateText).toBe(
+        '[2026-06-21 Sun]',
+      );
+    });
+
+    it('stops at a leading star that is not a spaced heading', () => {
+      // extractTaskDates breaks on any line whose first character is '*'.
+      const lines = [
+        '* TODO Task',
+        '*bold* note',
+        'SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+
+    it('treats a leading star inside a drawer as an unclosed boundary', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':ID: x',
+        '*bold* line',
+        ':END:',
+        'SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
     });
   });
 

@@ -21,9 +21,11 @@ import { buildWarningPeriodString } from '../utils/date-repeater';
 import {
   findDateLine,
   findDescriptionLine,
+  isTaskLine,
   parseTableCells,
   getTaskIndent,
   getDateLineIndent,
+  getIndentLength,
   supportsTaskMetadata,
   replaceTableCellContent,
   findOrgPlanningToken,
@@ -281,12 +283,55 @@ export class TaskWriter {
       const cell = parseTableCells(line)[task.tableCell.cellIndex];
       if (!cell) return false;
       const taskPart = cell.content.split(/<br\s*\/?>/i)[0]?.trim() ?? '';
+      // A table state write stores the whole cell in rawText, including the
+      // <br> date metadata, so compare task segments on both sides: an anchor
+      // at the end of the cell's task part is not at the end of the cell.
+      const expectedPart = expected.split(/<br\s*\/?>/i)[0]?.trim() ?? '';
+      if (taskPart === expectedPart) return true;
       const body = taskPart
         .replace(/^[\s>]*(?:[-*+]\s+)?(?:\[[ xX]\]\s+)?/, '')
         .replace(/^\[#(?:A|B|C)\]\s+/, '');
-      return body === expected || body === `${task.state} ${task.text}`.trim();
+      if (body !== `${task.state} ${task.text}`.trim()) return false;
+      // The parser strips a trailing block anchor out of `task.text`, so the
+      // normalized form also matches a replacement row that dropped the
+      // anchor. The anchor is the block's identity: prefer the verified
+      // task's own anchor (embedReference survives a full-cell snapshot).
+      const expectedAnchor =
+        task.embedReference?.replace(/^\^/, '').trim() ||
+        splitTrailingBlockAnchor(expectedPart).anchor;
+      return splitTrailingBlockAnchor(taskPart).anchor === expectedAnchor;
     }
-    return line.trimEnd() === expected;
+    return line.trim() === expected;
+  }
+
+  /**
+   * A queued rollover may only mutate the block that carried the request's
+   * authored identity. Headline text and planning values can be identical in
+   * two blocks; the drawer ID and block-end anchor distinguish them.
+   */
+  private blockIdentityMatches(lines: string[], task: Task): boolean {
+    if (task.isTableTask) return true;
+
+    // Compare both presence and value. A replacement block that introduces
+    // an anchor where the verified target had none is just as much a
+    // different block as one whose anchor changed.
+    if (task.sourceFormat !== 'org' && task.sourceFormat !== 'code-comment') {
+      const expectedAnchor =
+        task.embedReference?.replace(/^\^/, '').trim() || null;
+      const actualAnchor =
+        findTaskBlockAnchor(lines, task.line, getTaskIndent(task))?.anchor ??
+        null;
+      if (actualAnchor !== expectedAnchor) return false;
+    }
+
+    const drawer = this.findOwnedPropertiesDrawer(lines, task);
+    const ids =
+      drawer?.entries.filter((entry) => entry.canonicalKey === 'ID') ?? [];
+    if (!task.id) return ids.length === 0;
+    if (ids.length !== 1) return false;
+    return (
+      extractTaskProperties(drawer!, this.propertyFormat(task)).id === task.id
+    );
   }
 
   /** Recurrence-specific planning values carried from the queued request. */
@@ -297,8 +342,10 @@ export class TaskWriter {
       | {
           scheduledDate?: Date | null;
           scheduledDateRepeat?: DateRepeatInfo | null;
+          scheduledWarningPeriod?: WarningPeriodInfo | null;
           deadlineDate?: Date | null;
           deadlineDateRepeat?: DateRepeatInfo | null;
+          deadlineWarningPeriod?: WarningPeriodInfo | null;
         }
       | undefined,
   ): boolean {
@@ -311,6 +358,7 @@ export class TaskWriter {
           'SCHEDULED',
           expected.scheduledDate,
           expected.scheduledDateRepeat ?? null,
+          expected.scheduledWarningPeriod,
         )) &&
       (expected.deadlineDate === undefined ||
         this.planningValueMatches(
@@ -319,6 +367,7 @@ export class TaskWriter {
           'DEADLINE',
           expected.deadlineDate,
           expected.deadlineDateRepeat ?? null,
+          expected.deadlineWarningPeriod,
         ))
     );
   }
@@ -329,6 +378,7 @@ export class TaskWriter {
     dateType: 'SCHEDULED' | 'DEADLINE',
     expectedDate: Date | null,
     expectedRepeat: DateRepeatInfo | null,
+    expectedWarning: WarningPeriodInfo | null | undefined,
   ): boolean {
     let dateText: string | null = null;
 
@@ -350,11 +400,19 @@ export class TaskWriter {
         )?.[1] ?? null;
     }
 
-    if (!dateText) return expectedDate === null && expectedRepeat === null;
+    if (!dateText) {
+      return (
+        expectedDate === null &&
+        expectedRepeat === null &&
+        (expectedWarning === undefined || expectedWarning === null)
+      );
+    }
     const parsed = DateParser.parseDateWithRepeater(dateText);
     return (
       this.sameDate(parsed.date, expectedDate) &&
-      this.sameRepeat(parsed.repeat, expectedRepeat)
+      this.sameRepeat(parsed.repeat, expectedRepeat) &&
+      (expectedWarning === undefined ||
+        this.sameWarningPeriod(parsed.warningPeriod, expectedWarning ?? null))
     );
   }
 
@@ -368,7 +426,19 @@ export class TaskWriter {
     b: DateRepeatInfo | null,
   ): boolean {
     if (a === null || b === null) return a === b;
-    return a.unit === b.unit && a.value === b.value;
+    return a.type === b.type && a.unit === b.unit && a.value === b.value;
+  }
+
+  private sameWarningPeriod(
+    a: WarningPeriodInfo | null,
+    b: WarningPeriodInfo | null,
+  ): boolean {
+    if (a === null || b === null) return a === b;
+    return (
+      a.value === b.value &&
+      a.unit === b.unit &&
+      a.isFirstOnly === b.isFirstOnly
+    );
   }
 
   private tableCellPlanningMatches(
@@ -377,8 +447,10 @@ export class TaskWriter {
       | {
           scheduledDate?: Date | null;
           scheduledDateRepeat?: DateRepeatInfo | null;
+          scheduledWarningPeriod?: WarningPeriodInfo | null;
           deadlineDate?: Date | null;
           deadlineDateRepeat?: DateRepeatInfo | null;
+          deadlineWarningPeriod?: WarningPeriodInfo | null;
         }
       | undefined,
   ): boolean {
@@ -387,6 +459,7 @@ export class TaskWriter {
       dateType: 'SCHEDULED' | 'DEADLINE',
       expectedDate: Date | null | undefined,
       expectedRepeat: DateRepeatInfo | null | undefined,
+      expectedWarning: WarningPeriodInfo | null | undefined,
     ): boolean => {
       if (expectedDate === undefined) return true;
       const dateText =
@@ -396,11 +469,19 @@ export class TaskWriter {
             'i',
           ),
         )?.[1] ?? null;
-      if (!dateText) return expectedDate === null && !expectedRepeat;
+      if (!dateText) {
+        return (
+          expectedDate === null &&
+          !expectedRepeat &&
+          (expectedWarning === undefined || expectedWarning === null)
+        );
+      }
       const parsed = DateParser.parseDateWithRepeater(dateText);
       return (
         this.sameDate(parsed.date, expectedDate) &&
-        this.sameRepeat(parsed.repeat, expectedRepeat ?? null)
+        this.sameRepeat(parsed.repeat, expectedRepeat ?? null) &&
+        (expectedWarning === undefined ||
+          this.sameWarningPeriod(parsed.warningPeriod, expectedWarning ?? null))
       );
     };
 
@@ -409,8 +490,14 @@ export class TaskWriter {
         'SCHEDULED',
         expected.scheduledDate,
         expected.scheduledDateRepeat,
+        expected.scheduledWarningPeriod,
       ) &&
-      matches('DEADLINE', expected.deadlineDate, expected.deadlineDateRepeat)
+      matches(
+        'DEADLINE',
+        expected.deadlineDate,
+        expected.deadlineDateRepeat,
+        expected.deadlineWarningPeriod,
+      )
     );
   }
 
@@ -422,7 +509,11 @@ export class TaskWriter {
   private static taskLineAnchor(task: Task): string | undefined {
     const reference = task.embedReference;
     if (!reference) return undefined;
-    let text = task.rawText.trimEnd();
+    // A table state write leaves the <br> date metadata in rawText, so the
+    // task segment — not the full cell — is where its anchor can end.
+    let text = task.isTableTask
+      ? (task.rawText.split(/<br\s*\/?>/i)[0]?.trimEnd() ?? '')
+      : task.rawText.trimEnd();
     const footnote = task.footnoteReference;
     if (footnote && text.endsWith(footnote)) {
       text = text.slice(0, -footnote.length);
@@ -661,9 +752,101 @@ export class TaskWriter {
       }
       if (line.trim() === '') continue;
       if (format === 'org' && /^\*/.test(line)) break;
-      if (/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(line)) {
+      if (
+        /^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/.test(
+          line,
+        )
+      ) {
         continue;
       }
+      break;
+    }
+    return null;
+  }
+
+  /**
+   * True when a Markdown line is planning metadata the parser scans past.
+   *
+   * Mirror TaskParser.getDateLineType and getDescriptionText individually:
+   * date lines only count when quoted in column 0 or indented to the task's
+   * indent, while a description strips every quote prefix and ignores its
+   * indentation. Treating descriptions as date lines ends a valid block early
+   * (`> > DESCRIPTION:` or an unindented `DESCRIPTION:` under an indented
+   * task), so the recurrence guard rejects a rollover the parser owns.
+   */
+  private isMarkdownPlanningMetadataLine(
+    line: string,
+    taskIndent: string,
+  ): boolean {
+    const dateLine = /^(SCHEDULED|DEADLINE|CLOSED|STARTED):/;
+    if (line.startsWith('>')) {
+      // A quoted date line is owned at any indent: the parser trims the line
+      // and removes exactly one quote marker before matching.
+      if (dateLine.test(line.trim().substring(1).trim())) return true;
+    } else {
+      const trimmed = line.trimStart();
+      if (dateLine.test(trimmed)) {
+        const lineIndent = line.slice(0, line.length - trimmed.length);
+        const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
+        const taskIndentLength = isHeadingIndent
+          ? 0
+          : getIndentLength(taskIndent);
+        return getIndentLength(lineIndent) >= taskIndentLength;
+      }
+    }
+
+    // getDescriptionText strips every leading quote marker and ignores
+    // indentation, so both an indented `> DESCRIPTION:` and an unindented
+    // description under an indented task still belong to the block.
+    const quotePrefix = line.startsWith('>')
+      ? (line.match(/^(>\s*)+/)?.[0] ?? '')
+      : '';
+    return line
+      .slice(quotePrefix.length)
+      .trimStart()
+      .startsWith('DESCRIPTION:');
+  }
+
+  /**
+   * Find the drawer the parser would attach to this task. An unrelated quoted
+   * or differently indented drawer belongs to another block and must not
+   * become the recurrence guard's expected identity. Blank lines and planning
+   * metadata do not end a block, so this scan follows the parser rather than
+   * a separate fixed-distance limit; prose or a heading stops it.
+   */
+  private findOwnedPropertiesDrawer(
+    lines: string[],
+    task: Task,
+  ): TaskPropertiesDrawer | null {
+    const format = this.propertyFormat(task);
+    const taskIndent = format === 'markdown' ? getTaskIndent(task) : undefined;
+    for (let i = task.line + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (isPropertiesDrawerStart(line, format, taskIndent)) {
+        return readTaskPropertiesDrawer(lines, i, format, {
+          taskIndent,
+          isBoundary: (boundary) =>
+            isTaskLine(boundary, this.keywordManager) ||
+            /^#{1,6}\s+/.test(boundary) ||
+            CHECKBOX_DETECTION_REGEX.test(boundary),
+        });
+      }
+      if (line.trim() === '') continue;
+      if (format === 'org' && /^\*/.test(line)) break;
+      // Org has no DESCRIPTION line. The Org parser treats any non-planning
+      // line as body text, and a drawer after body text is not attached as
+      // entry properties, so it must not supply (or block) the identity here.
+      // Mirror its classification: a first SCHEDULED/DEADLINE timestamp keeps
+      // the line planning even inside a note, while CLOSED/STARTED only count
+      // at the start of a line.
+      const orgPlanning =
+        /(?:^|\s)(?:SCHEDULED|DEADLINE):\s*(?:<[^>]+>|\[[^\]]+\])/.test(line) ||
+        /^\s*(?:CLOSED|STARTED):/.test(line);
+      const planningMetadata =
+        format === 'org'
+          ? orgPlanning
+          : this.isMarkdownPlanningMetadataLine(line, taskIndent ?? '');
+      if (planningMetadata) continue;
       break;
     }
     return null;
@@ -2136,13 +2319,14 @@ export class TaskWriter {
     task: Task,
     mutate: (cellContent: string) => string,
     expected?: Task,
-  ): Promise<void> {
+    changedMessage = 'Task row changed before recurrence update',
+  ): Promise<boolean> {
     const file = this.app.vault.getAbstractFileByPath(task.path);
-    if (!(file instanceof TFile)) return;
+    if (!(file instanceof TFile)) return false;
 
     const mutateLine = (line: string): string | null => {
       if (expected && !this.lineMatchesRecurrenceTarget(line, expected)) {
-        throw new Error('Task row changed before recurrence update');
+        throw new Error(changedMessage);
       }
       const cell = parseTableCells(line)[task.tableCell!.cellIndex];
       if (!cell) return null;
@@ -2168,25 +2352,28 @@ export class TaskWriter {
 
     if (isSourceMode) {
       const line = editor.getLine(task.line);
-      if (typeof line !== 'string') return;
+      if (typeof line !== 'string') return false;
       const newLine = mutateLine(line);
-      if (newLine === null) return;
+      if (newLine === null) return false;
       editor.replaceRange(
         newLine,
         { line: task.line, ch: 0 },
         { line: task.line, ch: line.length },
       );
-      return;
+      return true;
     }
 
+    let applied = false;
     await this.app.vault.process(file, (data) => {
       const lines = data.split('\n');
       if (task.line >= lines.length) return data;
       const newLine = mutateLine(lines[task.line]);
       if (newLine === null) return data;
       lines[task.line] = newLine;
+      applied = true;
       return lines.join('\n');
     });
+    return applied;
   }
 
   private async applyTableCellUpdate(
@@ -2218,36 +2405,45 @@ export class TaskWriter {
     const closedAction = this.resolveClosedDateAction(task, newState);
 
     let fullCellContent = cellContent;
-    await this.modifyTableCell(task, (origCell) => {
-      const brIdx = origCell.indexOf('<br');
-      let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+    const applied = await this.modifyTableCell(
+      task,
+      (origCell) => {
+        const brIdx = origCell.indexOf('<br');
+        let dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
 
-      if (closedAction === 'add') {
-        const closedDateStr = DateUtils.formatClosedDate(new Date());
-        // Cell CLOSED dates use the same [date] single-bracket format as
-        // non-cell CLOSED lines (formatClosedDate output is already
-        // bracketed — do NOT wrap again). The pattern tolerates historic
-        // bracket depths ([date], [[date]], [[[date]]]) from earlier
-        // writers so re-stamping migrates them in place.
-        const closedPattern = /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,3}[^\]]*\]{1,3}/i;
-        const closedTag = `<br>CLOSED: ${closedDateStr}`;
-        dateSuffix = closedPattern.test(dateSuffix)
-          ? dateSuffix.replace(closedPattern, closedTag)
-          : `${dateSuffix}${closedTag}`;
-      } else if (closedAction === 'remove') {
-        // Tolerate historic bracket depths: [[[date]]] (double-wrapping bug
-        // output), [[date]], [date]. Matching {1,3} on both sides removes
-        // the whole tag — a {1,2} matcher would orphan trailing ']'s.
-        dateSuffix = dateSuffix.replace(
-          /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,3}[^\]]*\]{1,3}/i,
-          '',
-        );
-      }
-      // closedAction === 'keep': leave any existing CLOSED tag untouched.
+        if (closedAction === 'add') {
+          const closedDateStr = DateUtils.formatClosedDate(new Date());
+          // Cell CLOSED dates use the same [date] single-bracket format as
+          // non-cell CLOSED lines (formatClosedDate output is already
+          // bracketed — do NOT wrap again). The pattern tolerates historic
+          // bracket depths ([date], [[date]], [[[date]]]) from earlier
+          // writers so re-stamping migrates them in place.
+          const closedPattern =
+            /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,3}[^\]]*\]{1,3}/i;
+          const closedTag = `<br>CLOSED: ${closedDateStr}`;
+          dateSuffix = closedPattern.test(dateSuffix)
+            ? dateSuffix.replace(closedPattern, closedTag)
+            : `${dateSuffix}${closedTag}`;
+        } else if (closedAction === 'remove') {
+          // Tolerate historic bracket depths: [[[date]]] (double-wrapping bug
+          // output), [[date]], [date]. Matching {1,3} on both sides removes
+          // the whole tag — a {1,2} matcher would orphan trailing ']'s.
+          dateSuffix = dateSuffix.replace(
+            /\s*<br\s*\/?>\s*CLOSED:\s*\[{1,3}[^\]]*\]{1,3}/i,
+            '',
+          );
+        }
+        // closedAction === 'keep': leave any existing CLOSED tag untouched.
 
-      fullCellContent = `${cellContent}${dateSuffix}`;
-      return fullCellContent;
-    });
+        fullCellContent = `${cellContent}${dateSuffix}`;
+        return fullCellContent;
+      },
+      task,
+      'Task row changed before state update',
+    );
+    if (!applied) {
+      throw new Error('Task row changed before state update');
+    }
 
     const closedDate =
       closedAction === 'add'
@@ -2274,11 +2470,19 @@ export class TaskWriter {
     cellContent: string,
     extraUpdates: Partial<Task>,
   ): Promise<Task> {
-    await this.modifyTableCell(task, (origCell) => {
-      const brIdx = origCell.indexOf('<br');
-      const dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
-      return `${cellContent}${dateSuffix}`;
-    });
+    const applied = await this.modifyTableCell(
+      task,
+      (origCell) => {
+        const brIdx = origCell.indexOf('<br');
+        const dateSuffix = brIdx >= 0 ? origCell.substring(brIdx) : '';
+        return `${cellContent}${dateSuffix}`;
+      },
+      task,
+      'Task row changed before priority update',
+    );
+    if (!applied) {
+      throw new Error('Task row changed before priority update');
+    }
 
     return { ...task, rawText: cellContent, ...extraUpdates };
   }
@@ -2300,13 +2504,24 @@ export class TaskWriter {
       warningPeriod,
     );
 
-    await this.modifyTableCell(task, (cell) => {
-      const dateTag = `${dateType}: ${dateStr}`;
-      const existing = new RegExp(`<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`, 'i');
-      return existing.test(cell)
-        ? cell.replace(existing, `<br>${dateTag}`)
-        : `${cell}<br>${dateTag}`;
-    });
+    const applied = await this.modifyTableCell(
+      task,
+      (cell) => {
+        const dateTag = `${dateType}: ${dateStr}`;
+        const existing = new RegExp(
+          `<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
+          'i',
+        );
+        return existing.test(cell)
+          ? cell.replace(existing, `<br>${dateTag}`)
+          : `${cell}<br>${dateTag}`;
+      },
+      task,
+      'Task row changed before date update',
+    );
+    if (!applied) {
+      throw new Error('Task row changed before date update');
+    }
 
     const result: Task & { lineDelta?: number } = {
       ...task,
@@ -2333,23 +2548,31 @@ export class TaskWriter {
     task: Task,
     dateType: 'SCHEDULED' | 'DEADLINE' | 'CLOSED',
   ): Promise<Task & { lineDelta?: number }> {
-    await this.modifyTableCell(task, (cell) => {
-      if (dateType === 'CLOSED') {
-        // Tolerate historic bracket depths: [date], [[date]], [[[date]]]
-        // (the triple form is output of an earlier double-wrapping bug).
+    const applied = await this.modifyTableCell(
+      task,
+      (cell) => {
+        if (dateType === 'CLOSED') {
+          // Tolerate historic bracket depths: [date], [[date]], [[[date]]]
+          // (the triple form is output of an earlier double-wrapping bug).
+          const datePattern = new RegExp(
+            `\\s*<br\\s*/?>\\s*${dateType}:\\s*\\[{1,3}[^\\]]*\\]{1,3}`,
+            'i',
+          );
+          return cell.replace(datePattern, '');
+        }
+        // SCHEDULED and DEADLINE use <date> format
         const datePattern = new RegExp(
-          `\\s*<br\\s*/?>\\s*${dateType}:\\s*\\[{1,3}[^\\]]*\\]{1,3}`,
+          `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
           'i',
         );
         return cell.replace(datePattern, '');
-      }
-      // SCHEDULED and DEADLINE use <date> format
-      const datePattern = new RegExp(
-        `\\s*<br\\s*/?>\\s*${dateType}:\\s*<[^>]+>`,
-        'i',
-      );
-      return cell.replace(datePattern, '');
-    });
+      },
+      task,
+      'Task row changed before date update',
+    );
+    if (!applied) {
+      throw new Error('Task row changed before date update');
+    }
 
     const result: Task & { lineDelta?: number } = {
       ...task,
@@ -2383,15 +2606,17 @@ export class TaskWriter {
       expectedRecurrence?: {
         scheduledDate?: Date | null;
         scheduledDateRepeat?: DateRepeatInfo | null;
+        scheduledWarningPeriod?: WarningPeriodInfo | null;
         deadlineDate?: Date | null;
         deadlineDateRepeat?: DateRepeatInfo | null;
+        deadlineWarningPeriod?: WarningPeriodInfo | null;
       };
     },
     startedReset: { shouldResetStarted: boolean },
   ): Promise<Task & { lineDelta?: number }> {
     let newCellContent = task.rawText;
 
-    await this.modifyTableCell(
+    const applied = await this.modifyTableCell(
       task,
       (origCell) => {
         if (
@@ -2479,6 +2704,9 @@ export class TaskWriter {
       },
       task,
     );
+    if (!applied) {
+      throw new Error('Task row changed before recurrence update');
+    }
 
     const completed =
       options.newState !== undefined
@@ -2577,7 +2805,12 @@ export class TaskWriter {
             ? '[#B]'
             : '[#C]';
       const text = task.text ? ` ${task.text}` : '';
-      const cellContent = `${task.state} ${priorityToken}${text}`;
+      // A table cell's identity anchor is not part of task.text; carry it
+      // through the rebuild so a priority edit never drops the anchor.
+      const anchor = task.embedReference?.trim();
+      const cellContent = `${task.state} ${priorityToken}${text}${
+        anchor ? ` ${anchor}` : ''
+      }`;
       return this.applyTableCellContent(task, cellContent, {
         priority: newPriority,
       });
@@ -2675,7 +2908,8 @@ export class TaskWriter {
     // Table tasks: update cell content only
     if (task.isTableTask && task.tableCell) {
       const text = task.text ? ` ${task.text}` : '';
-      const cellContent = `${task.state}${text}`;
+      const anchor = task.embedReference?.trim();
+      const cellContent = `${task.state}${text}${anchor ? ` ${anchor}` : ''}`;
       return this.applyTableCellContent(task, cellContent, { priority: null });
     }
 
@@ -3542,12 +3776,20 @@ export class TaskWriter {
       expectedRecurrence?: {
         scheduledDate?: Date | null;
         scheduledDateRepeat?: DateRepeatInfo | null;
+        scheduledWarningPeriod?: WarningPeriodInfo | null;
         deadlineDate?: Date | null;
         deadlineDateRepeat?: DateRepeatInfo | null;
+        deadlineWarningPeriod?: WarningPeriodInfo | null;
       };
     },
   ): Promise<Task & { lineDelta?: number }> {
     const file = this.app.vault.getAbstractFileByPath(task.path);
+    // A deleted or renamed note leaves nothing to roll over. Returning the
+    // advanced snapshot here would let the coordinator publish a write that
+    // never happened, so fail like the table row guard does.
+    if (!(file instanceof TFile)) {
+      throw new Error('Task row changed before recurrence update');
+    }
     let lineDelta = 0;
 
     let newRawText: string | undefined;
@@ -3595,7 +3837,7 @@ export class TaskWriter {
       });
     }
 
-    if (file && file instanceof TFile) {
+    if (file instanceof TFile) {
       if (isSourceMode && editor) {
         // Use Editor API to avoid external file modification warning
         const taskIndent = getTaskIndent(task);
@@ -3603,6 +3845,7 @@ export class TaskWriter {
         const editorLines = this.editorLines(editor);
         if (
           !this.lineMatchesRecurrenceTarget(editor.getLine(task.line), task) ||
+          !this.blockIdentityMatches(editorLines, task) ||
           !this.recurrencePlanningMatches(
             editorLines,
             task,
@@ -3697,6 +3940,7 @@ export class TaskWriter {
           const lines = data.split('\n');
           if (
             !this.lineMatchesRecurrenceTarget(lines[task.line], task) ||
+            !this.blockIdentityMatches(lines, task) ||
             !this.recurrencePlanningMatches(
               lines,
               task,

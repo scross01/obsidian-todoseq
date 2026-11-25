@@ -350,6 +350,8 @@ describe('TaskWriter - STARTED date handling', () => {
         rawText: 'TODO Task text',
         text: 'Task text',
       });
+      // The live row must be the table cell the snapshot identifies.
+      lines = ['| TODO Task text |'];
       // Table path goes through applyTableCellUpdate via applyLineUpdate
       const result = await taskWriter.applyLineUpdate(cellTask, 'DOING');
       expect(result.state).toBe('DOING');

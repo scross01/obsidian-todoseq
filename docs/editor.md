@@ -84,9 +84,17 @@ When tasks use the checkbox format, you have additional interaction options:
 
 Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states. The task keyword is automatically synchronized with the checkbox state.
 
+### Queued Task Updates
+
+State, priority, scheduled-date and deadline-date changes are saved one at a time per note. If another edit moves the task while a change is waiting, TODOseq follows the task's ID or block anchor instead of trusting the old line. An anonymous task is followed while the row at its captured position still matches, or to the one row in the note with the same content; if the captured row changed and no unique match remains, the queued change is dropped and the note is left unchanged.
+
+### Table Cell Tasks
+
+State commands, checkbox toggles and context-menu changes work on tasks inside Markdown tables. A table task keeps its inline `<br>SCHEDULED:` and `<br>DEADLINE:` dates when its state changes, including repeaters and warning periods. Completing a recurring table task from the editor rolls the row to its next inactive state and advances the inline date without changing the other cells. If a table action cannot verify the target task, the editor shows the reason and leaves the table unchanged instead of failing silently. A date chosen from the table date picker is checked again immediately before the cell is written: if the task row was replaced while the picker was open, the date is not applied and the editor reports the failure. A task that moved to another row remains targetable by its unique content.
+
 ### Entering Scheduled and Deadline Dates
 
-TODOseq provides multiple ways to add scheduled and deadline dates to your tasks:
+TODOseq provides multiple ways to add scheduled and deadline dates to your tasks. When the picker opens it starts from the task's current date, repeater and warning period, and saving writes back the warning you selected, so changing a date keeps an existing warning unless you clear it.
 
 #### Manual Date Entry
 

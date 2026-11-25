@@ -340,8 +340,8 @@ export class RecurrenceCoordinator {
 
     if (hasStableTaskIdentity(task)) return null;
 
-    const byText = candidates.filter(
-      (candidate) => candidate.text === task.text,
+    const byText = candidates.filter((candidate) =>
+      taskIdentityMatches(candidate, task),
     );
     return byText.length === 1 ? byText[0] : null;
   }
