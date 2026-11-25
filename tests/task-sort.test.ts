@@ -6,6 +6,7 @@ import {
   taskComparator,
   classifyAll,
   classifyTask,
+  classifyContext,
   TaskClassification,
   // Keyword sort types and functions
   getKeywordGroup,
@@ -16,6 +17,7 @@ import {
 import { Task } from '../src/types/task';
 import { createBaseTask } from './helpers/test-helper';
 import { KeywordManager } from '../src/utils/keyword-manager';
+import { DateUtils } from '../src/utils/date-utils';
 import { createUrgencyScoreAccessor } from '../src/utils/task-urgency';
 import { getTaskKey } from '../src/utils/task-utils';
 
@@ -231,6 +233,71 @@ describe('Task Sorting System', () => {
       skipScheduledWarningPeriodIfDeadline: false,
       skipDeadlinePrewarningIfScheduled: false,
     };
+
+    it('does not allocate through addDays when warning periods are zero', () => {
+      const settings = {
+        upcomingPeriod: 7,
+        defaultDeadlineWarningPeriod: 0,
+        defaultScheduledWarningPeriod: 0,
+        skipScheduledWarningPeriodIfDeadline: false,
+        skipDeadlinePrewarningIfScheduled: false,
+      };
+      const now = new Date(2024, 0, 15, 12);
+      const task = createTask({
+        scheduledDate: new Date(2024, 0, 16),
+        deadlineDate: new Date(2024, 0, 18),
+      });
+      const context = classifyContext(now, settings);
+      const addDays = jest.spyOn(DateUtils, 'addDays');
+
+      try {
+        const result = classifyTask(task, now, settings, context);
+        expect(addDays).not.toHaveBeenCalled();
+        expect(result.category).toBe('upcoming');
+        expect(result.earliestDate?.getTime()).toBe(
+          task.scheduledDate?.getTime(),
+        );
+      } finally {
+        addDays.mockRestore();
+      }
+    });
+
+    it('preserves a zero-offset time component in the classification', () => {
+      const now = new Date(2024, 0, 15, 12);
+      const scheduled = new Date(2024, 0, 16, 9, 30);
+      const task = createTask({ scheduledDate: scheduled });
+
+      const result = classifyTask(
+        task,
+        now,
+        warningSettings,
+        classifyContext(now, warningSettings),
+      );
+
+      expect(result.category).toBe('upcoming');
+      expect(result.earliestDate?.getTime()).toBe(scheduled.getTime());
+    });
+
+    it('still applies a non-zero scheduled warning offset', () => {
+      const now = new Date(2024, 0, 15, 12);
+      const settings = {
+        ...warningSettings,
+        defaultScheduledWarningPeriod: 2,
+      };
+      const task = createTask({ scheduledDate: new Date(2024, 0, 16) });
+
+      const result = classifyTask(
+        task,
+        now,
+        settings,
+        classifyContext(now, settings),
+      );
+
+      expect(result.category).toBe('upcoming');
+      expect(result.earliestDate?.getTime()).toBe(
+        new Date(2024, 0, 18).getTime(),
+      );
+    });
 
     it('matches per-task classifyTask for every task (with warning settings)', () => {
       const tasks = [

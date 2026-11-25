@@ -312,19 +312,10 @@ export interface WarningPeriodSettings {
 }
 
 /**
- * Get the effective visibility date for a task, accounting for warning periods.
- * For deadlines: effective date = deadline - warning period (appears earlier)
- * For scheduled: effective date = scheduled + delay (appears later)
- *
- * Both -Nd (all occurrences) and --Nd (first-only) affect visibility the same way.
- * The difference is only in recurrence: --Nd is stripped after first occurrence,
- * while -Nd persists across repeats. This function uses whichever is set.
- *
- * @param task The task to analyze
- * @param settings Warning period settings
- * @returns The effective visibility date or null if no dates
+ * Internal zero-allocation resolver for classification. The returned Date may
+ * be one of the task's own Date objects; callers must treat it as read-only.
  */
-export function getEffectiveVisibilityDate(
+function resolveEffectiveVisibilityDate(
   task: Task,
   settings: WarningPeriodSettings,
 ): Date | null {
@@ -336,14 +327,14 @@ export function getEffectiveVisibilityDate(
     const scheduledDelay = scheduledWarningInfo
       ? warningPeriodToDays(scheduledWarningInfo)
       : settings.defaultScheduledWarningPeriod;
-    if (settings.skipScheduledWarningPeriodIfDeadline && task.deadlineDate) {
-      effectiveScheduled = task.scheduledDate;
-    } else {
-      effectiveScheduled = DateUtils.addDays(
-        task.scheduledDate,
-        scheduledDelay,
-      );
-    }
+    // Task dates are Date objects at runtime. Keep addDays' coercion for
+    // legacy fixtures and callers that still supply a date string.
+    effectiveScheduled =
+      task.scheduledDate instanceof Date &&
+      ((settings.skipScheduledWarningPeriodIfDeadline && task.deadlineDate) ||
+        scheduledDelay === 0)
+        ? task.scheduledDate
+        : DateUtils.addDays(task.scheduledDate, scheduledDelay);
   }
 
   if (task.deadlineDate) {
@@ -351,11 +342,12 @@ export function getEffectiveVisibilityDate(
     const warningDays = deadlineWarningInfo
       ? warningPeriodToDays(deadlineWarningInfo)
       : settings.defaultDeadlineWarningPeriod;
-    if (settings.skipDeadlinePrewarningIfScheduled && task.scheduledDate) {
-      effectiveDeadline = task.deadlineDate;
-    } else {
-      effectiveDeadline = DateUtils.addDays(task.deadlineDate, -warningDays);
-    }
+    effectiveDeadline =
+      task.deadlineDate instanceof Date &&
+      ((settings.skipDeadlinePrewarningIfScheduled && task.scheduledDate) ||
+        warningDays === 0)
+        ? task.deadlineDate
+        : DateUtils.addDays(task.deadlineDate, -warningDays);
   }
 
   if (!effectiveScheduled) return effectiveDeadline;
@@ -363,6 +355,27 @@ export function getEffectiveVisibilityDate(
   return effectiveScheduled < effectiveDeadline
     ? effectiveScheduled
     : effectiveDeadline;
+}
+
+/**
+ * Get the effective visibility date for a task, accounting for warning periods.
+ * For deadlines: effective date = deadline - warning period (appears earlier)
+ * For scheduled: effective date = scheduled + delay (appears later)
+ *
+ * Both -Nd (all occurrences) and --Nd (first-only) affect visibility the same way.
+ * The difference is only in recurrence: --Nd is stripped after first occurrence,
+ * while -Nd persists across repeats. This function uses whichever is set.
+ *
+ * @param task The task to analyze
+ * @param settings Warning period settings
+ * @returns A fresh Date with the effective visibility date, or null if no dates
+ */
+export function getEffectiveVisibilityDate(
+  task: Task,
+  settings: WarningPeriodSettings,
+): Date | null {
+  const effective = resolveEffectiveVisibilityDate(task, settings);
+  return effective ? new Date(effective) : null;
 }
 
 /**
@@ -388,7 +401,7 @@ export function classifyTask(
   }
 
   const effectiveDate = settings
-    ? getEffectiveVisibilityDate(task, settings)
+    ? resolveEffectiveVisibilityDate(task, settings)
     : getEarliestDate(task);
 
   // Tasks with no dates are current

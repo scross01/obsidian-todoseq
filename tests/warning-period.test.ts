@@ -375,6 +375,15 @@ describe('Warning Period', () => {
       expect(result).toEqual(new Date('2026-06-15'));
     });
 
+    it('keeps returning a new Date for zero-offset visibility', () => {
+      const scheduled = new Date(2024, 0, 16);
+      const task = createBaseTask({ scheduledDate: scheduled });
+      const result = getEffectiveVisibilityDate(task, defaultSettings);
+
+      expect(result?.getTime()).toBe(scheduled.getTime());
+      expect(result).not.toBe(scheduled);
+    });
+
     it('should return deadline date unchanged when no warning period', () => {
       const task = createBaseTask({
         deadlineDate: new Date('2026-06-20'),
