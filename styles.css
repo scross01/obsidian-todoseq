@@ -1204,6 +1204,21 @@
   height: 16px;
 }
 
+/* Obsidian's reading-view `.task-list-item-checkbox` rule offsets the box by
+   0.2em, while its source-view rule uses -0.1em. Embedded rows are flex rows,
+   so the reader offset drops the checkbox below the keyword and dependency
+   marker. Mirror the editor's vertical optical offset for this custom control
+   only; native Markdown task checkboxes keep Obsidian's own alignment. */
+.markdown-reading-view
+  .todoseq-embedded-task-list
+  .todoseq-embedded-task-checkbox,
+.markdown-preview-view
+  .todoseq-embedded-task-list
+  .todoseq-embedded-task-checkbox {
+  position: relative;
+  top: -0.1em;
+}
+
 /* Task text container */
 .todoseq-embedded-task-text-container {
   flex: 1;

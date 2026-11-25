@@ -588,9 +588,12 @@ test.describe('task dependencies', () => {
     );
     await openInReadingMode('dependency-embedded');
     const embeddedRow = page
-      .locator('.workspace-leaf.mod-active .todoseq-embedded-task-item', {
-        hasText: 'Dependent task',
-      })
+      .locator(
+        '.workspace-leaf.mod-active .markdown-preview-view .todoseq-embedded-task-item',
+        {
+          hasText: 'Dependent task',
+        },
+      )
       .first();
     await expect(embeddedRow.locator('.todoseq-task-blocked-icon')).toHaveCount(
       1,
@@ -607,6 +610,130 @@ test.describe('task dependencies', () => {
         );
       }),
     ).toBe(true);
+
+    type EmbeddedAlignment = {
+      position: string;
+      top: string;
+      fontSize: string;
+      rowWidth: number;
+      rowHeight: number;
+      checkboxWidth: number;
+      checkboxHeight: number;
+      keywordHeight: number;
+      markerHeight: number;
+      checkboxCenter: number;
+      keywordCenter: number;
+      markerCenter: number;
+    };
+
+    const embeddedAlignment = async (
+      text: string,
+      markerSelector: string,
+    ): Promise<EmbeddedAlignment> => {
+      const row = page
+        .locator(
+          '.workspace-leaf.mod-active .markdown-preview-view .todoseq-embedded-task-item',
+          {
+            hasText: text,
+          },
+        )
+        .first();
+
+      return row.evaluate((element, selector) => {
+        const checkbox = element.querySelector<HTMLInputElement>(
+          '.todoseq-embedded-task-checkbox',
+        );
+        const keyword = element.querySelector<HTMLElement>(
+          '.todoseq-embedded-task-state',
+        );
+        const marker = element.querySelector<HTMLElement>(selector);
+        if (!checkbox || !keyword || !marker) {
+          throw new Error(`Missing alignment element for ${selector}`);
+        }
+
+        const rect = (target: Element): DOMRect =>
+          target.getBoundingClientRect();
+        const center = (target: Element): number => {
+          const box = rect(target);
+          return box.top + box.height / 2;
+        };
+        const style = getComputedStyle(checkbox);
+        const rowRect = rect(element);
+        const checkboxRect = rect(checkbox);
+        const keywordRect = rect(keyword);
+        const markerRect = rect(marker);
+
+        return {
+          position: style.position,
+          top: style.top,
+          fontSize: style.fontSize,
+          rowWidth: rowRect.width,
+          rowHeight: rowRect.height,
+          checkboxWidth: checkboxRect.width,
+          checkboxHeight: checkboxRect.height,
+          keywordHeight: keywordRect.height,
+          markerHeight: markerRect.height,
+          checkboxCenter: center(checkbox),
+          keywordCenter: center(keyword),
+          markerCenter: center(marker),
+        };
+      }, markerSelector);
+    };
+
+    const expectEmbeddedAlignment = (alignment: EmbeddedAlignment): void => {
+      const fontSize = parseFloat(alignment.fontSize);
+      const top = parseFloat(alignment.top);
+      expect(Number.isFinite(fontSize)).toBe(true);
+      expect(fontSize).toBeGreaterThan(0);
+
+      const expectedTop = -0.1 * fontSize;
+      const tolerance = 0.5;
+      const maxCenterDelta = Math.abs(expectedTop) + tolerance;
+
+      expect(alignment.position).toBe('relative');
+      expect(Number.isFinite(top)).toBe(true);
+      expect(Math.abs(top - expectedTop)).toBeLessThanOrEqual(tolerance);
+      expect(alignment.rowWidth).toBeGreaterThan(0);
+      expect(alignment.rowHeight).toBeGreaterThan(0);
+      expect(alignment.checkboxWidth).toBeGreaterThan(0);
+      expect(alignment.checkboxHeight).toBeGreaterThan(0);
+      expect(alignment.keywordHeight).toBeGreaterThan(0);
+      expect(alignment.markerHeight).toBeGreaterThan(0);
+
+      const keywordDelta = alignment.checkboxCenter - alignment.keywordCenter;
+      const markerDelta = alignment.checkboxCenter - alignment.markerCenter;
+      expect(keywordDelta).toBeLessThanOrEqual(tolerance);
+      expect(markerDelta).toBeLessThanOrEqual(tolerance);
+      expect(Math.abs(keywordDelta)).toBeLessThanOrEqual(maxCenterDelta);
+      expect(Math.abs(markerDelta)).toBeLessThanOrEqual(maxCenterDelta);
+    };
+
+    await expect(embeddedRow).toBeVisible();
+
+    const warningRow = page
+      .locator(
+        '.workspace-leaf.mod-active .markdown-preview-view .todoseq-embedded-task-item',
+        {
+          hasText: 'Broken task',
+        },
+      )
+      .first();
+    await expect(warningRow).toBeVisible();
+    await expect(
+      warningRow.locator('.todoseq-dependency-issue-icon'),
+    ).toHaveCount(1);
+
+    const locked = await embeddedAlignment(
+      'Dependent task',
+      '.todoseq-task-blocked-icon',
+    );
+    expectEmbeddedAlignment(locked);
+
+    const warning = await embeddedAlignment(
+      'Broken task',
+      '.todoseq-dependency-issue-icon',
+    );
+    expectEmbeddedAlignment(warning);
 
     // The Task List marker sits before the keyword, and the row is not dimmed.
     await runCommandById(page, 'todoseq:show-task-list');

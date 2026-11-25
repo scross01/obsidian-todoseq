@@ -9,6 +9,8 @@ The TODOseq plugin supports rendering filtered task lists directly within your n
 
 To create an embedded task list, use a code block with the `todoseq` language:
 
+Embedded task rows render with the checkbox vertically aligned with the task keyword in both the editor and Reader view; a dependency lock or warning marker sits between the checkbox and keyword on the same line.
+
 ````txt
 ```todoseq
 search: tag:phoenix

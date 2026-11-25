@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Embedded task list checkboxes now line up with the task keyword in Reader view, including rows with a dependency lock or warning marker.
 - Tasks that block an incomplete dependent now gain a small urgency boost in urgency sorting and embedded urgency displays, so prerequisites rise ahead of the work waiting on them.
 - Property drawers now report malformed entries and date or description metadata placed inside them, instead of failing silently; other well-formed unknown properties are still preserved without a warning.
 - Scheduled and deadline dates on tasks inside nested blockquotes are now recognised, including from the date picker and recurrence rollover, while a date quoted more deeply than its task stays body text.
