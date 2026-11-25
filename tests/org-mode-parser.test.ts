@@ -398,7 +398,7 @@ More text`;
   });
 
   describe('properties drawer handling', () => {
-    it('should ignore dates inside properties drawer', () => {
+    it('reports dates inside properties drawer without parsing them', () => {
       const content = `* TODO Task
 :PROPERTIES:
   SCHEDULED: <2026-03-05>
@@ -407,16 +407,45 @@ More text`;
       const tasks = parser.parseFile(content, 'test.org');
       expect(tasks[0].scheduledDate).toBeNull();
       expect(tasks[0].deadlineDate).not.toBeNull();
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'misplaced-metadata', line: 2 }),
+      ]);
     });
 
     it('should resume parsing after :END:', () => {
       const content = `* TODO Task
 :PROPERTIES:
-SOMETHING: value
+:SOMETHING: value
 :END:
   SCHEDULED: <2026-03-05>`;
       const tasks = parser.parseFile(content, 'test.org');
       expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].propertyIssues).toBeUndefined();
+    });
+
+    it('reports malformed and property-style metadata inside a drawer', () => {
+      const content = `* TODO Task
+:PROPERTIES:
+:BOGUS
+:SCHEDULED: <2026-03-05>
+:BLOCKER: blocker-1
+:END:
+SCHEDULED: <2026-03-10>`;
+      const tasks = parser.parseFile(content, 'test.org');
+      expect(tasks[0].scheduledDate?.getDate()).toBe(10);
+      expect(tasks[0].blockedBy).toEqual(['blocker-1']);
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({
+          code: 'invalid-property',
+          line: 2,
+          reference: ':BOGUS',
+        }),
+        expect.objectContaining({
+          code: 'misplaced-metadata',
+          line: 3,
+          reference: ':SCHEDULED: <2026-03-05>',
+        }),
+      ]);
     });
   });
 

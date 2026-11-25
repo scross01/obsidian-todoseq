@@ -400,6 +400,45 @@ describe('TaskDependencyManager', () => {
     );
   });
 
+  it('surfaces malformed and misplaced property diagnostics without hiding blocking', () => {
+    const { engine } = managerFor([
+      task({
+        path: 'a.md',
+        line: 0,
+        blockedBy: ['missing-task'],
+        propertyIssues: [
+          {
+            code: 'invalid-property',
+            line: 2,
+            reference: ':BOGUS',
+            message: 'Malformed property entry ":BOGUS".',
+          },
+          {
+            code: 'misplaced-metadata',
+            line: 3,
+            reference: 'SCHEDULED: <2026-03-05 Thu>',
+            message: 'Metadata line is not allowed inside a properties drawer.',
+          },
+        ],
+      }),
+    ]);
+    expect(engine.isBlocked('a.md:0')).toBe(true);
+    expect(engine.getIssues()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'invalid-reference',
+          kind: 'property',
+          message: 'Malformed property entry ":BOGUS".',
+        }),
+        expect.objectContaining({
+          code: 'invalid-reference',
+          kind: 'property',
+          message: 'Metadata line is not allowed inside a properties drawer.',
+        }),
+      ]),
+    );
+  });
+
   it('keeps table-cell task identities distinct', () => {
     const { engine } = managerFor([
       task({

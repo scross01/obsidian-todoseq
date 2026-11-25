@@ -8,7 +8,9 @@ export type TaskPropertyIssueCode =
   | 'duplicate-drawer'
   | 'duplicate-key'
   | 'invalid-id'
-  | 'invalid-reference';
+  | 'invalid-reference'
+  | 'invalid-property'
+  | 'misplaced-metadata';
 
 export interface TaskPropertyIssue {
   code: TaskPropertyIssueCode;

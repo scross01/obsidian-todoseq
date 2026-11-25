@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Property drawers now report malformed entries and date or description metadata placed inside them, instead of failing silently; other well-formed unknown properties are still preserved without a warning.
 - Scheduled and deadline dates on tasks inside nested blockquotes are now recognised, including from the date picker and recurrence rollover, while a date quoted more deeply than its task stays body text.
 - **Add description** now finds an existing description at any blockquote depth or indentation and moves the cursor to its text, instead of adding a duplicate line; date lines still follow the description.
 - Scheduled and deadline changes from a table date picker now leave the table unchanged and report a failure if the task row is replaced while the picker is open. A unique moved row is still followed.

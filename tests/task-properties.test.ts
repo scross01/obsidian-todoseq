@@ -435,4 +435,105 @@ describe('extractTaskProperties', () => {
     );
     expect(result.blockedBy).toEqual(['^foo', '[[wiki]]']);
   });
+
+  test.each([
+    'SCHEDULED: <2026-03-05 Thu>',
+    'DEADLINE: <2026-03-10 Tue>',
+    'CLOSED: [2026-03-05 Thu]',
+    'STARTED: [2026-03-05 Thu]',
+    'DESCRIPTION: hidden',
+  ])('reports misplaced metadata line %s', (metadataLine) => {
+    const result = extractTaskProperties(
+      drawer([metadataLine, ':BLOCKER: blocker-1']),
+      'markdown',
+    );
+    expect(result.blockedBy).toEqual(['blocker-1']);
+    expect(result.propertyIssues).toEqual([
+      expect.objectContaining({ code: 'misplaced-metadata', line: 2 }),
+    ]);
+  });
+
+  test.each([
+    ':SCHEDULED: <2026-03-05 Thu>',
+    ':DEADLINE: <2026-03-10 Tue>',
+    ':CLOSED: [2026-03-05 Thu]',
+    ':STARTED: [2026-03-05 Thu]',
+    ':DESCRIPTION: hidden',
+  ])('reports property-style metadata line %s', (metadataLine) => {
+    const result = extractTaskProperties(
+      drawer([metadataLine, ':BLOCKER: blocker-1']),
+      'markdown',
+    );
+    expect(result.blockedBy).toEqual(['blocker-1']);
+    expect(result.propertyIssues).toEqual([
+      expect.objectContaining({ code: 'misplaced-metadata', line: 2 }),
+    ]);
+  });
+
+  test('reports malformed entries without losing later valid properties', () => {
+    const parsedDrawer = drawer([
+      ':ID: task-1',
+      ':BOGUS',
+      'BOGUS:',
+      ':BLOCKED: test-one',
+      ':Unknown: keep',
+      ':BLOCKER: blocker-1',
+    ]);
+    expect(parsedDrawer).toMatchObject({ closed: true, endLine: 8 });
+    const result = extractTaskProperties(parsedDrawer, 'markdown');
+    expect(result).toMatchObject({
+      id: 'task-1',
+      blockedBy: ['blocker-1'],
+    });
+    expect(result.propertyIssues).toEqual([
+      expect.objectContaining({
+        code: 'invalid-property',
+        line: 3,
+        reference: ':BOGUS',
+      }),
+      expect.objectContaining({
+        code: 'invalid-property',
+        line: 4,
+        reference: 'BOGUS:',
+      }),
+    ]);
+  });
+
+  test('reports supported keys with missing leading colons', () => {
+    const result = extractTaskProperties(
+      drawer([':ID', 'blocker:', 'blocker+:']),
+      'markdown',
+    );
+    expect(result.propertyIssues).toEqual([
+      expect.objectContaining({
+        code: 'invalid-property',
+        line: 2,
+        reference: ':ID',
+      }),
+      expect.objectContaining({
+        code: 'invalid-property',
+        line: 3,
+        reference: 'blocker:',
+      }),
+      expect.objectContaining({
+        code: 'invalid-property',
+        line: 4,
+        reference: 'blocker+:',
+      }),
+    ]);
+  });
+
+  test('keeps unrelated unknown properties silent', () => {
+    const result = extractTaskProperties(
+      drawer([':BLOCKED: test-one', ':Unknown: keep']),
+      'markdown',
+    );
+    expect(result.blockedBy).toBeUndefined();
+    expect(result.propertyIssues).toBeUndefined();
+  });
+
+  test('does not report prose-like note lines as malformed', () => {
+    const result = extractTaskProperties(drawer(['note: value']), 'markdown');
+    expect(result.propertyIssues).toBeUndefined();
+  });
 });

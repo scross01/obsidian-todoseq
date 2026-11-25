@@ -765,6 +765,9 @@ describe('Plan 120 Org planning tokens', () => {
     ].join('\n');
     const { parser, task } = parseOrg(source);
     const { writer, content } = createWriter(source);
+    expect(task.propertyIssues).toEqual([
+      expect.objectContaining({ code: 'misplaced-metadata', line: 3 }),
+    ]);
 
     await writer.applyRecurrenceUpdate(task, {
       newScheduledDate: new Date(2026, 5, 25),
@@ -797,6 +800,9 @@ describe('Plan 120 Org planning tokens', () => {
     ].join('\n');
     const { task } = parseOrg(source);
     const { writer, content } = createWriter(source);
+    expect(task.propertyIssues).toEqual([
+      expect.objectContaining({ code: 'misplaced-metadata', line: 3 }),
+    ]);
 
     await writer.applyRecurrenceUpdate(task, {
       newScheduledDate: new Date(2026, 5, 25),

@@ -1857,6 +1857,58 @@ CLOSED: [2026-05-09 Sat]`);
       expect(tasks[0].description).toBe('After the drawer');
     });
 
+    it('reports malformed and misplaced metadata inside a drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+SCHEDULED: <2026-03-05 Thu>
+DEADLINE: <2026-03-10 Tue>
+CLOSED: [2026-03-05 Thu]
+STARTED: [2026-03-05 Thu]
+DESCRIPTION: hidden description
+:BOGUS
+:BLOCKER: blocker-1
+:END:
+SCHEDULED: <2026-03-10 Tue>`);
+      expect(tasks[0].scheduledDate?.getDate()).toBe(10);
+      expect(tasks[0].deadlineDate).toBeNull();
+      expect(tasks[0].closedDate).toBeNull();
+      expect(tasks[0].startedDate).toBeNull();
+      expect(tasks[0].description).toBeUndefined();
+      expect(tasks[0].blockedBy).toEqual(['blocker-1']);
+      expect(tasks[0].properties?.BLOCKER).toBe('blocker-1');
+      expect(tasks[0].propertyIssues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'misplaced-metadata', line: 2 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 3 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 4 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 5 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 6 }),
+          expect.objectContaining({
+            code: 'invalid-property',
+            line: 7,
+            reference: ':BOGUS',
+          }),
+        ]),
+      );
+    });
+
+    it('reports property-style metadata inside a drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:SCHEDULED: <2026-03-05 Thu>
+:BLOCKER: blocker-1
+:END:`);
+      expect(tasks[0].scheduledDate).toBeNull();
+      expect(tasks[0].blockedBy).toEqual(['blocker-1']);
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({
+          code: 'misplaced-metadata',
+          line: 2,
+          reference: ':SCHEDULED: <2026-03-05 Thu>',
+        }),
+      ]);
+    });
+
     it('does not leak drawer lines from table cells into a following task', () => {
       const tasks = parse(`| TODO Cell |
 :PROPERTIES:

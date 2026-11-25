@@ -86,6 +86,15 @@ interface MetadataParts {
 }
 
 const PROPERTY_LINE = /^([ \t]*):([^:\s]+):(?:[ \t]*(.*))?$/;
+const METADATA_PREFIX = /^(?:SCHEDULED|DEADLINE|CLOSED|STARTED|DESCRIPTION):/;
+const METADATA_KEYS = new Set([
+  'SCHEDULED',
+  'DEADLINE',
+  'CLOSED',
+  'STARTED',
+  'DESCRIPTION',
+]);
+const KEY_PREFIX = /^([A-Za-z][A-Za-z0-9_.+-]*):\s*/;
 const MARKDOWN_METADATA = /^([ \t]*)((?:>[ \t]*)*)(.*)$/;
 
 function splitMetadataLine(
@@ -148,6 +157,42 @@ export function isPropertiesDrawerEnd(
   format: 'markdown' | 'org',
 ): boolean {
   return isDrawerEndLine(splitMetadataLine(line, format).body, format);
+}
+
+function isMisplacedMetadataLine(body: string): boolean {
+  return METADATA_PREFIX.test(body.trim());
+}
+
+function isMisplacedMetadataEntry(entry: TaskPropertyEntry): boolean {
+  return METADATA_KEYS.has(entry.baseKey.toUpperCase());
+}
+
+function isMalformedPropertyLine(body: string): boolean {
+  const trimmed = body.trim();
+  if (trimmed === '') return false;
+
+  // Valid property lines, including well-formed unknown keys, are not malformed.
+  if (PROPERTY_LINE.test(body)) return false;
+
+  // Missing trailing colon, for example :BOGUS or :ID.
+  if (trimmed.startsWith(':')) return true;
+
+  const keyMatch = KEY_PREFIX.exec(trimmed);
+  if (!keyMatch || METADATA_PREFIX.test(trimmed)) return false;
+
+  // Missing leading colon. An uppercase key is property-like; a lower-case
+  // key is also property-like when it is a supported key. This keeps ordinary
+  // prose such as "note: value" silent.
+  const authoredKey = keyMatch[1];
+  const baseKey = authoredKey.endsWith('+')
+    ? authoredKey.slice(0, -1)
+    : authoredKey;
+  return (
+    authoredKey.charAt(0) === authoredKey.charAt(0).toUpperCase() ||
+    SUPPORTED_TASK_PROPERTY_KEYS.some(
+      (supportedKey) => supportedKey === baseKey.toUpperCase(),
+    )
+  );
 }
 
 function parsePropertyBody(
@@ -257,9 +302,10 @@ export function findPropertiesDrawerEnd(
 }
 
 /**
- * Bounded drawer read. Unknown keys and blank lines are preserved. Scanning
- * stops before the first boundary line when the drawer is unclosed, so a
- * child task or prose line is never consumed as property data.
+ * Bounded drawer read. Unknown keys and blank lines are preserved; reserved
+ * metadata names are diagnosed. Scanning stops before the first boundary line
+ * when the drawer is unclosed, so a child task or prose line is never consumed
+ * as property data.
  */
 export function readTaskPropertiesDrawer(
   lines: string[],
@@ -302,16 +348,40 @@ export function readTaskPropertiesDrawer(
 
     const entry = parsePropertyBody(parts.body, parts.quotePrefix, line, i);
     if (entry) {
+      if (isMisplacedMetadataEntry(entry)) {
+        const reference = parts.body.trim();
+        issues.push({
+          code: 'misplaced-metadata',
+          line: i,
+          reference,
+          message: `Metadata line "${reference}" is not allowed inside a properties drawer; move it before or after the drawer.`,
+        });
+      }
       entries.push(entry);
       lastConsumed = i;
       continue;
     }
 
-    // Legacy drawers sometimes contain planning lines or a property-like
-    // line missing its leading colon. They are drawer content, never parsed
-    // as task dates, and must remain byte-preserved. A task boundary still
-    // stops the drawer so a child can never be swallowed.
+    // Invalid property-like lines and metadata in the wrong place are drawer
+    // content, never parsed as task dates, and must remain byte-preserved. A
+    // task boundary still stops the drawer so a child can never be swallowed.
     if (!options?.isBoundary?.(line) && line.includes(':')) {
+      const reference = parts.body.trim();
+      if (isMisplacedMetadataLine(parts.body)) {
+        issues.push({
+          code: 'misplaced-metadata',
+          line: i,
+          reference,
+          message: `Metadata line "${reference}" is not allowed inside a properties drawer; move it before or after the drawer.`,
+        });
+      } else if (isMalformedPropertyLine(parts.body)) {
+        issues.push({
+          code: 'invalid-property',
+          line: i,
+          reference,
+          message: `Malformed property entry "${reference}"; expected :KEY: value.`,
+        });
+      }
       lastConsumed = i;
       continue;
     }
@@ -488,8 +558,8 @@ function addUnique(target: string[], values: readonly string[]): void {
 }
 
 /**
- * Extract only the supported keys from a bounded drawer. Unsupported keys
- * stay in source and never produce warnings merely for existing.
+ * Extract only the supported keys from a bounded drawer. Unsupported keys stay
+ * in source; reserved metadata names are diagnosed by the reader.
  */
 export function extractTaskProperties(
   drawer: TaskPropertiesDrawer,

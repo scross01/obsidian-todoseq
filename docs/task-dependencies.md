@@ -4,7 +4,7 @@ TODOseq can read Org-style property drawers under a task. The drawer stays in yo
 
 ## Declaring properties
 
-Put the drawer directly below the task and its date or `DESCRIPTION:` lines:
+Put the drawer directly below the task and its date or `DESCRIPTION:` lines. Those metadata lines belong outside the drawer:
 
 ```markdown
 TODO Write the research paper
@@ -34,7 +34,9 @@ Folding and the Reading-view disclosure are view-only and never change the note,
 
 ### Org property syntax
 
-TODOseq uses Org's property-drawer conventions. Property names are case-insensitive; values and IDs keep their case. Unknown properties are preserved but not interpreted. A drawer can contain blank lines, and an unclosed drawer is left alone without consuming the following task.
+TODOseq uses Org's property-drawer conventions. Property names are case-insensitive; values and IDs keep their case. Unknown properties are preserved but not interpreted, except reserved date and `DESCRIPTION:` names, which are reported. A drawer can contain blank lines, and an unclosed drawer is left alone without consuming the following task.
+
+Property entries use `:KEY: value` syntax. A malformed entry such as `:BOGUS` or `BOGUS:` is left untouched in the note, but TODOseq reports a property problem so the drawer does not fail silently. Date and `DESCRIPTION:` metadata belong before or after the drawer, not inside it; a normal `SCHEDULED:`, `DEADLINE:`, `CLOSED:`, `STARTED:` or `DESCRIPTION:` line inside the drawer is reported the same way and is never interpreted. Property-style versions of those reserved keys (`:SCHEDULED:`, `:DEADLINE:`, `:CLOSED:`, `:STARTED:` and `:DESCRIPTION:`) are also reported the same way. Other well-formed unknown properties are preserved without a warning. TODOseq's completed date is `CLOSED:`; `COMPLETED:` is not a metadata keyword. Dependency keys are `BLOCKER` and `ARCHIVED_BLOCKER`; `BLOCKED` is not a dependency property.
 
 `BLOCKER` and its `previous-sibling` value follow the [org-depend contrib](https://orgmode.org/worg/org-contrib/org-depend.html) convention rather than being core Org dependency keys. The `+` suffix is Org's general [property append syntax](https://orgmode.org/manual/Property-Syntax.html), not a dependency-specific keyword: `:BLOCKER+: literature-03` adds a second entry to `BLOCKER`, and is not a separate `BLOCKER+` property. Org defines multiple entries per property only when the extra keys use `+`; multiple plain entries are ambiguous, so TODOseq uses the first plain entry and reports a duplicate-property diagnostic.
 
