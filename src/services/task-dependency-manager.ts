@@ -274,6 +274,16 @@ export class TaskDependencyManager {
     this.structureRevision = this.options.getStructureRevision?.() ?? 0;
     this.snapshotValidationEpoch = this.validationEpoch;
     this.cachedTasks = [...tasks];
+
+    const structuralSettings = this.options.getStructuralSettings?.() ?? {
+      hierarchy: false,
+      checkbox: false,
+    };
+    if (this.canSkipDependencyGraph(tasks, structuralSettings)) {
+      this.rebuildWithoutGraph(tasks, revision);
+      return;
+    }
+
     this.tasksByKey = new Map(tasks.map((task) => [getTaskKey(task), task]));
     this.edges = [];
     this.edgeKeys.clear();
@@ -309,10 +319,7 @@ export class TaskDependencyManager {
     const structuralReasons = this.buildStructuralReasons(
       tasks,
       structure,
-      this.options.getStructuralSettings?.() ?? {
-        hierarchy: false,
-        checkbox: false,
-      },
+      structuralSettings,
       entriesByPath,
     );
 
@@ -589,7 +596,7 @@ export class TaskDependencyManager {
 
     const blockingKeys = this.buildBlockingKeys(reasonsByKey, cycleComponents);
 
-    this.snapshot = {
+    this.publishSnapshot({
       revision,
       ready: this.validationReady,
       blocked,
@@ -598,13 +605,95 @@ export class TaskDependencyManager {
       issues: stableIssues,
       issuesByKey,
       blockedKeys: Array.from(blocked).sort(),
-    };
+    });
+  }
 
+  private canSkipDependencyGraph(
+    tasks: readonly Task[],
+    settings: { hierarchy: boolean; checkbox: boolean },
+  ): boolean {
+    if (settings.hierarchy || settings.checkbox) return false;
+    for (const task of tasks) {
+      if ((task.blockedBy?.length ?? 0) > 0) return false;
+      if ((task.archivedBlockers?.length ?? 0) > 0) return false;
+    }
+    return true;
+  }
+
+  private publishSnapshot(snapshot: DependencySnapshot): void {
+    this.snapshot = snapshot;
     try {
-      this.options.onSnapshot?.(this.snapshot);
+      this.options.onSnapshot?.(snapshot);
     } catch (error) {
       console.debug('[TaskDependencyManager] Snapshot listener failed:', error);
     }
+  }
+
+  /** Publish diagnostics without deriving an empty dependency graph. */
+  private rebuildWithoutGraph(tasks: readonly Task[], revision: number): void {
+    this.tasksByKey.clear();
+    this.edges = [];
+    this.edgeKeys.clear();
+    this.dependents.clear();
+    this.promotions = [];
+    this.idIndex.clear();
+    this.anchorIndex.clear();
+    this.pathSet.clear();
+
+    const idIndex = new Map<string, Task[]>();
+    for (const task of tasks) {
+      if (task.id) {
+        const list = idIndex.get(task.id) ?? [];
+        list.push(task);
+        idIndex.set(task.id, list);
+      }
+    }
+
+    const issues: DependencyIssue[] = [];
+    for (const [id, owners] of idIndex) {
+      if (owners.length < 2) continue;
+      issues.push({
+        code: 'ambiguous-reference',
+        fingerprint: `duplicate-id:${id}`,
+        message:
+          'Several tasks use the same ID, so references to it are ambiguous. Give each task a unique ID.',
+        reference: id,
+        sourceKey: getTaskKey(owners[1]),
+      });
+    }
+
+    for (const task of tasks) {
+      for (const propertyIssue of task.propertyIssues ?? []) {
+        issues.push({
+          code: 'invalid-reference',
+          kind: 'property',
+          fingerprint: `property:${getTaskKey(task)}:${propertyIssue.code}:${propertyIssue.line}:${propertyIssue.reference ?? propertyIssue.key ?? ''}`,
+          message: propertyIssue.message,
+          sourceKey: getTaskKey(task),
+          reference: propertyIssue.reference,
+        });
+      }
+    }
+
+    const stableIssues = this.stableIssues(issues);
+    const issuesByKey = new Map<string, DependencyIssue[]>();
+    for (const issue of stableIssues) {
+      if (!issue.sourceKey) continue;
+      const list = issuesByKey.get(issue.sourceKey);
+      if (list) list.push(issue);
+      else issuesByKey.set(issue.sourceKey, [issue]);
+    }
+
+    this.publishSnapshot({
+      revision,
+      ready: this.validationReady,
+      blocked: new Set<string>(),
+      blockingKeys: new Set<string>(),
+      reasonsByKey: new Map<string, DependencyReason[]>(),
+      issues: stableIssues,
+      issuesByKey,
+      blockedKeys: [],
+    });
   }
 
   clearCache(): void {

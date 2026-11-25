@@ -152,6 +152,23 @@ describe(`blocking benchmarks (size=${size})`, () => {
           manager.rebuild(tasks, revision);
         }),
       );
+
+      const defaultManager = new TaskDependencyManager(state, {
+        getStructuralSettings: () => ({ hierarchy: false, checkbox: false }),
+        getStructureEntries: () => entriesByPath,
+        getStructureRevision: () => 1,
+      });
+      defaultManager.rebuild(tasks, revision);
+      results.push(
+        await measure(
+          `blocking-dependency-default-${density}`,
+          iterations,
+          () => {
+            defaultManager.rebuild(tasks, revision);
+          },
+        ),
+      );
+      defaultManager.destroy();
       manager.destroy();
     }
 

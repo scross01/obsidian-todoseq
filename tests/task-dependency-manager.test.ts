@@ -538,6 +538,120 @@ describe('TaskDependencyManager', () => {
     expect(engine.getIssuesForTask('a.md:0')).toEqual([]);
   });
 
+  describe('empty dependency graph fast path', () => {
+    it('does not read structural entries when no task declares dependency metadata', () => {
+      const keywordManager = createTestKeywordManager();
+      const state = new TaskStateManager(keywordManager);
+      state.setTasks([
+        task({ path: 'a.md', line: 0 }),
+        task({ path: 'b.md', line: 0, properties: { OWNER: 'perf' } }),
+      ]);
+      const getStructureEntries = jest.fn(() => new Map());
+      const onSnapshot = jest.fn();
+      const engine = new TaskDependencyManager(state, {
+        getStructuralSettings: () => ({ hierarchy: false, checkbox: false }),
+        getStructureEntries,
+        getStructureRevision: () => 1,
+        onSnapshot,
+      });
+
+      expect(getStructureEntries).not.toHaveBeenCalled();
+      expect(onSnapshot).toHaveBeenCalledTimes(1);
+      const snapshot = engine.getSnapshot();
+      expect(snapshot.revision).toBe(state.getCommittedRevision());
+      expect(snapshot.ready).toBe(true);
+      expect(snapshot.blocked.size).toBe(0);
+      expect(snapshot.blockingKeys.size).toBe(0);
+      expect(snapshot.reasonsByKey.size).toBe(0);
+      expect(snapshot.issues).toEqual([]);
+      expect(snapshot.blockedKeys).toEqual([]);
+    });
+
+    it('reports duplicate IDs without building the graph when there are no references', () => {
+      const state = new TaskStateManager(createTestKeywordManager());
+      state.setTasks([
+        task({ path: 'a.md', line: 0, id: 'dup' }),
+        task({ path: 'b.md', line: 0, id: 'dup' }),
+      ]);
+      const getStructureEntries = jest.fn(() => new Map());
+      const engine = new TaskDependencyManager(state, {
+        getStructuralSettings: () => ({ hierarchy: false, checkbox: false }),
+        getStructureEntries,
+      });
+
+      expect(getStructureEntries).not.toHaveBeenCalled();
+      expect(engine.getIssues()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'ambiguous-reference',
+            reference: 'dup',
+          }),
+        ]),
+      );
+    });
+
+    it('builds the graph when a task declares a blocker', () => {
+      const state = new TaskStateManager(createTestKeywordManager());
+      state.setTasks([
+        task({ path: 'a.md', line: 0, id: 'a', blockedBy: ['b'] }),
+        task({ path: 'b.md', line: 0, id: 'b' }),
+      ]);
+      const getStructureEntries = jest.fn(() => new Map());
+      const engine = new TaskDependencyManager(state, {
+        getStructuralSettings: () => ({ hierarchy: false, checkbox: false }),
+        getStructureEntries,
+      });
+
+      expect(getStructureEntries).toHaveBeenCalledTimes(1);
+      expect(engine.isBlocked('a.md:0')).toBe(true);
+    });
+
+    it('builds the graph when a task declares archived dependency history', () => {
+      const state = new TaskStateManager(createTestKeywordManager());
+      state.setTasks([
+        task({ path: 'a.md', line: 0, id: 'a', archivedBlockers: ['b'] }),
+        task({ path: 'b.md', line: 0, id: 'b' }),
+      ]);
+      const getStructureEntries = jest.fn(() => new Map());
+      const engine = new TaskDependencyManager(state, {
+        getStructuralSettings: () => ({ hierarchy: false, checkbox: false }),
+        getStructureEntries,
+      });
+
+      expect(getStructureEntries).toHaveBeenCalledTimes(1);
+      expect(engine.getArchivedReferencePromotions()).toHaveLength(1);
+    });
+
+    it('clears cached tasks when a dependency is removed', () => {
+      const state = new TaskStateManager(createTestKeywordManager());
+      const target = task({ path: 'b.md', line: 0, id: 'b' });
+      state.setTasks([
+        task({ path: 'a.md', line: 0, id: 'a', blockedBy: ['b'] }),
+        target,
+      ]);
+      const engine = new TaskDependencyManager(state);
+      expect(engine.getIncomingActiveReferences(target)).toHaveLength(1);
+
+      state.setTasks([task({ path: 'a.md', line: 0, id: 'a' }), target]);
+      expect(engine.getIncomingActiveReferences(target)).toEqual([]);
+    });
+
+    it('builds structural reasons when a structural gate is enabled', () => {
+      const state = new TaskStateManager(createTestKeywordManager());
+      state.setTasks([
+        task({ path: 'a.md', line: 0 }),
+        task({ path: 'a.md', line: 1, indent: '  ' }),
+      ]);
+      const getStructureEntries = jest.fn(() => new Map());
+      const engine = new TaskDependencyManager(state, {
+        getStructuralSettings: () => ({ hierarchy: true, checkbox: false }),
+        getStructureEntries,
+      });
+
+      expect(getStructureEntries).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('blocking urgency graph', () => {
     it('indexes a cross-file prerequisite once for multiple dependents', () => {
       const { engine } = managerFor([

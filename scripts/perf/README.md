@@ -73,8 +73,10 @@ compares three property-drawer densities over the generated vault:
 `baseline` (no drawers), `occasional` (every tenth eligible task) and
 `heavy` (every eligible task, plus blockers and unknown properties). It
 measures `blocking-parse-<density>` and
-`blocking-dependency-<density>` for each density. The suite is
-report-only and has no thresholds.
+`blocking-dependency-<density>` for each density. It also measures
+`blocking-dependency-default-<density>` with the production-default structural
+gates; that scenario skips graph construction for the `baseline` density. The
+suite is report-only and has no thresholds.
 
 ```bash
 PERF_SIZE=m PERF_ITERATIONS=30 npm run perf:node
