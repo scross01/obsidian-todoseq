@@ -16,6 +16,7 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import { DateUtils } from '../utils/date-utils';
 import {
   parseTableCells,
   isSeparatorCell,
@@ -102,6 +103,9 @@ export class TaskParser implements ITaskParser {
 
   // Urgency coefficients (loaded on startup)
   private urgencyCoefficients: UrgencyCoefficients;
+
+  /** Normalized start of day for the current parseFile pass, if any. */
+  private parseTodayStart: Date | null = null;
 
   // App instance for daily note detection (optional for decoration-only use)
   private readonly app: App;
@@ -635,6 +639,14 @@ export class TaskParser implements ITaskParser {
         }
       ).languageCommentSupport = config.languageCommentSupport;
     }
+  }
+
+  private urgencyContext(): UrgencyContext {
+    return {
+      activeKeywordsSet: this.keywordManager.getActiveSet(),
+      waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      todayStart: this.parseTodayStart ?? undefined,
+    };
   }
 
   /**
@@ -1186,173 +1198,180 @@ export class TaskParser implements ITaskParser {
     };
   }
 
-  // Parse a single file content into Task[], pure and stateless w.r.t. external app
+  // Parse a single file content into Task[]. parseTodayStart is pass-local and
+  // restored before this method returns.
   parseFile(content: string, path: string, file?: TFile): Task[] {
-    const lines = content.split('\n');
+    const previousTodayStart = this.parseTodayStart;
+    this.parseTodayStart = DateUtils.getStartOfDay(new Date());
+    try {
+      const lines = content.split('\n');
 
-    // Initialize state machine
-    let inBlock = false;
-    let blockMarker: 'code' | 'math' | 'comment' | null = null;
-    let codeDelimiter: string | null = null;
-    let codeRegex: RegExp | null = null;
+      // Initialize state machine
+      let inBlock = false;
+      let blockMarker: 'code' | 'math' | 'comment' | null = null;
+      let codeDelimiter: string | null = null;
+      let codeRegex: RegExp | null = null;
 
-    const tasks: Task[] = [];
-    const processedLines = new Set<number>();
-    // Nearest enclosing markdown heading, tracked for Task.parentHeading
-    // (search `heading:` prefix; heading-grouping plans consume it too).
-    let currentHeading: string | undefined;
+      const tasks: Task[] = [];
+      const processedLines = new Set<number>();
+      // Nearest enclosing markdown heading, tracked for Task.parentHeading
+      // (search `heading:` prefix; heading-grouping plans consume it too).
+      let currentHeading: string | undefined;
 
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
 
-      // Skip blank lines
-      if (line.trim() === '') {
-        continue;
-      }
+        // Skip blank lines
+        if (line.trim() === '') {
+          continue;
+        }
 
-      // Check for block transitions
-      const blockTransition = this.detectBlockTransition(
-        line,
-        inBlock,
-        blockMarker,
-        codeDelimiter,
-      );
-      if (blockTransition) {
-        const result = this.handleBlockTransition(
-          blockTransition,
-          index,
-          lines,
+        // Check for block transitions
+        const blockTransition = this.detectBlockTransition(
+          line,
           inBlock,
-          codeRegex,
-          path,
+          blockMarker,
+          codeDelimiter,
         );
-        if (result) {
-          inBlock = result.inBlock;
-          blockMarker = result.blockMarker;
-          codeDelimiter = result.blockDelimiter ?? null;
-          codeRegex = result.codeRegex;
+        if (blockTransition) {
+          const result = this.handleBlockTransition(
+            blockTransition,
+            index,
+            lines,
+            inBlock,
+            codeRegex,
+            path,
+          );
+          if (result) {
+            inBlock = result.inBlock;
+            blockMarker = result.blockMarker;
+            codeDelimiter = result.blockDelimiter ?? null;
+            codeRegex = result.codeRegex;
+          }
+          continue;
         }
-        continue;
-      }
 
-      // Section-heading tracking for Task.parentHeading. Cheap leading-'#'
-      // gate first; block-transition handling above guarantees in-block
-      // lines (e.g. `# comment` inside a code fence) never reach the regex.
-      // Heading-task lines (`# TODO x`) are captured here too — their own
-      // text becomes their parentHeading (they *are* that section).
-      if (!inBlock && line.charCodeAt(0) === 35 /* '#' */) {
-        const headingText = SECTION_HEADING_TEXT_REGEX.exec(line);
-        if (headingText) {
-          currentHeading = headingText[1];
+        // Section-heading tracking for Task.parentHeading. Cheap leading-'#'
+        // gate first; block-transition handling above guarantees in-block
+        // lines (e.g. `# comment` inside a code fence) never reach the regex.
+        // Heading-task lines (`# TODO x`) are captured here too — their own
+        // text becomes their parentHeading (they *are* that section).
+        if (!inBlock && line.charCodeAt(0) === 35 /* '#' */) {
+          const headingText = SECTION_HEADING_TEXT_REGEX.exec(line);
+          if (headingText) {
+            currentHeading = headingText[1];
+          }
         }
-      }
 
-      // Check for single-line comment blocks (%% ... %%)
-      const isSingleLineComment = SINGLE_LINE_COMMENT_REGEX.test(line);
-      if (isSingleLineComment) {
-        if (this.includeCommentBlocks) {
-          const commentTask = this.tryParseCommentBlockTask(
+        // Check for single-line comment blocks (%% ... %%)
+        const isSingleLineComment = SINGLE_LINE_COMMENT_REGEX.test(line);
+        if (isSingleLineComment) {
+          if (this.includeCommentBlocks) {
+            const commentTask = this.tryParseCommentBlockTask(
+              line,
+              path,
+              index,
+              lines,
+              processedLines,
+            );
+            if (commentTask) {
+              commentTask.parentHeading = currentHeading;
+              tasks.push(commentTask);
+            }
+          }
+          continue;
+        }
+
+        // Check if line should be skipped
+        if (this.shouldSkipLine(line, inBlock, blockMarker)) {
+          continue;
+        }
+
+        // Numeric footnote definitions obey the same block-inclusion rules as
+        // other tasks; the block transition above has already run.
+        if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
+          const footnoteTask = this.tryParseFootnoteTask(
             line,
             path,
             index,
             lines,
             processedLines,
           );
-          if (commentTask) {
-            commentTask.parentHeading = currentHeading;
-            tasks.push(commentTask);
+          if (footnoteTask) {
+            footnoteTask.parentHeading = currentHeading;
+            tasks.push(footnoteTask);
           }
+          continue;
         }
-        continue;
-      }
 
-      // Check if line should be skipped
-      if (this.shouldSkipLine(line, inBlock, blockMarker)) {
-        continue;
-      }
+        // Table cell task detection
+        if (/^\s*\|/.test(line) && !this.testRegex.test(line)) {
+          const cellTasks = this.parseTasksFromTableCells(line, index, path);
+          for (const cellTask of cellTasks) {
+            cellTask.parentHeading = currentHeading;
+          }
+          tasks.push(...cellTasks);
+          continue;
+        }
 
-      // Numeric footnote definitions obey the same block-inclusion rules as
-      // other tasks; the block transition above has already run.
-      if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
-        const footnoteTask = this.tryParseFootnoteTask(
+        // Heading task detection (e.g., "# TODO task", "## DONE")
+        if (!inBlock && this.headingRegex.test(line)) {
+          const headingTask = this.tryParseHeadingTask(
+            line,
+            path,
+            index,
+            lines,
+            processedLines,
+            file,
+          );
+          if (headingTask) {
+            headingTask.parentHeading = currentHeading;
+            tasks.push(headingTask);
+          }
+          continue;
+        }
+
+        // Determine which regex to use
+        const useCodeRegex =
+          inBlock &&
+          this.includeCodeBlocks &&
+          blockMarker === 'code' &&
+          this.languageCommentSupport &&
+          this.currentLanguage &&
+          codeRegex;
+        if (
+          !this.shouldParseLine(
+            line,
+            useCodeRegex && codeRegex ? codeRegex : undefined,
+            inBlock,
+          )
+        ) {
+          continue;
+        }
+
+        // Extract task details and create task
+        const regex = useCodeRegex && codeRegex ? codeRegex : this.captureRegex;
+        const taskDetails = this.extractTaskDetails(line, regex);
+        const task = this.createTaskFromDetails(
           line,
           path,
           index,
-          lines,
-          processedLines,
-        );
-        if (footnoteTask) {
-          footnoteTask.parentHeading = currentHeading;
-          tasks.push(footnoteTask);
-        }
-        continue;
-      }
-
-      // Table cell task detection
-      if (/^\s*\|/.test(line) && !this.testRegex.test(line)) {
-        const cellTasks = this.parseTasksFromTableCells(line, index, path);
-        for (const cellTask of cellTasks) {
-          cellTask.parentHeading = currentHeading;
-        }
-        tasks.push(...cellTasks);
-        continue;
-      }
-
-      // Heading task detection (e.g., "# TODO task", "## DONE")
-      if (!inBlock && this.headingRegex.test(line)) {
-        const headingTask = this.tryParseHeadingTask(
-          line,
-          path,
-          index,
+          taskDetails,
           lines,
           processedLines,
           file,
         );
-        if (headingTask) {
-          headingTask.parentHeading = currentHeading;
-          tasks.push(headingTask);
+
+        if (task) {
+          task.parentHeading = currentHeading;
+          tasks.push(task);
         }
-        continue;
       }
 
-      // Determine which regex to use
-      const useCodeRegex =
-        inBlock &&
-        this.includeCodeBlocks &&
-        blockMarker === 'code' &&
-        this.languageCommentSupport &&
-        this.currentLanguage &&
-        codeRegex;
-      if (
-        !this.shouldParseLine(
-          line,
-          useCodeRegex && codeRegex ? codeRegex : undefined,
-          inBlock,
-        )
-      ) {
-        continue;
-      }
-
-      // Extract task details and create task
-      const regex = useCodeRegex && codeRegex ? codeRegex : this.captureRegex;
-      const taskDetails = this.extractTaskDetails(line, regex);
-      const task = this.createTaskFromDetails(
-        line,
-        path,
-        index,
-        taskDetails,
-        lines,
-        processedLines,
-        file,
-      );
-
-      if (task) {
-        task.parentHeading = currentHeading;
-        tasks.push(task);
-      }
+      return tasks;
+    } finally {
+      this.parseTodayStart = previousTodayStart;
     }
-
-    return tasks;
   }
 
   /**
@@ -1801,14 +1820,10 @@ export class TaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -1941,14 +1956,10 @@ export class TaskParser implements ITaskParser {
     task.subtaskSpan = subtaskSpan;
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -2058,14 +2069,10 @@ export class TaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -2221,14 +2228,10 @@ export class TaskParser implements ITaskParser {
     task.subtaskSpan = subtaskSpan;
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 

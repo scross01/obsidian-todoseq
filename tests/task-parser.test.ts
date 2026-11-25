@@ -2,6 +2,11 @@ import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { Task } from '../src/types/task';
 import {
+  calculateTaskUrgency,
+  getDefaultCoefficients,
+} from '../src/utils/task-urgency';
+import { DateUtils } from '../src/utils/date-utils';
+import {
   createBaseSettings,
   createTestKeywordManager,
 } from './helpers/test-helper';
@@ -1336,9 +1341,9 @@ TODO 🇨🇦 Canadian flag
         'scheduled',
       );
       // Nested quotes (>>) not supported - returns null
-      expect(
-        parser.getDateLineType('>> SCHEDULED: <2026-03-10>', '>> '),
-      ).toBe('scheduled');
+      expect(parser.getDateLineType('>> SCHEDULED: <2026-03-10>', '>> ')).toBe(
+        'scheduled',
+      );
       expect(
         parser.getDateLineType('> > > SCHEDULED: <2026-03-10>', '>> '),
       ).toBeNull();
@@ -1490,9 +1495,7 @@ describe('nested-quoted date lines', () => {
 
   test('parses a deadline at a compact two-marker depth', () => {
     const tasks = nestedParser.parseFile(
-      ['>> - [ ] TODO Nested task', '>> DEADLINE: <2026-03-12 Thu>'].join(
-        '\n',
-      ),
+      ['>> - [ ] TODO Nested task', '>> DEADLINE: <2026-03-12 Thu>'].join('\n'),
       'test.md',
     );
 
@@ -1514,10 +1517,9 @@ describe('nested-quoted date lines', () => {
 
   test('does not parse a date quoted deeper than the task', () => {
     const tasks = nestedParser.parseFile(
-      [
-        '> > - [ ] TODO Nested task',
-        '> > > SCHEDULED: <2026-03-10 Tue>',
-      ].join('\n'),
+      ['> > - [ ] TODO Nested task', '> > > SCHEDULED: <2026-03-10 Tue>'].join(
+        '\n',
+      ),
       'test.md',
     );
 
@@ -1526,10 +1528,9 @@ describe('nested-quoted date lines', () => {
 
   test('still parses a depth-one date under a nested task', () => {
     const tasks = nestedParser.parseFile(
-      [
-        '> > - [ ] TODO Nested task',
-        '> SCHEDULED: <2026-03-10 Tue>',
-      ].join('\n'),
+      ['> > - [ ] TODO Nested task', '> SCHEDULED: <2026-03-10 Tue>'].join(
+        '\n',
+      ),
       'test.md',
     );
 
@@ -2043,5 +2044,51 @@ describe('Block-end anchors', () => {
     expect(tasks[0].embedReference).toBe('^firstend');
     expect(tasks[1].text).toBe('second');
     expect(tasks[1].embedReference).toBeUndefined();
+  });
+});
+
+describe('Task parsing uses one parse-wide today', () => {
+  const referenceDate = new Date(2026, 3, 15, 23, 30);
+  const settings = createBaseSettings();
+  const parser = TaskParser.create(
+    createTestKeywordManager(settings),
+    null,
+    undefined,
+    settings,
+  );
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(referenceDate);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('matches a direct calculation with the same explicit day', () => {
+    const tasks = parser.parseFile(
+      'TODO task\nDEADLINE: <2026-04-20>',
+      'test.md',
+    );
+    const expected = calculateTaskUrgency(tasks[0], getDefaultCoefficients(), {
+      todayStart: new Date(2026, 3, 15),
+    });
+
+    expect(tasks[0].urgency).toBe(expected);
+  });
+
+  it('normalizes one today for the whole file', () => {
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      parser.parseFile(
+        'TODO one\nDEADLINE: <2026-04-20>\n\nTODO two\nDEADLINE: <2026-04-21>',
+        'test.md',
+      );
+      // One parse-wide today plus one normalization per deadline date.
+      expect(startOfDay).toHaveBeenCalledTimes(3);
+    } finally {
+      startOfDay.mockRestore();
+    }
   });
 });

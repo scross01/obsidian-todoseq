@@ -208,19 +208,23 @@ export function createUrgencyScoreAccessor(
 /**
  * Calculate the age factor of a task (only for daily notes)
  * @param task The task to calculate age for
+ * @param todayStart Normalized start of day for the pass, or null when unused
  * @returns Age factor between 0.0 and 1.0, or 1.0 if not a daily note
  */
-function getTaskAge(task: Task): number {
+function getTaskAge(task: Task, todayStart: Date | null): number {
   // Use the new isDailyNote field and dailyNoteDate
   if (!task.isDailyNote || !task.dailyNoteDate) {
     return 1.0;
   }
 
+  if (!todayStart) {
+    return 1.0;
+  }
+
   try {
     const noteDate = task.dailyNoteDate;
-    const today = DateUtils.getStartOfDay(new Date());
 
-    const diffTime = today.getTime() - noteDate.getTime();
+    const diffTime = todayStart.getTime() - noteDate.getTime();
     const age = Math.floor(diffTime / DateUtils.MILLISECONDS_PER_DAY);
     const urgencyAgeMax = 365;
 
@@ -234,6 +238,7 @@ function getTaskAge(task: Task): number {
 /**
  * Calculate due urgency based on deadline date using linear gradient formula
  * @param task The task to check
+ * @param todayStart Normalized start of day for the pass, or null when unused
  * @returns Urgency value between 0 and 1.0 based on deadline proximity (0 if no deadline)
  *
  * Formula: ((days_overdue + 14.0) * 0.8 / 21.0) + 0.2
@@ -242,14 +247,13 @@ function getTaskAge(task: Task): number {
  * - 7 days future: ~0.467
  * - 14 days future: 0.2
  */
-function getDeadlineUrgency(task: Task): number {
-  if (!task.deadlineDate) return 0;
+function getDeadlineUrgency(task: Task, todayStart: Date | null): number {
+  if (!task.deadlineDate || !todayStart) return 0;
 
   const deadline = task.deadlineDate;
   const deadlineDay = DateUtils.getStartOfDay(deadline);
-  const today = DateUtils.getStartOfDay(new Date());
 
-  const diffTime = today.getTime() - deadlineDay.getTime();
+  const diffTime = todayStart.getTime() - deadlineDay.getTime();
   const daysOverdue = Math.floor(diffTime / DateUtils.MILLISECONDS_PER_DAY);
 
   const clampedDays = Math.max(-14, Math.min(7, daysOverdue));
@@ -282,15 +286,15 @@ function getDeadlineTimeUrgency(task: Task): number {
 /**
  * Calculate scheduled urgency based on scheduled date
  * @param task The task to check
+ * @param todayStart Normalized start of day for the pass, or null when unused
  * @returns 1.0 if scheduled date is today or in the past, 0 otherwise
  */
-function getScheduledUrgency(task: Task): number {
-  if (!task.scheduledDate) return 0;
+function getScheduledUrgency(task: Task, todayStart: Date | null): number {
+  if (!task.scheduledDate || !todayStart) return 0;
 
   const scheduledDay = DateUtils.getStartOfDay(task.scheduledDate);
-  const today = DateUtils.getStartOfDay(new Date());
 
-  return scheduledDay.getTime() <= today.getTime() ? 1.0 : 0;
+  return scheduledDay.getTime() <= todayStart.getTime() ? 1.0 : 0;
 }
 
 function getScheduledTimeUrgency(task: Task): number {
@@ -333,21 +337,26 @@ function countTags(task: Task): number {
 }
 
 /**
- * Context for urgency calculation including keyword sets.
- * Provides keyword sets for determining task state groups.
+ * Context for urgency calculation, including keyword sets and an optional
+ * pass-wide normalized start of day.
  */
 export interface UrgencyContext {
   /** Set of keywords that indicate an active task (built-in + custom) */
   activeKeywordsSet?: Set<string>;
   /** Set of keywords that indicate a waiting task (built-in + custom) */
   waitingKeywordsSet?: Set<string>;
+  /**
+   * Normalized local start of day for the whole calculation pass. When
+   * omitted, calculateTaskUrgency() derives it once for this task.
+   */
+  todayStart?: Date;
 }
 
 /**
  * Calculate urgency score for a task
  * @param task The task to calculate urgency for
  * @param coefficients Urgency coefficients to use
- * @param context Optional context with keyword sets for state group detection
+ * @param context Optional context with keyword sets and the pass-wide start of day
  * @returns Urgency score or null if calculation fails
  */
 export function calculateTaskUrgency(
@@ -363,7 +372,15 @@ export function calculateTaskUrgency(
 
     let urgency = 0;
 
-    const deadlineUrgency = getDeadlineUrgency(task);
+    const needsToday =
+      Boolean(task.deadlineDate) ||
+      Boolean(task.scheduledDate) ||
+      Boolean(task.isDailyNote && task.dailyNoteDate);
+    const todayStart = needsToday
+      ? (context?.todayStart ?? DateUtils.getStartOfDay(new Date()))
+      : null;
+
+    const deadlineUrgency = getDeadlineUrgency(task, todayStart);
     urgency += coefficients.deadline * deadlineUrgency;
 
     const deadlineTimeUrgency = getDeadlineTimeUrgency(task);
@@ -378,7 +395,7 @@ export function calculateTaskUrgency(
       urgency += coefficients.priorityLow;
     }
 
-    const scheduledUrgency = getScheduledUrgency(task);
+    const scheduledUrgency = getScheduledUrgency(task, todayStart);
     urgency += coefficients.scheduled * scheduledUrgency;
 
     const scheduledTimeUrgency = getScheduledTimeUrgency(task);
@@ -389,7 +406,7 @@ export function calculateTaskUrgency(
     urgency += coefficients.active * active;
 
     // Age urgency (only for daily notes)
-    const age = getTaskAge(task);
+    const age = getTaskAge(task, todayStart);
     urgency += coefficients.age * age;
 
     // Tag count urgency - factor based on number of tags

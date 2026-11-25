@@ -4,7 +4,11 @@
  */
 
 import { OrgModeTaskParser } from '../src/parser/org-mode-task-parser';
-import { getDefaultCoefficients } from '../src/utils/task-urgency';
+import {
+  calculateTaskUrgency,
+  getDefaultCoefficients,
+} from '../src/utils/task-urgency';
+import { DateUtils } from '../src/utils/date-utils';
 import {
   createBaseSettings,
   createTestKeywordManager,
@@ -569,5 +573,49 @@ SCHEDULED: <2026-03-05> DEADLINE: <2026-03-10>`;
       const tasks = newParser.parseFile('* TODO test', 'test.org');
       expect(tasks).toHaveLength(1);
     });
+  });
+});
+
+describe('Org parsing uses one parse-wide today', () => {
+  const referenceDate = new Date(2026, 3, 15, 23, 30);
+  const parser = OrgModeTaskParser.create(
+    defaultKeywordManager,
+    null,
+    getDefaultCoefficients(),
+  );
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(referenceDate);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('matches a direct calculation with the same explicit day', () => {
+    const tasks = parser.parseFile(
+      '* TODO task\n   DEADLINE: <2026-04-20>',
+      'test.org',
+    );
+    const expected = calculateTaskUrgency(tasks[0], getDefaultCoefficients(), {
+      todayStart: new Date(2026, 3, 15),
+    });
+
+    expect(tasks[0].urgency).toBe(expected);
+  });
+
+  it('normalizes one today for the whole file', () => {
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      parser.parseFile(
+        '* TODO one\n   DEADLINE: <2026-04-20>\n* TODO two\n   DEADLINE: <2026-04-21>',
+        'test.org',
+      );
+      // One parse-wide today plus one normalization per deadline date.
+      expect(startOfDay).toHaveBeenCalledTimes(3);
+    } finally {
+      startOfDay.mockRestore();
+    }
   });
 });

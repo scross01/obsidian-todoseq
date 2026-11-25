@@ -317,6 +317,103 @@ describe('Urgency Calculation', () => {
     expect(urgency).toBeCloseTo(10.8, 2);
   });
 
+  it('uses the supplied todayStart instead of the wall clock', () => {
+    jest.useFakeTimers().setSystemTime(createDate(2026, 4, 15));
+    const task = createTestTask({
+      deadlineDate: createDate(2026, 4, 20),
+      tags: [],
+      isDailyNote: false,
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 20),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+
+    // The deadline is today from the context date, not five days future from
+    // the fake wall clock.
+    expect(urgency).toBeCloseTo(10.8, 2);
+  });
+
+  it('does not normalize a new today when todayStart is supplied', () => {
+    const task = createTestTask({
+      isDailyNote: true,
+      dailyNoteDate: createDate(2026, 4, 15),
+      tags: [],
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 15),
+    };
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      calculateTaskUrgency(task, defaultCoefficients, context);
+      expect(startOfDay).not.toHaveBeenCalled();
+    } finally {
+      startOfDay.mockRestore();
+    }
+  });
+
+  it('uses the supplied todayStart for scheduled dates', () => {
+    const task = createTestTask({
+      scheduledDate: createDate(2026, 4, 16),
+      tags: [],
+      isDailyNote: false,
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 20),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+
+    // The scheduled date is past from the context day, not future from the
+    // fake wall clock.
+    expect(urgency).toBe(7.0);
+  });
+
+  it('uses the supplied todayStart for daily-note age', () => {
+    const task = createTestTask({
+      isDailyNote: true,
+      dailyNoteDate: createDate(2026, 4, 5),
+      tags: [],
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 25),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+
+    // 20 days of age, not the 10 days measured from the fake wall clock.
+    expect(urgency).toBeCloseTo((20 / 365) * 2, 3);
+  });
+
+  it('keeps the wall-clock fallback when todayStart is omitted', () => {
+    const task = createTestTask({
+      deadlineDate: createDate(2026, 4, 20),
+      tags: [],
+      isDailyNote: false,
+    });
+
+    const fallback = calculateTaskUrgency(task, defaultCoefficients);
+    const explicit = calculateTaskUrgency(task, defaultCoefficients, {
+      todayStart: DateUtils.getStartOfDay(referenceDate),
+    });
+
+    expect(fallback).toBe(explicit);
+  });
+
+  it('does not normalize today for a task with no dates or daily-note age', () => {
+    const task = createTestTask({ tags: [], isDailyNote: false });
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      calculateTaskUrgency(task, defaultCoefficients);
+      expect(startOfDay).not.toHaveBeenCalled();
+    } finally {
+      startOfDay.mockRestore();
+    }
+  });
+
   it('should add urgency for future deadline dates', () => {
     const tomorrow = createDate(2026, 4, 16);
 

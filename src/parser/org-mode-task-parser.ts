@@ -19,6 +19,7 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import { DateUtils } from '../utils/date-utils';
 import { RegexCache } from '../utils/regex-cache';
 import {
   buildOrgHeadlineRegex,
@@ -57,6 +58,8 @@ export class OrgModeTaskParser implements ITaskParser {
   private keywords: string[];
   private keywordManager: KeywordManager;
   private urgencyCoefficients: UrgencyCoefficients;
+  /** Normalized start of day for the current parseFile pass, if any. */
+  private parseTodayStart: Date | null = null;
   private regexCache: RegexCache;
   private headlineRegex: RegExp;
   private readonly app: App;
@@ -123,25 +126,31 @@ export class OrgModeTaskParser implements ITaskParser {
    * Parse file content and extract tasks.
    */
   parseFile(content: string, path: string, file?: TFile): Task[] {
-    const lines = content.split('\n');
-    const tasks: Task[] = [];
+    const previousTodayStart = this.parseTodayStart;
+    this.parseTodayStart = DateUtils.getStartOfDay(new Date());
+    try {
+      const lines = content.split('\n');
+      const tasks: Task[] = [];
 
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
 
-      // Skip empty lines
-      if (line.trim() === '') {
-        continue;
+        // Skip empty lines
+        if (line.trim() === '') {
+          continue;
+        }
+
+        // Try to parse as org-mode headline task
+        const task = this.tryParseHeadlineTask(line, index, path, lines, file);
+        if (task) {
+          tasks.push(task);
+        }
       }
 
-      // Try to parse as org-mode headline task
-      const task = this.tryParseHeadlineTask(line, index, path, lines, file);
-      if (task) {
-        tasks.push(task);
-      }
+      return tasks;
+    } finally {
+      this.parseTodayStart = previousTodayStart;
     }
-
-    return tasks;
   }
 
   /**
@@ -182,6 +191,14 @@ export class OrgModeTaskParser implements ITaskParser {
       }
     }
     return false;
+  }
+
+  private urgencyContext(): UrgencyContext {
+    return {
+      activeKeywordsSet: this.keywordManager.getActiveSet(),
+      waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      todayStart: this.parseTodayStart ?? undefined,
+    };
   }
 
   /**
@@ -286,14 +303,10 @@ export class OrgModeTaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
