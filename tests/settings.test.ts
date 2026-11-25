@@ -200,6 +200,10 @@ describe('TodoTrackerSettingTab', () => {
       app: appMock,
       settings: settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
+      taskDependencyManager: { clearCache: jest.fn() },
+      lifecycleManager: {
+        scheduleDependencySurfaceRefresh: jest.fn(),
+      },
       recreateParser: jest.fn().mockResolvedValue(undefined),
       scanVault: jest.fn().mockResolvedValue(undefined),
       refreshVisibleEditorDecorations: jest.fn(),
@@ -847,6 +851,28 @@ describe('TodoTrackerSettingTab', () => {
         appMock.workspace.getLeavesOfType as jest.Mock,
       ).toHaveBeenCalledWith('todoseq-view');
     });
+
+    it.each([
+      'enforceTaskHierarchyDependencies',
+      'enforceCheckboxDependencies',
+    ])(
+      'setControlValue for %s invalidates and refreshes dependencies',
+      async (key) => {
+        await (settingTab as any).setControlValue(key, true);
+
+        expect(
+          (pluginMock.taskDependencyManager as { clearCache: jest.Mock })
+            .clearCache,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          (
+            pluginMock.lifecycleManager as {
+              scheduleDependencySurfaceRefresh: jest.Mock;
+            }
+          ).scheduleDependencySurfaceRefresh,
+        ).toHaveBeenCalledTimes(1);
+      },
+    );
 
     it('setControlValue for formatTaskKeywords triggers updateTaskFormatting', async () => {
       await (settingTab as any).setControlValue('formatTaskKeywords', true);

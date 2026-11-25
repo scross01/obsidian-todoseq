@@ -41,6 +41,8 @@ export interface DependencySnapshot {
   revision: number;
   ready: boolean;
   blocked: ReadonlySet<string>;
+  /** Prerequisites that hold up an incomplete dependent and earn the boost. */
+  blockingKeys: ReadonlySet<string>;
   reasonsByKey: ReadonlyMap<string, readonly DependencyReason[]>;
   issues: readonly DependencyIssue[];
   /** Issues for one task key, built with the snapshot for O(1) row reads. */

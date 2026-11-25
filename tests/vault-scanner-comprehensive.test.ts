@@ -356,6 +356,29 @@ describe('VaultScanner', () => {
       expect(newKeywords).toContain('NEXT');
     });
 
+    it('notifies urgency surfaces when the blocking coefficient changes', async () => {
+      const schedule = jest.fn();
+      (
+        vaultScanner as unknown as {
+          plugin: {
+            lifecycleManager: { scheduleDependencySurfaceRefresh: jest.Mock };
+          };
+        }
+      ).plugin = {
+        lifecycleManager: { scheduleDependencySurfaceRefresh: schedule },
+      } as never;
+      const zeroBlocking = {
+        ...getDefaultCoefficients(),
+        blocking: 0,
+      };
+
+      await vaultScanner.updateSettings(createBaseSettings(), zeroBlocking);
+      expect(schedule).toHaveBeenCalledTimes(1);
+
+      await vaultScanner.updateSettings(createBaseSettings(), zeroBlocking);
+      expect(schedule).toHaveBeenCalledTimes(1);
+    });
+
     it('should update all parsers with new config', async () => {
       const newSettings = createBaseSettings({
         includeCodeBlocks: true,

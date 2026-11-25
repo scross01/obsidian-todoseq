@@ -5,6 +5,7 @@
 import { EmbeddedTaskItemRenderer } from '../src/view/embedded-task-list/embedded-task-item-renderer';
 import { createBaseTask } from './helpers/test-helper';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
+import { getTaskKey } from '../src/utils/task-utils';
 
 /**
  * Update `renderer.plugin.keywordManager.getSettings` to a specific
@@ -701,6 +702,25 @@ describe('EmbeddedTaskItemRenderer', () => {
 
       const checkbox = li.querySelector('input[type="checkbox"]');
       expect(checkbox).toBeTruthy();
+    });
+
+    it('displays the effective blocking score without mutating the task', () => {
+      const task = createBaseTask({ urgency: 1, text: 'Prerequisite' });
+      renderer.setUrgencyScoreContext({
+        blockingKeys: new Set([getTaskKey(task)]),
+        blockingCoefficient: 3,
+      });
+
+      const li = renderer.createTaskListItem(task, 0, {
+        wrapContent: false,
+        showUrgency: true,
+        showFile: false,
+      });
+
+      expect(
+        li.querySelector('.todoseq-embedded-task-urgency')?.textContent,
+      ).toBe('4.00');
+      expect(task.urgency).toBe(1);
     });
 
     it('sets date category class for overdue tasks', () => {

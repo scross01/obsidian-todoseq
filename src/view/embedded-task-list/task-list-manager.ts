@@ -11,6 +11,12 @@ import { TodoseqParameters, TodoseqCodeBlockParser } from './code-block-parser';
 import { KeywordManager } from '../../utils/keyword-manager';
 import { PropertySearchEngine } from '../../services/property-search-engine';
 import { DependencyStatusProvider } from '../../search/search-types';
+import {
+  createUrgencyScoreAccessor,
+  UrgencyScoreAccessor,
+  UrgencyScoreContext,
+} from '../../utils/task-urgency';
+import type { DependencySnapshot } from '../../types/task-dependency';
 
 /**
  * Manages task filtering and sorting for embedded task lists.
@@ -21,20 +27,26 @@ export class EmbeddedTaskListManager {
   private keywordManager: KeywordManager;
   private propertySearchEngine: PropertySearchEngine | null;
   private dependencyStatus: DependencyStatusProvider | null;
-  private taskCache: Map<string, { tasks: Task[]; timestamp: number }> =
-    new Map();
+  private taskCache: Map<
+    string,
+    { tasks: Task[]; timestamp: number; urgencyContext?: UrgencyScoreContext }
+  > = new Map();
   private cacheTTL = 5000; // 5 seconds cache TTL
   private cacheVersion = 0; // Version number to invalidate cache on task changes
 
   // Keyword sort config caching
   private cachedKeywordConfig: KeywordSortConfig | null = null;
   private cachedKeywords: string | null = null;
+  private scoreCacheToken = 0;
+  private lastSnapshot: DependencySnapshot | null = null;
+  private lastBlockingCoefficient = 0;
 
   constructor(
     settings: TodoTrackerSettings,
     keywordManager: KeywordManager,
     propertySearchEngine: PropertySearchEngine | null = null,
     dependencyStatus: DependencyStatusProvider | null = null,
+    private readonly getBlockingCoefficient: () => number = () => 0,
   ) {
     this.settings = settings;
     this.keywordManager = keywordManager;
@@ -52,8 +64,9 @@ export class EmbeddedTaskListManager {
     tasks: Task[],
     params: TodoseqParameters,
   ): Promise<Task[]> {
+    const urgencyContext = this.getUrgencyScoreContext();
     // Generate cache key
-    const cacheKey = this.generateCacheKey(tasks, params);
+    const cacheKey = this.generateCacheKey(tasks, params, urgencyContext);
 
     // Check cache
     const cached = this.taskCache.get(cacheKey);
@@ -70,7 +83,11 @@ export class EmbeddedTaskListManager {
       }
 
       // Sort tasks based on sort method
-      let sortedTasks = this.sortTasks(filteredTasks, params);
+      let sortedTasks = this.sortTasks(
+        filteredTasks,
+        params,
+        createUrgencyScoreAccessor(filteredTasks, urgencyContext),
+      );
 
       // Apply limit if specified
       if (params.limit && params.limit > 0) {
@@ -81,6 +98,7 @@ export class EmbeddedTaskListManager {
       this.taskCache.set(cacheKey, {
         tasks: sortedTasks,
         timestamp: Date.now(),
+        urgencyContext,
       });
 
       return sortedTasks;
@@ -129,8 +147,13 @@ export class EmbeddedTaskListManager {
   async filterAndSortTasksWithCount(
     tasks: Task[],
     params: TodoseqParameters,
-  ): Promise<{ tasks: Task[]; totalCount: number }> {
+  ): Promise<{
+    tasks: Task[];
+    totalCount: number;
+    urgencyContext?: UrgencyScoreContext;
+  }> {
     try {
+      const urgencyContext = this.getUrgencyScoreContext();
       // Filter tasks based on search query
       let filteredTasks = tasks;
 
@@ -140,15 +163,20 @@ export class EmbeddedTaskListManager {
 
       const totalCount = filteredTasks.length;
 
-      // Sort tasks
-      let sortedTasks = this.sortTasks(filteredTasks, params);
+      // Sort tasks, carrying the captured score context with the result so a
+      // graph publication during the await cannot mix versions in one render.
+      let sortedTasks = this.sortTasks(
+        filteredTasks,
+        params,
+        createUrgencyScoreAccessor(filteredTasks, urgencyContext),
+      );
 
       // Apply limit if specified
       if (params.limit && params.limit > 0) {
         sortedTasks = sortedTasks.slice(0, params.limit);
       }
 
-      return { tasks: sortedTasks, totalCount };
+      return { tasks: sortedTasks, totalCount, urgencyContext };
     } catch (error) {
       console.error('Error filtering/sorting tasks:', error);
       return { tasks, totalCount: tasks.length };
@@ -189,7 +217,11 @@ export class EmbeddedTaskListManager {
    * @param params Parsed parameters
    * @returns Sorted tasks
    */
-  private sortTasks(tasks: Task[], params: TodoseqParameters): Task[] {
+  private sortTasks(
+    tasks: Task[],
+    params: TodoseqParameters,
+    urgencyAccessor?: UrgencyScoreAccessor,
+  ): Task[] {
     try {
       const now = new Date();
       const sortMethod = this.getSortMethod(params);
@@ -253,6 +285,8 @@ export class EmbeddedTaskListManager {
                   : this.settings.skipDeadlinePrewarningIfScheduled,
             }
           : undefined,
+        undefined,
+        urgencyAccessor,
       );
 
       return sorted;
@@ -305,10 +339,15 @@ export class EmbeddedTaskListManager {
    * @param params Parameters used for filtering/sorting
    * @returns Cache key string
    */
-  private generateCacheKey(tasks: Task[], params: TodoseqParameters): string {
+  private generateCacheKey(
+    tasks: Task[],
+    params: TodoseqParameters,
+    urgencyContext?: UrgencyScoreContext,
+  ): string {
     // Use cache version and task count for cache key
     // This ensures cache is invalidated when tasks change
     const taskCount = tasks.length;
+    const scoreToken = this.getScoreCacheToken(urgencyContext);
     const searchHash = params.searchQuery
       ? this.hashString(params.searchQuery)
       : 'none';
@@ -323,7 +362,41 @@ export class EmbeddedTaskListManager {
     const skipSchedHash = params.skipScheduledWarningIfDeadline ?? 'global';
     const skipDeadHash = params.skipDeadlineWarningIfScheduled ?? 'global';
 
-    return `${this.cacheVersion}-${taskCount}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}-${upcomingHash}-${schedWarnHash}-${deadWarnHash}-${skipSchedHash}-${skipDeadHash}`;
+    return `${this.cacheVersion}-${taskCount}-${scoreToken}-${searchHash}-${sortHash}-${completedHash}-${futureHash}-${limitHash}-${upcomingHash}-${schedWarnHash}-${deadWarnHash}-${skipSchedHash}-${skipDeadHash}`;
+  }
+
+  private getUrgencyScoreContext(): UrgencyScoreContext | undefined {
+    const snapshot = this.dependencyStatus?.getSnapshot?.();
+    const coefficient = this.getBlockingCoefficient();
+    if (
+      !snapshot?.ready ||
+      !snapshot.blockingKeys ||
+      !Number.isFinite(coefficient) ||
+      coefficient === 0
+    ) {
+      return undefined;
+    }
+    return {
+      blockingKeys: snapshot.blockingKeys,
+      blockingCoefficient: coefficient,
+    };
+  }
+
+  private getScoreCacheToken(context?: UrgencyScoreContext): number {
+    const snapshot =
+      context === undefined
+        ? null
+        : (this.dependencyStatus?.getSnapshot?.() ?? null);
+    const coefficient = context?.blockingCoefficient ?? 0;
+    if (
+      snapshot !== this.lastSnapshot ||
+      coefficient !== this.lastBlockingCoefficient
+    ) {
+      this.lastSnapshot = snapshot;
+      this.lastBlockingCoefficient = coefficient;
+      this.scoreCacheToken++;
+    }
+    return this.scoreCacheToken;
   }
 
   /**

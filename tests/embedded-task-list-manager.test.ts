@@ -5,6 +5,8 @@ import {
   createTestKeywordManager,
 } from './helpers/test-helper';
 import { TodoseqParameters } from '../src/view/embedded-task-list/code-block-parser';
+import type { DependencySnapshot } from '../src/types/task-dependency';
+import { getTaskKey } from '../src/utils/task-utils';
 
 describe('EmbeddedTaskListManager', () => {
   let manager: EmbeddedTaskListManager;
@@ -189,6 +191,95 @@ describe('EmbeddedTaskListManager', () => {
 
       expect(result.tasks.length).toBe(0);
       expect(result.totalCount).toBe(0);
+    });
+  });
+
+  describe('blocking urgency context', () => {
+    function snapshot(blockingKeys: string[]): DependencySnapshot {
+      return {
+        revision: 1,
+        ready: true,
+        blocked: new Set(),
+        blockingKeys: new Set(blockingKeys),
+        reasonsByKey: new Map(),
+        issues: [],
+        issuesByKey: new Map(),
+        blockedKeys: [],
+      };
+    }
+
+    it('sorts with the boost and carries the same context to rendering', async () => {
+      const blocker = createBaseTask({
+        path: 'a.md',
+        line: 1,
+        urgency: 1,
+        text: 'Blocker',
+      });
+      const dependent = createBaseTask({
+        path: 'b.md',
+        line: 1,
+        urgency: 4,
+        text: 'Dependent',
+      });
+      const graph = snapshot([getTaskKey(blocker)]);
+      const boosted = new EmbeddedTaskListManager(
+        settings,
+        keywordManager,
+        null,
+        { getSnapshot: () => graph },
+        () => 3,
+      );
+
+      const result = await boosted.filterAndSortTasksWithCount(
+        [dependent, blocker],
+        { sortMethod: 'urgency' },
+      );
+
+      expect(result.tasks.map((task) => task.text)).toEqual([
+        'Blocker',
+        'Dependent',
+      ]);
+      expect(result.urgencyContext).toEqual({
+        blockingKeys: graph.blockingKeys,
+        blockingCoefficient: 3,
+      });
+    });
+
+    it('invalidates the sibling cache when the snapshot changes at one revision', async () => {
+      const blocker = createBaseTask({
+        path: 'a.md',
+        line: 1,
+        urgency: 1,
+        text: 'Blocker',
+      });
+      const dependent = createBaseTask({
+        path: 'b.md',
+        line: 1,
+        urgency: 4,
+        text: 'Dependent',
+      });
+      let graph = snapshot([getTaskKey(blocker)]);
+      const cached = new EmbeddedTaskListManager(
+        settings,
+        keywordManager,
+        null,
+        { getSnapshot: () => graph },
+        () => 3,
+      );
+      const params: TodoseqParameters = { sortMethod: 'urgency' };
+
+      expect(
+        (await cached.filterAndSortTasks([dependent, blocker], params)).map(
+          (task) => task.text,
+        ),
+      ).toEqual(['Blocker', 'Dependent']);
+
+      graph = snapshot([]);
+      expect(
+        (await cached.filterAndSortTasks([dependent, blocker], params)).map(
+          (task) => task.text,
+        ),
+      ).toEqual(['Dependent', 'Blocker']);
     });
   });
 

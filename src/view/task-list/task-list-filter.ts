@@ -8,6 +8,7 @@ import {
   classifyTask,
   TaskClassification,
 } from '../../utils/task-sort';
+import { createUrgencyScoreAccessor } from '../../utils/task-urgency';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
 import { KeywordManager } from '../../utils/keyword-manager';
@@ -176,6 +177,9 @@ export class TaskListFilter {
       keywordConfig,
       warningSettings,
       outClassifications,
+      sortMethod === 'sortByUrgency'
+        ? this.getUrgencyAccessor(tasks)
+        : undefined,
     );
 
     return sortedTasks;
@@ -231,5 +235,26 @@ export class TaskListFilter {
     }
 
     return this.cachedKeywordConfig;
+  }
+
+  /** One graph read + one score map for this sort pass. */
+  private getUrgencyAccessor(
+    tasks: Task[],
+  ): ((task: Task) => number | null) | undefined {
+    const snapshot = this.plugin.taskDependencyManager?.getSnapshot();
+    const coefficient =
+      this.plugin.vaultScanner?.getUrgencyCoefficients().blocking ?? 0;
+    if (
+      !snapshot?.ready ||
+      !snapshot.blockingKeys ||
+      !Number.isFinite(coefficient) ||
+      coefficient === 0
+    ) {
+      return undefined;
+    }
+    return createUrgencyScoreAccessor(tasks, {
+      blockingKeys: snapshot.blockingKeys,
+      blockingCoefficient: coefficient,
+    });
   }
 }

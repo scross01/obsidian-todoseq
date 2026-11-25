@@ -2,6 +2,7 @@ import { Task } from '../types/task';
 import { App } from 'obsidian';
 import { DateUtils } from './date-utils';
 import { extractTagsFromText } from './patterns';
+import { getTaskKey } from './task-utils';
 
 /**
  * Urgency coefficients interface matching the urgency.ini configuration
@@ -18,6 +19,8 @@ export interface UrgencyCoefficients {
   age: number;
   tags: number;
   waiting: number;
+  /** Flat boost for an incomplete task that blocks an incomplete dependent. */
+  blocking: number;
 }
 
 /**
@@ -35,6 +38,7 @@ const DEFAULT_URGENCY_COEFFICIENTS: UrgencyCoefficients = {
   age: 2.0,
   tags: 1.0,
   waiting: -3.0,
+  blocking: 3.0,
 };
 
 /**
@@ -51,6 +55,20 @@ export function parseUrgencyCoefficientsFromContent(
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
+
+    // Blocking is the one signed decimal key whose full token must be valid:
+    // the generic matcher below accepts a leading substring (3.5oops) and
+    // skips a leading plus, which would silently turn a typo into a value.
+    if (/^urgency\.blocking\.coefficient\s*=/.test(trimmed)) {
+      const blockingMatch = trimmed.match(
+        /^urgency\.blocking\.coefficient\s*=\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(?:#.*)?$/,
+      );
+      if (blockingMatch) {
+        const numValue = Number(blockingMatch[1]);
+        if (Number.isFinite(numValue)) coefficients.blocking = numValue;
+      }
+      continue;
+    }
 
     // Try pattern with subcategory first: urgency.category.subcategory.coefficient
     let match = trimmed.match(
@@ -127,6 +145,64 @@ export async function parseUrgencyCoefficients(
  */
 export function getDefaultCoefficients(): UrgencyCoefficients {
   return { ...DEFAULT_URGENCY_COEFFICIENTS };
+}
+
+/** Immutable inputs for a pass that displays effective urgency scores. */
+export interface UrgencyScoreContext {
+  /** Canonical keys of prerequisites that hold up at least one dependent. */
+  blockingKeys: ReadonlySet<string>;
+  blockingCoefficient: number;
+}
+
+export type UrgencyScoreAccessor = (task: Task) => number | null;
+
+/**
+ * Add the blocking boost to a task's stored (base) urgency.
+ *
+ * The stored score stays untouched so parser and coordinator writes remain
+ * task-local. Callers compute this once per render/sort pass from a ready
+ * dependency snapshot.
+ */
+export function getEffectiveUrgency(
+  task: Task,
+  context?: UrgencyScoreContext,
+): number | null {
+  if (
+    task.urgency === null ||
+    task.completed ||
+    !context ||
+    context.blockingCoefficient === 0 ||
+    !context.blockingKeys.has(getTaskKey(task))
+  ) {
+    return task.urgency;
+  }
+  return task.urgency + context.blockingCoefficient;
+}
+
+/**
+ * Build a batch-local score lookup. Only tasks whose key is in the blocker
+ * set need an entry, so the comparator never constructs keys per comparison.
+ */
+export function createUrgencyScoreAccessor(
+  tasks: readonly Task[],
+  context?: UrgencyScoreContext,
+): UrgencyScoreAccessor {
+  if (!context || context.blockingCoefficient === 0) {
+    return (task) => task.urgency;
+  }
+
+  const boosted = new Map<Task, number>();
+  for (const task of tasks) {
+    if (
+      task.urgency !== null &&
+      !task.completed &&
+      context.blockingKeys.has(getTaskKey(task))
+    ) {
+      boosted.set(task, task.urgency + context.blockingCoefficient);
+    }
+  }
+
+  return (task) => boosted.get(task) ?? task.urgency;
 }
 
 /**

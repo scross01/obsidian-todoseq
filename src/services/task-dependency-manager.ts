@@ -61,6 +61,7 @@ export class TaskDependencyManager {
     revision: -1,
     ready: false,
     blocked: new Set<string>(),
+    blockingKeys: new Set<string>(),
     reasonsByKey: new Map(),
     issues: [],
     issuesByKey: new Map(),
@@ -103,6 +104,7 @@ export class TaskDependencyManager {
       revision: -1,
       ready: false,
       blocked: new Set(),
+      blockingKeys: new Set(),
       reasonsByKey: new Map(),
       issues: [],
       issuesByKey: new Map(),
@@ -563,7 +565,8 @@ export class TaskDependencyManager {
       if (reasons.length > 0) reasonsByKey.set(key, reasons);
     }
 
-    for (const cycle of this.findCycles(tasks)) {
+    const cycleComponents = this.findCycleMembers(this.edges);
+    for (const cycle of cycleComponents) {
       const keys = cycle.sort();
       issues.push({
         code: 'cycle',
@@ -584,10 +587,13 @@ export class TaskDependencyManager {
       else issuesByKey.set(issue.sourceKey, [issue]);
     }
 
+    const blockingKeys = this.buildBlockingKeys(reasonsByKey, cycleComponents);
+
     this.snapshot = {
       revision,
       ready: this.validationReady,
       blocked,
+      blockingKeys,
       reasonsByKey,
       issues: stableIssues,
       issuesByKey,
@@ -974,17 +980,83 @@ export class TaskDependencyManager {
     });
   }
 
+  /**
+   * Derive the scoring graph from resolved, task-backed blocking reasons.
+   * Diagnostics (including broken references and cycles) stay in the snapshot;
+   * only edges that pull urgent work forward contribute.
+   */
+  private buildBlockingKeys(
+    reasonsByKey: ReadonlyMap<string, readonly DependencyReason[]>,
+    diagnosticComponents: readonly string[][],
+  ): ReadonlySet<string> {
+    if (!this.validationReady) return new Set<string>();
+
+    const eligible: BuildEdge[] = [];
+    const seen = new Set<string>();
+    for (const [sourceKey, reasons] of reasonsByKey) {
+      const source = this.tasksByKey.get(sourceKey);
+      if (!source || source.completed || source.noblocking) continue;
+
+      for (const reason of reasons) {
+        if (!reason.blocking || !reason.targetKey) continue;
+        const target = this.tasksByKey.get(reason.targetKey);
+        if (!target || target.completed) continue;
+        const edgeKey = `${sourceKey}\u0000${reason.targetKey}`;
+        if (seen.has(edgeKey)) continue;
+        seen.add(edgeKey);
+        eligible.push({ sourceKey, targetKey: reason.targetKey });
+      }
+    }
+
+    if (eligible.length === 0) return new Set<string>();
+
+    // Dependency-heavy vaults normally have no broken references, so the
+    // scoring graph is the diagnostic graph. Reuse its Kosaraju result rather
+    // than traversing every edge twice. An acyclic diagnostic graph also
+    // proves the scoring subset is acyclic, even when completed-task or
+    // non-blocking edges made the two edge sets differ.
+    const sameGraph =
+      eligible.length === this.edges.length &&
+      eligible.every((edge) =>
+        this.edgeKeys.has(`${edge.sourceKey}\u0000${edge.targetKey}`),
+      );
+    const components =
+      sameGraph || diagnosticComponents.length === 0
+        ? diagnosticComponents
+        : this.findCycleMembers(eligible);
+
+    const componentByKey = new Map<string, number>();
+    components.forEach((component, index) => {
+      for (const key of component) componentByKey.set(key, index);
+    });
+
+    const blockingKeys = new Set<string>();
+    for (const edge of eligible) {
+      const sourceComponent = componentByKey.get(edge.sourceKey);
+      if (
+        sourceComponent !== undefined &&
+        sourceComponent === componentByKey.get(edge.targetKey)
+      ) {
+        continue;
+      }
+      blockingKeys.add(edge.targetKey);
+    }
+    return blockingKeys;
+  }
+
   /** Iterative Kosaraju pass; no recursion on large vaults. */
-  private findCycles(tasks: Task[]): string[][] {
-    if (this.edges.length === 0) return [];
+  private findCycleMembers(edges: readonly BuildEdge[]): string[][] {
+    if (edges.length === 0) return [];
 
     const nodeKeys = new Set<string>();
-    for (const edge of this.edges) {
+    for (const edge of edges) {
       nodeKeys.add(edge.sourceKey);
       nodeKeys.add(edge.targetKey);
     }
 
-    const keys = tasks.map(getTaskKey).filter((key) => nodeKeys.has(key));
+    const keys = Array.from(this.tasksByKey.keys()).filter((key) =>
+      nodeKeys.has(key),
+    );
 
     const forward = new Map<string, string[]>();
     const reverse = new Map<string, string[]>();
@@ -992,7 +1064,7 @@ export class TaskDependencyManager {
       forward.set(key, []);
       reverse.set(key, []);
     }
-    for (const edge of this.edges) {
+    for (const edge of edges) {
       forward.get(edge.sourceKey)?.push(edge.targetKey);
       reverse.get(edge.targetKey)?.push(edge.sourceKey);
     }

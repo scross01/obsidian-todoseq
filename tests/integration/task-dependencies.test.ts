@@ -235,6 +235,269 @@ async function completeTaskByCommand(
 }
 
 test.describe('task dependencies', () => {
+  test('blocking urgency boosts a prerequisite in lists and embeds', async () => {
+    const prerequisite = 'urgency-prerequisite.md';
+    const dependent = 'urgency-dependent.md';
+    const embed = 'urgency-embed.md';
+
+    await page.evaluate(
+      async ({ prerequisitePath, dependentPath, embedPath }) => {
+        const app = (window as any).app;
+        const write = async (path: string, content: string) => {
+          const existing = app.vault.getAbstractFileByPath(path);
+          if (existing) await app.vault.modify(existing, content);
+          else await app.vault.create(path, content);
+        };
+        await write(
+          prerequisitePath,
+          [
+            '- [ ] TODO Zeta prerequisite',
+            '  :PROPERTIES:',
+            '  :ID: urgency-prereq',
+            '  :END:',
+            '',
+          ].join('\n'),
+        );
+        await write(
+          dependentPath,
+          [
+            '- [ ] TODO Alpha dependent',
+            '  :PROPERTIES:',
+            '  :BLOCKER: urgency-prereq',
+            '  :END:',
+            '',
+          ].join('\n'),
+        );
+        await write(
+          embedPath,
+          [
+            '```todoseq',
+            'search: (file:"urgency-prerequisite" OR file:"urgency-dependent")',
+            'sort: urgency',
+            'show-urgency: true',
+            'show-file: false',
+            '```',
+            '',
+            '```todoseq',
+            'search: file:"urgency-prerequisite"',
+            'sort: urgency',
+            'show-urgency: true',
+            'show-file: false',
+            '```',
+            '',
+            '```todoseq',
+            'search: (file:"urgency-prerequisite" OR file:"urgency-dependent")',
+            'sort: filepath',
+            'show-urgency: true',
+            'show-file: false',
+            '```',
+            '',
+          ].join('\n'),
+        );
+        await app.commands.executeCommandById('todoseq:rescan-vault');
+      },
+      {
+        prerequisitePath: prerequisite,
+        dependentPath: dependent,
+        embedPath: embed,
+      },
+    );
+    await page.waitForTimeout(800);
+
+    await openInReadingMode('urgency-embed');
+    const activeLeaf = page.locator('.workspace-leaf.mod-active');
+    const embeddedLists = activeLeaf.locator(
+      '.todoseq-embedded-task-list:visible',
+    );
+    await expect(embeddedLists).toHaveCount(3);
+    const urgencyRows = embeddedLists
+      .nth(0)
+      .locator('.todoseq-embedded-task-item');
+    const filteredRows = embeddedLists
+      .nth(1)
+      .locator('.todoseq-embedded-task-item');
+    const filepathRows = embeddedLists
+      .nth(2)
+      .locator('.todoseq-embedded-task-item');
+
+    await expect(urgencyRows.first()).toContainText('Zeta prerequisite');
+    await expect(
+      urgencyRows
+        .filter({ hasText: 'Zeta prerequisite' })
+        .locator('.todoseq-embedded-task-urgency')
+        .first(),
+    ).toContainText('5.00');
+    await expect(
+      urgencyRows
+        .filter({ hasText: 'Alpha dependent' })
+        .locator('.todoseq-embedded-task-urgency')
+        .first(),
+    ).toContainText('2.00');
+
+    // The dependent is filtered out here, so the displayed boost must come
+    // from the full vault-wide graph rather than the visible rows.
+    await expect(filteredRows).toHaveCount(1);
+    await expect(filteredRows.first()).toContainText('Zeta prerequisite');
+    await expect(
+      filteredRows.first().locator('.todoseq-embedded-task-urgency').first(),
+    ).toContainText('5.00');
+
+    // A non-urgency order keeps its filepath order but still displays the
+    // effective score.
+    await expect(filepathRows.first()).toContainText('Alpha dependent');
+    await expect(filepathRows.nth(1)).toContainText('Zeta prerequisite');
+    await expect(
+      filepathRows
+        .filter({ hasText: 'Zeta prerequisite' })
+        .locator('.todoseq-embedded-task-urgency')
+        .first(),
+    ).toContainText('5.00');
+
+    await runCommandById(page, 'todoseq:show-task-list');
+    await waitForTaskListVisible(page);
+    await page
+      .locator('select[aria-label="Sort tasks by"]')
+      .selectOption('sortByUrgency');
+    await expect
+      .poll(async () =>
+        page.locator('.todoseq-task-item').evaluateAll((rows) =>
+          rows
+            .map((row) => row.textContent ?? '')
+            .filter(
+              (text) =>
+                text.includes('Zeta prerequisite') ||
+                text.includes('Alpha dependent'),
+            )
+            .map((text) =>
+              text.includes('Zeta prerequisite') ? 'prerequisite' : 'dependent',
+            ),
+        ),
+      )
+      .toEqual(['prerequisite', 'dependent']);
+
+    const coefficientFile = await page.evaluate(async () => {
+      const app = (window as any).app;
+      const path = `${app.vault.configDir}/plugins/todoseq/urgency.ini`;
+      const exists = await app.vault.adapter.exists(path);
+      return {
+        path,
+        content: exists
+          ? ((await app.vault.adapter.read(path)) as string)
+          : null,
+      };
+    });
+    const writeCoefficient = async (value: number | null) =>
+      page.evaluate(
+        async ({ path, coefficient }) => {
+          const app = (window as any).app;
+          const adapter = app.vault.adapter;
+          if (coefficient === null) {
+            if (await adapter.exists(path)) await adapter.remove(path);
+          } else {
+            await adapter.write(
+              path,
+              `urgency.blocking.coefficient = ${coefficient}\n`,
+            );
+          }
+          const plugin = app.plugins.plugins.todoseq;
+          await plugin.vaultScanner.updateSettings(plugin.settings);
+        },
+        { path: coefficientFile.path, coefficient: value },
+      );
+    const restoreCoefficientFile = async () =>
+      page.evaluate(async ({ path, content }) => {
+        const app = (window as any).app;
+        const adapter = app.vault.adapter;
+        if (content === null) {
+          if (await adapter.exists(path)) await adapter.remove(path);
+        } else {
+          await adapter.write(path, content);
+        }
+        const plugin = app.plugins.plugins.todoseq;
+        await plugin.vaultScanner.updateSettings(plugin.settings);
+      }, coefficientFile);
+
+    // Reloading +3 -> 0 must repaint an open embed even though no task changed.
+    try {
+      await writeCoefficient(0);
+      await page.waitForTimeout(350);
+
+      await expect(urgencyRows.first()).toContainText('Alpha dependent');
+      await expect(filteredRows.first()).toContainText('Zeta prerequisite');
+      await expect(
+        filteredRows.first().locator('.todoseq-embedded-task-urgency').first(),
+      ).toContainText('2.00');
+      await expect(
+        filepathRows
+          .filter({ hasText: 'Zeta prerequisite' })
+          .locator('.todoseq-embedded-task-urgency')
+          .first(),
+      ).toContainText('2.00');
+      await expect(
+        activeLeaf.locator('.todoseq-embedded-task-urgency:visible', {
+          hasText: '5.00',
+        }),
+      ).toHaveCount(0);
+    } finally {
+      await restoreCoefficientFile();
+      await page.waitForTimeout(350);
+    }
+
+    await expect(
+      filteredRows.first().locator('.todoseq-embedded-task-urgency').first(),
+    ).toContainText('5.00');
+
+    // Removing the edge returns both tasks to their base score and the
+    // dependent's earlier path wins the tie again.
+    await page.evaluate(async (path) => {
+      const app = (window as any).app;
+      const file = app.vault.getAbstractFileByPath(path);
+      if (!file) throw new Error(`Missing ${path}`);
+      await app.vault.modify(file, '- [ ] TODO Alpha dependent\n');
+      await app.commands.executeCommandById('todoseq:rescan-vault');
+    }, dependent);
+    await page.waitForTimeout(900);
+
+    await openInReadingMode('urgency-embed');
+    await expect(urgencyRows.first()).toContainText('Alpha dependent');
+    await expect(urgencyRows.nth(1)).toContainText('Zeta prerequisite');
+    await expect(filteredRows.first()).toContainText('Zeta prerequisite');
+    await expect(
+      filteredRows.first().locator('.todoseq-embedded-task-urgency').first(),
+    ).toContainText('2.00');
+    await expect(filepathRows.first()).toContainText('Alpha dependent');
+    await expect(
+      filepathRows
+        .filter({ hasText: 'Zeta prerequisite' })
+        .locator('.todoseq-embedded-task-urgency')
+        .first(),
+    ).toContainText('2.00');
+    await expect(
+      activeLeaf.locator('.todoseq-embedded-task-urgency:visible', {
+        hasText: '5.00',
+      }),
+    ).toHaveCount(0);
+
+    await runCommandById(page, 'todoseq:show-task-list');
+    await waitForTaskListVisible(page);
+    await expect
+      .poll(async () =>
+        page.locator('.todoseq-task-item').evaluateAll((rows) =>
+          rows
+            .map((row) => row.textContent ?? '')
+            .filter(
+              (text) =>
+                text.includes('Zeta prerequisite') ||
+                text.includes('Alpha dependent'),
+            )
+            .map((text) =>
+              text.includes('Zeta prerequisite') ? 'prerequisite' : 'dependent',
+            ),
+        ),
+      )
+      .toEqual(['dependent', 'prerequisite']);
+  });
+
   test('reader badge and editor diagnostic track the derived graph', async () => {
     const content = [dependentBody(), '', MISSING_TASK, ''].join('\n');
     await writeDependencyFixture(content, true);

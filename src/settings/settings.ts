@@ -115,6 +115,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     defaultScheduledWarningPeriod: () => this.refreshViews(),
     skipScheduledWarningPeriodIfDeadline: () => this.refreshViews(),
     skipDeadlinePrewarningIfScheduled: () => this.refreshViews(),
+    enforceTaskHierarchyDependencies: () => this.refreshDependencySurfaces(),
+    enforceCheckboxDependencies: () => this.refreshDependencySurfaces(),
     migrateToTodayState: () => {
       this.plugin.embeddedTaskListProcessor?.updateSettings();
       return this.refreshViews();
@@ -242,6 +244,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
 
   private refreshViews(): Promise<void> {
     return this.refreshAllTaskListViews();
+  }
+
+  /** Structural gates change the graph without changing any task revision. */
+  private refreshDependencySurfaces(): void {
+    this.plugin.taskDependencyManager?.clearCache();
+    this.plugin.lifecycleManager?.scheduleDependencySurfaceRefresh();
   }
 
   async setControlValue(key: string, value: unknown): Promise<void> {

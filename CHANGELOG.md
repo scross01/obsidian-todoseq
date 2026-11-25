@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Tasks that block an incomplete dependent now gain a small urgency boost in urgency sorting and embedded urgency displays, so prerequisites rise ahead of the work waiting on them.
 - Property drawers now report malformed entries and date or description metadata placed inside them, instead of failing silently; other well-formed unknown properties are still preserved without a warning.
 - Scheduled and deadline dates on tasks inside nested blockquotes are now recognised, including from the date picker and recurrence rollover, while a date quoted more deeply than its task stays body text.
 - **Add description** now finds an existing description at any blockquote depth or indentation and moves the cursor to its text, instead of adding a duplicate line; date lines still follow the description.

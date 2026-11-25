@@ -7,6 +7,7 @@ import { TodoTrackerSettings } from '../settings/settings-types';
 import { taskComparator } from '../utils/task-sort';
 import TodoTracker from '../main';
 import {
+  getDefaultCoefficients,
   parseUrgencyCoefficients,
   UrgencyCoefficients,
 } from '../utils/task-urgency';
@@ -45,7 +46,7 @@ export class VaultScanner
   private _rescanRequested = false;
   private _isInitializing = true; // Track Obsidian initialization state
   private _hasCompletedInitialScan = false; // Track if the first scan has completed
-  private urgencyCoefficients!: UrgencyCoefficients;
+  private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
   private regexCache = new RegexCache();
   private parserRegistry: ParserRegistry;
   private keywordManager: KeywordManager;
@@ -113,6 +114,11 @@ export class VaultScanner
    */
   getKeywordManager(): KeywordManager {
     return this.keywordManager;
+  }
+
+  /** Current coefficients, including the synchronous default before startup loads. */
+  getUrgencyCoefficients(): Readonly<UrgencyCoefficients> {
+    return this.urgencyCoefficients;
   }
 
   /** Monotonic revision for published structural entries. */
@@ -503,11 +509,18 @@ export class VaultScanner
     this.settings = newSettings;
     // Clear regex cache when settings change (userIgnoreFilters may have changed)
     this.regexCache.clear();
+    const previousCoefficients = { ...this.urgencyCoefficients };
     // Use provided urgency coefficients or reload them if not provided
     if (urgencyCoefficients) {
       this.urgencyCoefficients = urgencyCoefficients;
     } else {
       await this.loadUrgencyCoefficients();
+    }
+    if (this.haveUrgencyCoefficientsChanged(previousCoefficients)) {
+      // Sorting and embedded scores are derived from this scalar, so direct
+      // updateSettings() callers (settings UI and the list dropdown) must not
+      // leave an open embed on the old coefficient.
+      this.plugin.lifecycleManager?.scheduleDependencySurfaceRefresh?.();
     }
 
     // Create a new KeywordManager with the updated settings
@@ -531,6 +544,14 @@ export class VaultScanner
     for (const parser of this.parserRegistry.getAllParsers()) {
       parser.updateConfig(config);
     }
+  }
+
+  private haveUrgencyCoefficientsChanged(
+    previous: Readonly<UrgencyCoefficients>,
+  ): boolean {
+    return (
+      Object.keys(this.urgencyCoefficients) as (keyof UrgencyCoefficients)[]
+    ).some((key) => previous[key] !== this.urgencyCoefficients[key]);
   }
 
   /**

@@ -16,6 +16,7 @@ The urgency score considers various aspects of your tasks:
 - **Task age**: Older tasks in daily note pages gain urgency over time using a linear scale (0.0 to 1.0) based on days since creation, with a maximum of 365 days
 - **Tags**: Tasks with tags receive a small urgency boost based on the number of tags (0.8 for 1 tag, 0.9 for 2 tags, 1.0 for 3+ tags)
 - **Waiting state**: Tasks in WAIT, WAITING, or custom waiting keywords have reduced urgency
+- **Blocking**: A task that holds up at least one incomplete dependent gains a flat boost
 
 ## How Urgency is Calculated
 
@@ -45,9 +46,26 @@ urgency.active.coefficient = 4.0           # state is an active keyword (DOING, 
 urgency.age.coefficient = 2.0              # if the page is a daily notes page, weight tasks on older pages higher
 urgency.tags.coefficient = 1.0             # the task has one or more tags (multiplied by tag factor)
 urgency.waiting.coefficient = -3.0         # the task is in a waiting keyword state (WAIT, WAITING, or custom waiting keywords)
+urgency.blocking.coefficient = 3.0         # the task blocks at least one incomplete dependent (0 disables)
 ```
 
 The highest coefficient (12.0) is assigned to deadline dates, meaning tasks with deadlines will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).
+
+## Blocking Urgency
+
+A task that blocks an incomplete task receives the `urgency.blocking.coefficient` once, no matter how many dependents it has. The boost belongs to the prerequisite, not the dependent; the dependent keeps its own score. For example, with the default `+3.0`, a task with base urgency `1.00` that holds up a release task displays `4.00`.
+
+Only task-backed dependencies in the current ready graph qualify:
+
+- explicit `BLOCKER` references and restored `ARCHIVED_BLOCKER` references whose target is incomplete
+- parent, `ORDERED`, and checkbox constraints when those optional structural settings are enabled
+- a dependent that does not use `NOBLOCKING`
+
+Missing, ambiguous, completed, archived-only, and pending-validation references contribute nothing. Edges inside a dependency cycle are ignored, including self-references; an edge leaving or entering a cycle still qualifies. A task can be blocked itself and still earn the boost by holding up another task.
+
+Set `urgency.blocking.coefficient = 0` to disable the boost, or change it to tune how strongly prerequisites rise in urgency. The stored task score is unchanged: the boost is applied when urgency is sorted or displayed, and disappears as soon as the last qualifying dependent is completed or its reference is removed.
+
+The boost applies inside the existing urgency buckets and tie-breaks. Future-dated, completed, and hidden tasks keep the same visibility rules; the graph is still read from the full committed vault, so filtering the task list does not remove a prerequisite's boost.
 
 ## Tag Urgency Calculation
 
@@ -208,7 +226,7 @@ For advanced users who want to fine-tune the urgency calculation, you can modify
 3. Adjust the coefficient values to match your workflow preferences
 4. Reload the TODOseq plugin or restart Obsidian for the changes to take effect
 
-Note that this is an advanced feature and the default coefficients are carefully balanced for most use cases. Changes to these values will only take effect after restarting the plugin.
+Note that this is an advanced feature and the default coefficients are carefully balanced for most use cases. Reload the plugin after changing the file. Older custom files that omit `urgency.blocking.coefficient` inherit the default `+3.0`.
 
 ## Urgency in Practice
 

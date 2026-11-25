@@ -2,6 +2,7 @@ import { Task } from '../types/task';
 import { DateUtils } from './date-utils';
 import { KeywordManager } from './keyword-manager';
 import { warningPeriodToDays } from './date-utils';
+import type { UrgencyScoreAccessor } from './task-urgency';
 
 /**
  * Task Classification Types
@@ -466,6 +467,7 @@ export function classifyAll(
 function getSortFunction(
   sortMethod: SortMethod,
   keywordConfig?: KeywordSortConfig,
+  urgencyAccessor?: UrgencyScoreAccessor,
 ): (a: Task, b: Task) => number {
   switch (sortMethod) {
     case 'sortByScheduled':
@@ -583,16 +585,18 @@ function getSortFunction(
 
     case 'sortByUrgency':
       return (a, b) => {
+        const aUrgency = urgencyAccessor ? urgencyAccessor(a) : a.urgency;
+        const bUrgency = urgencyAccessor ? urgencyAccessor(b) : b.urgency;
         // Handle null urgency values - sort to end
-        if (a.urgency === null && b.urgency === null) {
+        if (aUrgency === null && bUrgency === null) {
           return taskComparator(a, b);
         }
-        if (a.urgency === null) return 1;
-        if (b.urgency === null) return -1;
+        if (aUrgency === null) return 1;
+        if (bUrgency === null) return -1;
 
         // Sort by urgency descending (higher urgency first)
-        if (a.urgency !== b.urgency) {
-          return b.urgency - a.urgency;
+        if (aUrgency !== bUrgency) {
+          return bUrgency - aUrgency;
         }
 
         // If urgencies are equal, use keyword sort as secondary
@@ -639,6 +643,7 @@ export function sortTasksInBlocks(
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
   classifications?: Map<Task, TaskClassification>,
+  urgencyAccessor?: UrgencyScoreAccessor,
 ): TaskBlock[] {
   // Classify all tasks - don't sort yet
   const classified: Record<TaskCategory, Task[]> = {
@@ -658,7 +663,11 @@ export function sortTasksInBlocks(
   }
 
   // Get the sort function once
-  const sortFunction = getSortFunction(sortMethod, keywordConfig);
+  const sortFunction = getSortFunction(
+    sortMethod,
+    keywordConfig,
+    urgencyAccessor,
+  );
 
   const blocks: TaskBlock[] = [];
 
@@ -762,6 +771,7 @@ export function sortTasksWithThreeBlockSystem(
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
   classifications?: Map<Task, TaskClassification>,
+  urgencyAccessor?: UrgencyScoreAccessor,
 ): Task[] {
   const blocks = sortTasksInBlocks(
     tasks,
@@ -772,6 +782,7 @@ export function sortTasksWithThreeBlockSystem(
     keywordConfig,
     warningPeriodSettings,
     classifications,
+    urgencyAccessor,
   );
   return flattenBlocks(blocks);
 }

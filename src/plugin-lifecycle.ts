@@ -690,6 +690,9 @@ export class PluginLifecycleManager {
       // Do not leave dependency validation stuck in "checking" after a
       // definitive scan failure; the retained snapshot remains authoritative.
       this.plugin.taskDependencyManager?.setValidationReady(true);
+      // Readiness may have changed without a task revision; repaint both
+      // surfaces so scores and blocked markers leave the checking state.
+      this.scheduleDependencySurfaceRefresh();
       console.error('TODOseq: VaultScanner scan error:', error);
     });
 
@@ -1012,7 +1015,7 @@ export class PluginLifecycleManager {
    * the visible files, so rows, embeds, reader badges and diagnostics must be
    * refreshed from the publication rather than from a file event.
    */
-  private scheduleDependencySurfaceRefresh(): void {
+  scheduleDependencySurfaceRefresh(): void {
     if (!this.plugin.taskDependencyManager) return;
     if (this.dependencyRefreshTimer !== null) return;
 

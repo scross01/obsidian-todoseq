@@ -34,13 +34,23 @@ import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
 import { resolveDependencyMarker } from '../components/dependency-marker';
+import {
+  getEffectiveUrgency,
+  type UrgencyScoreContext,
+} from '../../utils/task-urgency';
 
 export class EmbeddedTaskItemRenderer {
+  private urgencyContext?: UrgencyScoreContext;
+
   constructor(
     private plugin: TodoTracker,
     private menuBuilder: StateMenuBuilder,
     private taskContextMenu: TaskContextMenu,
   ) {}
+
+  setUrgencyScoreContext(context?: UrgencyScoreContext): void {
+    this.urgencyContext = context;
+  }
 
   createTaskListItem(
     task: Task,
@@ -192,7 +202,7 @@ export class EmbeddedTaskItemRenderer {
 
       this.buildWrapDateInfoRows(task, params, contentWrapper);
 
-      const urgencyValue = task.urgency;
+      const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
       const showUrgency =
         params.showUrgency === true &&
         urgencyValue !== null &&
@@ -268,7 +278,7 @@ export class EmbeddedTaskItemRenderer {
         'todoseq-embedded-task-date-info-dynamic-wrap',
       );
 
-      const urgencyValue = task.urgency;
+      const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
       const showUrgency =
         params.showUrgency === true &&
         urgencyValue !== null &&
@@ -340,28 +350,30 @@ export class EmbeddedTaskItemRenderer {
         });
         setTooltip(fileEl, task.path);
 
+        const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
         if (
           params.showUrgency === true &&
-          task.urgency !== null &&
-          task.urgency !== undefined
+          urgencyValue !== null &&
+          urgencyValue !== undefined
         ) {
           const urgEl = li.createSpan({
             cls: 'todoseq-embedded-task-urgency',
-            text: `${task.urgency.toFixed(2)}`,
+            text: `${urgencyValue.toFixed(2)}`,
           });
-          setTooltip(urgEl, `Urgency: ${task.urgency.toFixed(2)}`);
+          setTooltip(urgEl, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
       } else {
+        const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
         if (
           params.showUrgency === true &&
-          task.urgency !== null &&
-          task.urgency !== undefined
+          urgencyValue !== null &&
+          urgencyValue !== undefined
         ) {
           const urgEl = li.createSpan({
             cls: 'todoseq-embedded-task-urgency',
-            text: `${task.urgency.toFixed(2)}`,
+            text: `${urgencyValue.toFixed(2)}`,
           });
-          setTooltip(urgEl, `Urgency: ${task.urgency.toFixed(2)}`);
+          setTooltip(urgEl, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
       }
 

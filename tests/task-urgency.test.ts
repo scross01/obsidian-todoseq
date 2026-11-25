@@ -4,10 +4,14 @@
 
 import {
   parseUrgencyCoefficients,
+  parseUrgencyCoefficientsFromContent,
   calculateTaskUrgency,
+  createUrgencyScoreAccessor,
   getDefaultCoefficients,
+  getEffectiveUrgency,
   UrgencyContext,
 } from '../src/utils/task-urgency';
+import { getTaskKey } from '../src/utils/task-utils';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
 import { createBaseTask, createDate } from './helpers/test-helper';
@@ -147,6 +151,116 @@ urgency.waiting.coefficient = -3.0
     expect(coefficients.active).toBe(4.0);
     expect(coefficients.age).toBe(2.0);
     expect(coefficients.tags).toBe(1.0);
+  });
+});
+
+describe('Blocking Coefficient Parsing', () => {
+  const parse = (line: string) =>
+    parseUrgencyCoefficientsFromContent(
+      `urgency.blocking.coefficient = ${line}`,
+    ).blocking;
+
+  it('inherits +3 when an older custom INI omits the key', () => {
+    const coefficients = parseUrgencyCoefficientsFromContent(
+      'urgency.deadline.coefficient = 12.0',
+    );
+    expect(coefficients.blocking).toBe(3.0);
+  });
+
+  it('parses zero, signed decimals, and an inline comment', () => {
+    expect(parse('0')).toBe(0);
+    expect(parse('+3.5 # weak boost')).toBe(3.5);
+    expect(parse('-3.5')).toBe(-3.5);
+  });
+
+  it.each(['3.5oops', '3..5', 'Infinity', 'NaN', ''])(
+    'keeps the default for malformed value %p',
+    (value) => {
+      expect(parse(value)).toBe(3.0);
+    },
+  );
+
+  it('preserves other keys while validating blocking independently', () => {
+    const coefficients = parseUrgencyCoefficientsFromContent(`
+urgency.deadline.coefficient = 12.0
+urgency.blocking.coefficient = 3.5oops
+urgency.priority.high.coefficient = 6.0
+`);
+    expect(coefficients.deadline).toBe(12.0);
+    expect(coefficients.blocking).toBe(3.0);
+    expect(coefficients.priorityHigh).toBe(6.0);
+  });
+
+  it('does not treat a blocking subcategory as the scalar coefficient', () => {
+    const coefficients = parseUrgencyCoefficientsFromContent(
+      'urgency.blocking.time.coefficient = 9.0',
+    );
+    expect(coefficients.blocking).toBe(3.0);
+  });
+});
+
+describe('Effective Blocking Urgency', () => {
+  it('adds the coefficient once for a task that blocks a dependent', () => {
+    const blocker = createTestTask({ urgency: 1 });
+    const context = {
+      blockingKeys: new Set([getTaskKey(blocker)]),
+      blockingCoefficient: 3,
+    };
+
+    expect(getEffectiveUrgency(blocker, context)).toBe(4);
+  });
+
+  it('adds only one boost with multiple dependents', () => {
+    const blocker = createTestTask({ urgency: 1 });
+    const first = createTestTask({
+      path: 'first.md',
+      line: 0,
+      urgency: 2,
+    });
+    const second = createTestTask({
+      path: 'second.md',
+      line: 0,
+      urgency: 2,
+    });
+    const context = {
+      blockingKeys: new Set([getTaskKey(blocker)]),
+      blockingCoefficient: 3,
+    };
+    const accessor = createUrgencyScoreAccessor(
+      [blocker, first, second],
+      context,
+    );
+
+    expect(accessor(blocker)).toBe(4);
+    expect(accessor(first)).toBe(2);
+    expect(accessor(second)).toBe(2);
+  });
+
+  it('leaves completed, null, disabled, and unblocked scores unchanged', () => {
+    const task = createTestTask({ urgency: 1 });
+    const context = {
+      blockingKeys: new Set([getTaskKey(task)]),
+      blockingCoefficient: 3,
+    };
+
+    expect(
+      getEffectiveUrgency(
+        createTestTask({ urgency: 1, completed: true }),
+        context,
+      ),
+    ).toBe(1);
+    expect(
+      getEffectiveUrgency(createTestTask({ urgency: null }), context),
+    ).toBeNull();
+    expect(
+      getEffectiveUrgency(task, { ...context, blockingCoefficient: 0 }),
+    ).toBe(1);
+    expect(
+      getEffectiveUrgency(createTestTask({ urgency: 1 }), {
+        ...context,
+        blockingKeys: new Set(),
+      }),
+    ).toBe(1);
   });
 });
 
@@ -583,6 +697,7 @@ describe('Default Coefficients', () => {
     expect(defaults.age).toBe(2.0);
     expect(defaults.tags).toBe(1.0);
     expect(defaults.waiting).toBe(-3.0);
+    expect(defaults.blocking).toBe(3.0);
   });
 
   it('should return a new object each time (no mutation)', () => {

@@ -13,6 +13,7 @@ import {
 } from '../../utils/daily-note-utils';
 import { readTaskBlockFromVault } from '../../utils/task-sub-bullets';
 import { EmbeddedTaskItemRenderer } from './embedded-task-item-renderer';
+import type { UrgencyScoreContext } from '../../utils/task-urgency';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -274,7 +275,9 @@ export class EmbeddedTaskListRenderer {
     isCollapsed?: boolean,
     toggleCollapse?: (containerId: string) => void,
     containerId?: string,
+    urgencyContext?: UrgencyScoreContext,
   ): void {
+    this.itemRenderer.setUrgencyScoreContext?.(urgencyContext);
     // Handle collapsible mode with incremental updates to prevent flicker
     if (params.collapse) {
       const hasTitle = !!params.title;

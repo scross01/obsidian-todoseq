@@ -15,8 +15,11 @@ export type SearchPrefix =
   | 'property';
 
 /** Derived dependency status shared by search and dashboards. */
+import type { DependencySnapshot } from '../types/task-dependency';
+
 export interface DependencyStatusProvider {
   getBlockedKeys(): ReadonlySet<string>;
+  getSnapshot?(): DependencySnapshot;
 }
 
 export interface SearchToken {

@@ -378,6 +378,34 @@ describe('PluginLifecycleManager', () => {
       );
     });
 
+    it('restores readiness and refreshes surfaces after a scan error', async () => {
+      await lifecycleManager.onload();
+      const scanner = pluginMock.vaultScanner as { on: jest.Mock };
+      const errorHandler = scanner.on.mock.calls.find(
+        ([event]) => event === 'scan-error',
+      )?.[1] as ((error: Error) => void) | undefined;
+      expect(errorHandler).toBeDefined();
+
+      const manager = pluginMock.taskDependencyManager as {
+        setValidationReady: (ready: boolean) => void;
+      };
+      const setReady = jest.spyOn(manager, 'setValidationReady');
+      const schedule = jest.spyOn(
+        lifecycleManager,
+        'scheduleDependencySurfaceRefresh',
+      );
+      schedule.mockImplementation(() => undefined);
+
+      try {
+        errorHandler!(new Error('scan failed'));
+        expect(setReady).toHaveBeenCalledWith(true);
+        expect(schedule).toHaveBeenCalledTimes(1);
+      } finally {
+        setReady.mockRestore();
+        schedule.mockRestore();
+      }
+    });
+
     it('should initialize embedded task list processor', async () => {
       await lifecycleManager.onload();
       expect(pluginMock.embeddedTaskListProcessor).not.toBeNull();

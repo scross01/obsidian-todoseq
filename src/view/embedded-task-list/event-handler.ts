@@ -222,8 +222,11 @@ export class EmbeddedTaskListEventHandler {
       const allTasks = this.plugin.getTasks();
 
       // Filter, sort, and get count in a single operation
-      const { tasks: filteredTasks, totalCount } =
-        await this.manager.filterAndSortTasksWithCount(allTasks, params);
+      const {
+        tasks: filteredTasks,
+        totalCount,
+        urgencyContext,
+      } = await this.manager.filterAndSortTasksWithCount(allTasks, params);
 
       // A newer refresh, or the render teardown, may have won while awaiting.
       if (!this.isCurrent(containerId, codeBlock, generation)) return;
@@ -237,6 +240,7 @@ export class EmbeddedTaskListEventHandler {
         codeBlock.isCollapsed,
         (id: string) => this.toggleCollapse(id),
         containerId,
+        urgencyContext,
       );
     } catch (error: unknown) {
       if (!this.isCurrent(containerId, codeBlock, generation)) return;
