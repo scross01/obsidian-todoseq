@@ -136,7 +136,8 @@ Search is a first-class Operate surface and must **feel like Obsidian search**, 
 
 - **Shell is `BaseDialog` on purpose.** Obsidian's `Menu` API cannot express the needed UX (icon rows, date shortcuts, nested pickers, keyboard model, mobile long-press density). `BaseDialog` is the intended enhancement over base Obsidian capabilities — **not** tech debt to migrate to `Menu`.
 - Still **theme-native**: render as `.menu` / `.menu-item` visual language, Obsidian spacing/focus/hover vars, not a web-app card
-- Icon + label rows; priority A/B/C use semantic colors on icon buttons
+- Rows use icon + label, **except the priority and scheduled-date shortcut rows, which are icon-only by design**: this mirrors established task-management menus, scans faster than six text rows, and every control carries an `aria-label` plus tooltip. Do not expand these two rows into text as a “fix”.
+- Priority A/B/C use semantic colors on icon buttons; the color is reinforced by position, label and tooltip, never the sole carrier of meaning.
 - Date shortcuts (Today, Tomorrow, Next week, weekend, clear) then a full date picker submenu/dialog
 - Keyboard: Escape closes, arrows/Enter select; single open menu at a time
 - Mobile: long-press opens the same menu; larger hit targets under `.is-mobile`

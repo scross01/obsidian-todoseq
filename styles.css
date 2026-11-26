@@ -2,7 +2,9 @@
   display: none;
 }
 
-/* TodoView theme-aligned styles. Inherit fonts/colors from the active Obsidian theme. */
+/* ============================================================================
+   Task List panel and toolbar
+   ============================================================================ */
 .todoseq-panel {
   color: var(--text-normal);
   display: flex;
@@ -186,7 +188,9 @@
   font-size: 0.9em;
 }
 
-/* List layout */
+/* ============================================================================
+   Task List rows and interaction
+   ============================================================================ */
 .todoseq-panel .todoseq-task-list {
   font-family: var(--font-text);
   font-size: var(--font-text-size);
@@ -349,7 +353,9 @@
   border-radius: var(--input-radius);
 }
 
-/* Checkbox alignment */
+/* ============================================================================
+   Task checkboxes across views
+   ============================================================================ */
 .todoseq-panel .todoseq-task-checkbox {
   margin-right: var(--size-2-2);
   vertical-align: middle;
@@ -539,7 +545,9 @@
 
 /* Icon base for toolbar buttons rendered via CSS masks */
 
-/* Date display styling */
+/* ============================================================================
+   Task metadata and warning indicators
+   ============================================================================ */
 .todoseq-panel .todoseq-task-date-container {
   margin-top: var(--size-2-2);
   /* Theme-relative meta sizing: dates track the theme scale. */
@@ -711,7 +719,9 @@
   margin-left: 0;
 }
 
-/* Settings UI - Shared font size for messages */
+/* ============================================================================
+   Settings messages and validation
+   ============================================================================ */
 .todoseq-setting-item-error,
 .todoseq-setting-item-warning,
 .todoseq-setting-item-info,
@@ -742,7 +752,9 @@
   border-style: solid;
 }
 
-/* Smart date highlight — subtle outline and background on the active task line */
+/* ============================================================================
+   Editor and Reading view task formatting
+   ============================================================================ */
 .todoseq-smart-date-highlight {
   background-color: color-mix(
     in srgb,
@@ -1007,7 +1019,9 @@
   color: var(--interactive-accent);
 }
 
-/* Dropdown containers for search suggestions and options */
+/* ============================================================================
+   Search suggestions and options
+   ============================================================================ */
 .todoseq-dropdown {
   position: absolute;
   z-index: var(--layer-menu);
@@ -1055,13 +1069,17 @@
   text-overflow: ellipsis;
 }
 
-/* Status bar item styling */
+/* ============================================================================
+   Status bar
+   ============================================================================ */
 .todoseq-status-bar {
   order: -1;
   margin-right: auto;
 }
 
-/* Embedded Task List Styles - New Implementation */
+/* ============================================================================
+   Embedded task list
+   ============================================================================ */
 
 /* Main container */
 .todoseq-embedded-task-list-container {
@@ -1327,7 +1345,7 @@
 }
 
 /* ============================================================================
-   Wrap Content Mode - Task text wrapping and file info on new row
+   Embedded task list wrapping and responsive layout
    ============================================================================ */
 
 /* Wrap content mode - task item stays as row but allows content to wrap */
@@ -1694,7 +1712,7 @@
 }
 
 /* ============================================================================
-   Floating Indicators - Subtask count and repeat icon on top-right
+   Embedded task list indicators and feedback
    ============================================================================ */
 
 /* Floating indicators container - positioned at top-right of task line */
@@ -1846,6 +1864,10 @@
   border-left-color: color-mix(in srgb, var(--color-orange) 50%, transparent);
 }
 
+/* ============================================================================
+   Task formatting in footnotes and nested quotes
+   ============================================================================ */
+
 /* Footnote task keyword styling */
 .cm-editor .todoseq-footnote-task-keyword {
   font-weight: var(--font-bold);
@@ -1881,7 +1903,7 @@
 }
 
 /* ============================================================================
-   Collapsible Embedded Task List Styles
+   Embedded task list collapse controls
    ============================================================================ */
 
 /* Title styling when used as collapsible toggle */
@@ -2757,6 +2779,10 @@
   border-width: 2px;
 }
 
+/* ============================================================================
+   Archive completion notice
+   ============================================================================ */
+
 /*
  * Archive-run completion notice (auto-run + manual run).
  * Obsidian renders notice content inline and styles `.notice button` with
@@ -2833,9 +2859,9 @@
   background: color-mix(in srgb, var(--interactive-accent) 75%, black);
 }
 
-/*
- * Auto-archive dialog
- */
+/* ============================================================================
+   Auto-archive dialog
+   ============================================================================ */
 
 .todoseq-archive-backdrop {
   position: fixed;
@@ -3241,6 +3267,10 @@
   justify-content: center;
 }
 
+/* ============================================================================
+   Saved search dialog actions
+   ============================================================================ */
+
 .todoseq-saved-search-buttons {
   display: flex;
   justify-content: flex-end;
@@ -3292,6 +3322,10 @@
 .todoseq-saved-search-btn-delete:hover {
   background: color-mix(in srgb, var(--color-red) 10%, transparent);
 }
+
+/* ============================================================================
+   Search history save action
+   ============================================================================ */
 
 /* History item save icon - hidden by default, shown on hover */
 .todoseq-dropdown .search-suggest-history-item .suggestion-aux {
@@ -4024,6 +4058,10 @@
 .is-phone .todoseq-dashboard-clickable {
   min-height: 24px;
 }
+
+/* ============================================================================
+   Task dependency markers across views
+   ============================================================================ */
 
 /* One status glyph before the keyword on every task surface. The lock marks
    ordinary blocked state; the warning marks a source diagnostic that outranks
