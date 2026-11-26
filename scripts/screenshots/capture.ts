@@ -48,12 +48,18 @@ import {
   splitCssRules,
   type CssRule,
 } from './css-slices.ts';
+import { SCENARIOS, type ScenarioDef, type ThemeMode } from './registry.ts';
 import {
-  HELPERS_FILE,
-  SCENARIOS,
-  type ScenarioDef,
-  type ThemeMode,
-} from './registry.ts';
+  SEED_MODULE_SOURCE_PATHS,
+  SEED_MODULES,
+  buildScenarioHashInput,
+} from './scenario-inputs.ts';
+import {
+  ASSET_FEATURES,
+  formatFocusedReport,
+  parseFeatureSelection,
+  type FeatureTag,
+} from './asset-features.ts';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, '../..');
@@ -72,20 +78,10 @@ function readScenarioFile(file: string): string {
 }
 
 /**
- * Scenario hash inputs: the scenario script *and* the shared helpers module.
- * Both define what the capture looks like, so both must invalidate.
+ * Hash input for one scenario: its script, the shared helpers, its declared
+ * seed modules, and the resolved seed vault. Built in scenario-inputs.ts so
+ * tests exercise the same builder without running main().
  */
-function scenarioHashInputs(scenarioId: string, scriptFile: string) {
-  return {
-    id: scenarioId,
-    sources: {
-      [scriptFile]: readScenarioFile(scriptFile),
-      [HELPERS_FILE]: readScenarioFile(HELPERS_FILE),
-    },
-    seed: {},
-  };
-}
-
 /**
  * Every *git-tracked* markdown file that can reference a docs asset.
  *
@@ -439,6 +435,21 @@ function explainMode(): void {
         `CSS slice ${slice.length}/${totalRules} rules`,
     );
     for (const f of specific) console.log(`    ${f}`);
+    const def = SCENARIOS[scenarioId];
+    const seedSources = def.seeds.map((seedId) => {
+      const vaultPaths = Object.keys(SEED_MODULES[seedId]).join(', ');
+      return `${seedId} (${SEED_MODULE_SOURCE_PATHS[seedId]}) → ${vaultPaths}`;
+    });
+    console.log(`    seeds: ${seedSources.join('; ')}`);
+  }
+
+  console.log('\nAsset features (--check --features=<tag>):');
+  for (const [asset, entry] of Object.entries(ASSET_FEATURES)) {
+    console.log(
+      `${asset}: ${entry.tags.join(', ')}${
+        entry.broadReview ? ' [broad review]' : ''
+      }`,
+    );
   }
 }
 
@@ -461,7 +472,7 @@ function captureMode(only: string[] | null, themes: ThemeMode[]): void {
   for (const scenarioId of scenarioIds) {
     const def = SCENARIOS[scenarioId];
     const scenarioHash = computeScenarioHash(
-      scenarioHashInputs(scenarioId, def.script),
+      buildScenarioHashInput(scenarioId, readScenarioFile),
     );
     const pluginBuildHash = pluginBuildHashFor(scenarioId);
     for (const theme of themes) {
@@ -536,7 +547,7 @@ function producedName(
     : `${scriptBase}.gif`;
 }
 
-function checkMode(): void {
+function checkMode(features: FeatureTag[] | null): void {
   if (!fs.existsSync(MANIFEST_PATH))
     fail('No manifest yet — run docs:screenshots first.');
   const manifest = JSON.parse(
@@ -550,7 +561,7 @@ function checkMode(): void {
   for (const [scenarioId, def] of Object.entries(SCENARIOS)) {
     currentScenarioHash.set(
       scenarioId,
-      computeScenarioHash(scenarioHashInputs(scenarioId, def.script)),
+      computeScenarioHash(buildScenarioHashInput(scenarioId, readScenarioFile)),
     );
   }
   // Per scenario, not global: only the sources that scenario renders can
@@ -606,7 +617,9 @@ function checkMode(): void {
   const { unreferenced } = scanAssetUsage(files, docsMarkdownSources(), readMd);
   for (const u of unreferenced) rows.push({ asset: u, status: 'UNREFERENCED' });
   rows.sort((a, b) => a.asset.localeCompare(b.asset));
-  console.log(formatCheckReport(rows));
+  console.log(
+    features ? formatFocusedReport(rows, features) : formatCheckReport(rows),
+  );
   // Non-zero on drift, so the command is a real check. Nothing runs it
   // automatically: no CI job gates on it, because staleness still fires on
   // commits that change no rendered pixel, and a hard failure on every such PR
@@ -618,8 +631,15 @@ function checkMode(): void {
 
 function main(): void {
   const args = process.argv.slice(2);
-  if (args.includes('--check')) {
-    checkMode();
+  const checkRequested = args.includes('--check');
+  let features: FeatureTag[] | null;
+  try {
+    features = parseFeatureSelection(args, checkRequested);
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+  if (checkRequested) {
+    checkMode(features);
     return;
   }
   if (args.includes('--explain')) {

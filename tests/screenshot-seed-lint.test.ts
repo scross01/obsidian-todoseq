@@ -3,17 +3,15 @@ import {
   lintSeedContent,
   type SeedProblem,
 } from '../scripts/screenshots/seed-lint';
-import {
-  ARCHIVE_SEEDS,
-  COLLAPSE_SEEDS,
-  DASHBOARD_SEEDS,
-  DEMO_SEEDS,
-  EDITOR_SEEDS,
-  EMBED_SEEDS,
-  SEARCH_FILTER_SEEDS,
-  TASK_ENTRY_SEEDS,
-  WARNING_PERIOD_SEEDS,
-} from '../scripts/screenshots/scenarios/helpers';
+import { ARCHIVE_SEEDS } from '../scripts/screenshots/scenarios/seeds/archive';
+import { COLLAPSE_SEEDS } from '../scripts/screenshots/scenarios/seeds/collapse';
+import { DASHBOARD_SEEDS } from '../scripts/screenshots/scenarios/seeds/dashboard';
+import { DEMO_SEEDS } from '../scripts/screenshots/scenarios/seeds/demo';
+import { EDITOR_SEEDS } from '../scripts/screenshots/scenarios/seeds/editor';
+import { EMBED_SEEDS } from '../scripts/screenshots/scenarios/seeds/embed';
+import { SEARCH_FILTER_SEEDS } from '../scripts/screenshots/scenarios/seeds/search-filter';
+import { TASK_ENTRY_SEEDS } from '../scripts/screenshots/scenarios/seeds/task-entry';
+import { WARNING_PERIOD_SEEDS } from '../scripts/screenshots/scenarios/seeds/warning-period';
 
 /**
  * The demo content rules from AGENTS.md, enforced rather than documented.

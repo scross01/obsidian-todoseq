@@ -1,9 +1,6 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import {
-  TASK_ENTRY_SEEDS,
-  waitForPlugin,
-  waitForTaskListView,
-} from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { TASK_ENTRY_SEEDS } from './seeds/task-entry.ts';
 
 /**
  * Animated task-entry demo — the landing-page hero (docs/index.md, README).

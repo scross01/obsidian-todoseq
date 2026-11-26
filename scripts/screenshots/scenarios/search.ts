@@ -1,9 +1,6 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import {
-  SEARCH_FILTER_SEEDS,
-  waitForPlugin,
-  waitForTaskListView,
-} from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { SEARCH_FILTER_SEEDS } from './seeds/search-filter.ts';
 
 /**
  * Docs scenario for search and filtering (docs/search.md).

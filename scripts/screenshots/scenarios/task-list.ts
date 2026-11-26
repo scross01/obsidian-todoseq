@@ -1,5 +1,6 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import { DEMO_SEEDS, waitForPlugin, waitForTaskListView } from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { DEMO_SEEDS } from './seeds/demo.ts';
 
 /**
  * Docs scenarios for the Task List page (docs/task-list.md).

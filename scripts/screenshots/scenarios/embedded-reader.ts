@@ -1,12 +1,12 @@
 import { defineScript } from 'obsidian-demo-recorder';
 import {
-  DEMO_SEEDS,
-  EMBED_SEEDS,
   TOGGLE_VIEW_MODE,
   leaveReadingMode,
   waitForPlugin,
   waitForReadingMode,
 } from './helpers';
+import { DEMO_SEEDS } from './seeds/demo.ts';
+import { EMBED_SEEDS } from './seeds/embed.ts';
 
 /**
  * Docs scenarios for embedded task lists (docs/embedded-task-lists.md), the

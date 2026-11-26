@@ -188,6 +188,27 @@ report on every PR is noise rather than signal. Run it yourself when you touch
 plugin sources, and read a stale row as "these images may need updating", not as
 work this change owes.
 
+#### Reviewing one feature at a time
+
+When you know which feature a change touches, `--features` groups the report so
+the stills most likely to show it come first:
+
+```bash
+npm run docs:screenshots -- --check --features=date-autocomplete
+```
+
+Tags live in `scripts/screenshots/asset-features.ts`, keyed by asset id and
+shared with the generated light twin. The report lists matching plugin drift
+first, then unmatched plugin drift (still stale), then everything else:
+scenario drift, missing or unreferenced assets, and overview images marked
+_broad review_, whose crop cannot prove which part of the frame a change
+affects. Totals and the exit status are unchanged. The report reflects drift
+accumulated since each capture, not only your change, so a matching row is a
+review lead rather than proof that its pixels differ. A selected feature with no
+captured asset says so — an empty match is not evidence of freshness. Tag the
+feature a screenshot actually shows when adding one, and run the plain check
+when a change spans several features or you are unsure.
+
 ### Workflow when you choose to regenerate
 
 Nothing here is required after a visual change: the check is manual, and a stale
@@ -222,11 +243,17 @@ have regenerated but cannot review, revert `docs/assets/` and
 
 ### Things that will waste your time otherwise
 
-- **Editing `scenarios/helpers.ts` invalidates every scenario.** It holds the
-  shared vault seeds and wait predicates, and it is part of every scenario's
-  hash, so `--check` will flag every scenario. That is a fact about the
-  dependency, not an instruction: whether to recapture those images remains
-  your deliberate choice, and `--only` still works for the ones you pick.
+- **Shared helpers invalidate every scenario; a seed module invalidates its
+  own.** `scenarios/helpers.ts` holds the wait predicates and date helpers every
+  scenario imports, so editing it flags every scenario. Seed notes live in
+  `scenarios/seeds/<name>.ts`, and each scenario hashes only the modules it
+  declares in `registry.ts` — editing `seeds/dashboard.ts` flags the dashboards,
+  not the settings shot. Both are facts about the dependency, not instructions:
+  whether to recapture an image remains your deliberate choice, and `--only`
+  still works for the ones you pick. A hash-input change — a new seed module, or
+  an edited one — can flag every historical row at once; that is expected, and
+  those images stay stale until a maintainer deliberately recaptures and
+  reviews them.
 - **Never hand-write a light-mode scenario.** The driver generates a light twin
   of each scenario (`lightVariantScriptPath()`) that imports the real one and
   only overrides the base theme and a `-light` suffix on each screenshot id. A

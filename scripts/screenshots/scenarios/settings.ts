@@ -1,11 +1,11 @@
 import { defineScript } from 'obsidian-demo-recorder';
 import {
-  DEMO_SEEDS,
   openSettingsDialog,
   revealActiveSettingsTab,
   waitForSettingsDialog,
   waitForPlugin,
 } from './helpers';
+import { DEMO_SEEDS } from './seeds/demo.ts';
 
 /**
  * Docs scenario for the Settings page (docs/settings.md).

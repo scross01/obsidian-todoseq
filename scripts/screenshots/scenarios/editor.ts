@@ -1,10 +1,7 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import {
-  DEMO_SEEDS,
-  EDITOR_SEEDS,
-  waitForPlugin,
-  waitForTaskListView,
-} from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { DEMO_SEEDS } from './seeds/demo.ts';
+import { EDITOR_SEEDS } from './seeds/editor.ts';
 
 /**
  * Docs scenarios for the Editor Integration page (docs/editor.md).
