@@ -2572,18 +2572,25 @@
   align-items: center;
 }
 
-.todoseq-dropdown .search-suggest-saved-item .suggestion-content {
+/* Saved-search and history rows share content, action and title styling */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-content,
+.todoseq-dropdown .search-suggest-history-item .suggestion-content {
   min-width: 0;
   overflow: hidden;
 }
 
-.todoseq-dropdown .search-suggest-saved-item .suggestion-aux {
+.todoseq-dropdown .search-suggest-saved-item .suggestion-aux,
+.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
   align-items: center;
   flex-shrink: 0;
 }
 
 .todoseq-dropdown
   .search-suggest-saved-item
+  .suggestion-aux
+  .search-suggest-icon,
+.todoseq-dropdown
+  .search-suggest-history-item
   .suggestion-aux
   .search-suggest-icon {
   display: flex;
@@ -2598,8 +2605,9 @@
   background-color: var(--background-modifier-hover);
 }
 
-/* Saved search title - single line with truncation (matches search option rows) */
-.todoseq-dropdown .search-suggest-saved-item .suggestion-title {
+/* Saved-search and history titles - single line with truncation */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-title,
+.todoseq-dropdown .search-suggest-history-item .suggestion-title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2615,34 +2623,6 @@
   align-items: center;
 }
 
-.todoseq-dropdown .search-suggest-history-item .suggestion-content {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.todoseq-dropdown
-  .search-suggest-history-item
-  .suggestion-aux
-  .search-suggest-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-/* History query text - single line with truncation */
-.todoseq-dropdown .search-suggest-history-item .suggestion-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .todoseq-dropdown .search-suggest-history-query {
   font-weight: var(--font-normal);
 }
@@ -2655,8 +2635,9 @@
   opacity: 0.8;
 }
 
-/* Hover action icons (edit/delete) - hidden by default, shown on hover */
-.todoseq-dropdown .search-suggest-saved-item .suggestion-aux {
+/* Row actions (edit/delete/save) - hidden by default; reveal rules follow */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-aux,
+.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
   opacity: 0;
   transition: opacity 0.1s ease;
   max-height: 1em;
@@ -3276,13 +3257,7 @@
    Search history save action
    ============================================================================ */
 
-/* History item save icon - hidden by default, shown on hover */
-.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  max-height: 1em;
-}
-
+/* History item save action - revealed on hover */
 .todoseq-dropdown .search-suggest-history-item:hover .suggestion-aux {
   opacity: 1;
 }
