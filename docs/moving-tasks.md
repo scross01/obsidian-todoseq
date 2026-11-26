@@ -12,6 +12,8 @@ Copy, move and drag-and-drop take the whole task block: the task line, its conse
 
 Migrate to Today is the exception: the copy keeps the full block, while the source line keeps `STARTED:`, `CLOSED:` and `DESCRIPTION:` and loses only the `SCHEDULED:` and `DEADLINE:` dates it is moving to the new copy.
 
+A task with an `ID` or block anchor keeps it, and the references TODOseq can find are updated to follow the task. See [Task IDs and Anchors](task-ids.md) for how identities work and what [Task Dependencies](task-dependencies.md#moving-and-copying-tasks) does with them.
+
 ## Copy
 
 Copy the task content to the clipboard. This is useful when you want to duplicate a task without changing its original location.

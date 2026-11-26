@@ -108,6 +108,7 @@ Once enabled, the Task List opens in the right sidebar. You can always reopen it
 <li><a href="reader.html">Reader View</a><p>Task styling and interaction in Reading mode</p></li>
 <li><a href="embedded-task-lists.html">Embedded Task Lists</a><p>Render live task lists inside notes</p></li>
 <li><a href="moving-tasks.html">Moving Tasks</a><p>Move tasks between notes and dates</p></li>
+<li><a href="task-ids.html">Task IDs &amp; Anchors</a><p>Optional identities for links, embeds and blockers</p></li>
 <li><a href="command-palette.html">Command Palette</a><p>Commands for common actions</p></li>
 </ul>
 </div>

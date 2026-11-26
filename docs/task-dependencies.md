@@ -86,7 +86,7 @@ While TODOseq is rebuilding its task index, an incomplete task that names depend
 
 IDs resolve against the complete collected task set, so forward and cross-file references work. IDs are exact and case-sensitive. If two tasks declare the same ID, a reference to that ID is ambiguous and neither task is selected.
 
-A Markdown block link resolves the note first and then the anchor in that note. Two notes can both contain `^same` without colliding, while a broken note link never falls back to a same-named ID or an anchor in another file. The target block must belong to a collected TODOseq task. Org dependencies remain ID-only.
+A Markdown block link resolves the note first and then the anchor in that note (see [Task IDs and Anchors](task-ids.md#block-anchors)). Two notes can both contain `^same` without colliding, while a broken note link never falls back to a same-named ID or an anchor in another file. The target block must belong to a collected TODOseq task. Org dependencies remain ID-only.
 
 Dependencies on files excluded from TODOseq scanning are unavailable, not deleted. They block until the reference is removed, the task completes, or the target becomes scannable again.
 
@@ -98,7 +98,9 @@ Cycles are reported as diagnostics, but they do not replace the direct completio
 
 `ARCHIVED_BLOCKER` is inactive history. It does not block completion while the archived task is absent. If the exact ID or file-plus-anchor target reappears in the scanned tasks, TODOseq treats the relationship as active immediately using the target's current state: an incomplete restored target blocks, and a completed one does not.
 
-Archiving a task that others depend on moves their active `BLOCKER` references into `ARCHIVED_BLOCKER` automatically, so archiving a prerequisite does not strand its dependents as permanently blocked. The inventory uses the same unique-target rule as the graph: if a duplicate ID or block anchor makes a reference ambiguous, the reference stays active instead of being moved. Restoring the prerequisite moves those references back to `BLOCKER`. Each dependent is re-read before it is changed; if its note no longer matches, the reference is left alone, the dependent is reported, and the next restore or dependency change retries it. A token you removed from the live drawer is not recreated from the earlier inventory. All of this is session-scoped bookkeeping — the only durable change is the property text in your notes.
+`ARCHIVED_BLOCKER` is a record of what used to block a task, and it never stops a task from being completed while the archived task is gone. If a task with the same ID or block link returns, the reference becomes active again immediately: an incomplete restored task blocks, a completed one does not.
+
+Archiving a prerequisite moves its dependents' active `BLOCKER` references into `ARCHIVED_BLOCKER`, so archiving does not leave them stuck; restoring it moves them back. If an ID or block anchor is shared by more than one task, TODOseq leaves the reference active rather than guess which one was meant. Each dependent is re-read before it changes; one whose note no longer matches is reported and retried on the next restore or dependency change. A reference you deliberately removed is never recreated from the older record. This bookkeeping lasts for the session — the only lasting change is the property text in your notes.
 
 ## Optional structural dependencies
 
@@ -174,17 +176,25 @@ A missing, ambiguous, excluded or temporarily unvalidated reference counts as bl
 
 Blocked tasks carry a lock immediately before the keyword in the Task List, embedded task lists, reading view and editor, and the row keeps its normal text colour instead of being dimmed. In task lists and embedded lists the lock is a focusable button: hovering or focusing it shows the blocking reasons, and clicking it or pressing Enter/Space opens them in a notice. Reader views draw the same lock before the keyword of Markdown, heading, bullet and table tasks; Live Preview and source-mode editors draw it before the keyword on plain, heading and bullet task lines. The reading view's lock opens the reasons, while the editor marker shows them in its tooltip. The marker is derived at render time and writes nothing. Markers update when the current file's task snapshot publishes, so adding or removing a `BLOCKER` reference takes effect without another edit.
 
+![A task waiting on an incomplete prerequisite: it keeps its normal text colour and carries the lock before the keyword](./assets/todoseq-task-dependency-blocked.png){.ts-img-detail .ts-img-dark}
+![A task waiting on an incomplete prerequisite: it keeps its normal text colour and carries the lock before the keyword](./assets/todoseq-task-dependency-blocked-light.png){.ts-img-detail .ts-img-light}
+
 A **source diagnostic** — an unresolved, ambiguous or invalid reference, a dependency cycle or duplicate IDs — replaces the lock with a warning triangle in the Task List, embedded task lists, reading view and editor. Its tooltip carries the first diagnostic and any remaining count, and repairing the reference removes it on the next render or decoration refresh. Ordinary waiting on an incomplete task is normal blocked state and shows only the lock; a task never carries both markers.
 
 Diagnostics are shown quietly. The affected task carries a warning triangle whose tooltip names the first problem, and the Task List toolbar shows an **Issues** count. Select it, or run **Show task issues** from the command palette, to open the list with each problem's source task; select a row to jump to that task. Property problems are labelled **Property problem** and dependency-graph problems are labelled **Dependency problem**. The panel has a close button and shows **Checking task diagnostics…** while the index is still rebuilding. TODOseq does not show a notice for each edit; notices are reserved for actions you take and for failures that need your attention. All of these markers are session-local: nothing is persisted to the vault.
 
-When **Enforce blocked tasks** is on (the default), completing a blocked task from a TODOseq checkbox, keyword menu, command or context menu is refused. The notice explains that the task cannot be completed yet, names the blocking reasons, and points to **Complete anyway** in the task context menu or the **Complete blocked task** command. Nothing is written and the task stays in its original state. A refused checkbox springs back immediately, and a queued completion is checked again just before the write, so a blocker that reopens in the meantime is still caught. That check follows the task if its row moves while the request is queued, including after a failed write has to re-read the note, and recurring completions are checked against the completion you requested before they roll to the next occurrence. If the original row can no longer be identified, the completion fails rather than applying to whatever now occupies its old position. Completion authorization uses saved note state: a dependent stays blocked until its prerequisite's write actually succeeds, so an optimistic state change, a failed prerequisite write, or a scan of another file cannot release it. A scan that starts while a task is being saved preserves that task's saved state until the write completes. Repeating a completion from a row that already looks complete is checked against the saved source state again. The dependency check and the write use the same verified row. A task with an ID or block anchor must match that identity, so a same-title row with a different anchor is never substituted; an unanchored task falls back to unique task text. A duplicate identity or a row that cannot be uniquely located is refused instead of being applied to a neighboring task. **Complete anyway** bypasses the dependency check, not this row verification. Use **Complete anyway** when you deliberately need to complete the task anyway. Disabling enforcement in [Settings](/settings) allows normal completion while blocked status remains visible in search, dashboards and row styling.
+![A task with an unresolved prerequisite reference: the warning triangle replaces the lock, and the Issues panel lists the problem](./assets/todoseq-task-dependency-issues.png){.ts-img-wide .ts-img-dark}
+![A task with an unresolved prerequisite reference: the warning triangle replaces the lock, and the Issues panel lists the problem](./assets/todoseq-task-dependency-issues-light.png){.ts-img-wide .ts-img-light}
 
-This gate covers plugin completion actions only. Editing the note text manually, syncing a file or changing it outside Obsidian remains authoritative and is picked up on the next scan.
+When **Enforce blocked tasks** is on (the default), TODOseq refuses to complete a blocked task from its own checkboxes, keyword menus, commands and context menus. The notice explains what the task is waiting for and points to **Complete anyway** in the task context menu or the **Complete blocked task** command. Nothing is written and the task stays as it was; a refused checkbox springs back immediately.
+
+The check uses what is saved in your notes rather than the row as it last looked, so a dependent is released only once its prerequisite's change has actually been written. A completion that is still queued follows its task if the list moves, and if TODOseq can no longer identify the original row it refuses rather than completing a neighbour. A task with an `ID` or block anchor must still match that identity, so a same-title row is never substituted. **Complete anyway** skips the dependency check, not that last safeguard.
+
+Editing the note, syncing a file or changing it outside Obsidian is never blocked; those changes are simply picked up on the next scan. Turning **Enforce blocked tasks** off in [Settings](/settings) allows normal completion, while blocked tasks keep their lock, search results and row styling.
 
 ### Copying identities
 
-The task context menu can copy an `ID` or a Markdown block anchor:
+Both kinds of identity are optional; [Task IDs and Anchors](task-ids.md) covers their general use. The task context menu can copy an `ID` or a Markdown block anchor:
 
 - **Copy ID** reuses the task's authored ID. If it has none, TODOseq writes a UUID to the task's property drawer and then copies it. Scanning or capturing a task never creates an ID by itself.
 - **Copy anchor** is available for Markdown task lines. It reuses the task's block anchor or creates one, then copies a file-qualified link such as `[[Projects/Plan#^todoseq-a1b2c3d4]]`. The anchor goes on the last line of the task's recognised metadata block, because Obsidian only resolves a block reference at the end of that block:
@@ -203,6 +213,13 @@ The task context menu can copy an `ID` or a Markdown block anchor:
 
 **Add copied link as blocker** reads one ID or file-qualified block link from the clipboard, resolves it to exactly one collected task, and appends it to the current task's `BLOCKER` list. Ambiguous or invalid clipboard content is rejected without writing.
 
+Both actions sit together in the row's [task context menu](task-list.md#task-context-menu).
+
+The workflow is stored in the note, not in a side database: **Copy ID** writes a generated UUID into the task's `:ID:` drawer, and **Add copied link as blocker** writes that same value into the dependent's `:BLOCKER:` drawer.
+
+![The editor after the workflow: the generated ID on the first task and the matching blocker on the second](./assets/todoseq-org-properties-generated.png){.ts-img-wide .ts-img-dark}
+![The editor after the workflow: the generated ID on the first task and the matching blocker on the second](./assets/todoseq-org-properties-generated-light.png){.ts-img-wide .ts-img-light}
+
 ## Moving and copying tasks
 
 Moving, copying or migrating a task through TODOseq keeps its block references working:
@@ -211,7 +228,7 @@ Moving, copying or migrating a task through TODOseq keeps its block references w
 - **Copy forks identity.** A copied task with an `ID` gets a new UUID and a copied task with a block anchor gets a new anchor. References inside the copied block are remapped to the copy; references elsewhere stay attached to the original. A task with neither identity is copied without one.
 - **Migrate cleans the history entry.** The destination keeps the original `ID` and anchor; the migrated line left behind drops both, including from nested rows and quoted property drawers, so no part of the retained source is a second owner of the same identity. Other properties and neighbouring tasks are preserved.
 
-A transfer scans every anchor in the moved block in one pass. If a note cannot be read, the other repairs still apply and the notice names every note that could not be scanned. Those notes have no discovered link to retry, so the notice does not offer an edit retry for them and keeps the unchecked paths visible even after known repairs succeed. If a discovered reference cannot be rewritten, the transfer reports how many links failed and the notice includes a **Retry** button; **Retry failed task reference repairs** in the command palette retries exactly those links during the current session. A failed block move makes no reference changes at all. Moves repair references to every anchored task in the transferred block, including nested rows.
+A move updates every reference it can find, including references to nested tasks in the moved block. If a note cannot be read, the move still updates what it did find and the notice names every note it could not check; those notes have no discovered reference to retry, so the notice offers no Retry for them. If a reference it did find cannot be rewritten, the notice says how many failed and offers **Retry** — also available later as **Retry failed task reference repairs** in the command palette for the rest of the session. If the move itself fails, no references are changed.
 
 Renaming a note in Obsidian is handled by Obsidian; TODOseq does not chase file renames. Moving text outside TODOseq is best-effort: a stale reference is reported by the existing broken-reference warning after the next scan, and TODOseq never guesses a new target.
 

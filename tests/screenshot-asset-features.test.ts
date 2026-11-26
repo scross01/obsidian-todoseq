@@ -240,7 +240,9 @@ describe('focused report grouping', () => {
   });
 
   it('says a feature with no captured asset proves nothing', () => {
-    const report = formatFocusedReport(rows, ['property-drawers']);
+    // `org-mode` is part of the vocabulary but no captured still is tagged
+    // with it, so an empty match must not read as freshness.
+    const report = formatFocusedReport(rows, ['org-mode']);
     expect(report).toMatch(/no dedicated capture/i);
   });
 });

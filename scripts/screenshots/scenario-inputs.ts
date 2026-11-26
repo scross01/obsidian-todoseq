@@ -21,6 +21,8 @@ import { EMBED_SEEDS } from './scenarios/seeds/embed.ts';
 import { SEARCH_FILTER_SEEDS } from './scenarios/seeds/search-filter.ts';
 import { TASK_ENTRY_SEEDS } from './scenarios/seeds/task-entry.ts';
 import { WARNING_PERIOD_SEEDS } from './scenarios/seeds/warning-period.ts';
+import { DEPENDENCY_SEEDS } from './scenarios/seeds/dependencies.ts';
+import { ORG_PROPERTIES_SEEDS } from './scenarios/seeds/org-properties.ts';
 
 /** Vault path → note content. */
 export type SeedContent = Record<string, string>;
@@ -36,6 +38,8 @@ export const SEED_MODULES: Record<SeedModuleId, SeedContent> = {
   archive: ARCHIVE_SEEDS,
   'warning-period': WARNING_PERIOD_SEEDS,
   collapse: COLLAPSE_SEEDS,
+  dependencies: DEPENDENCY_SEEDS,
+  'org-properties': ORG_PROPERTIES_SEEDS,
 };
 
 /**
@@ -54,6 +58,8 @@ export const SEED_MODULE_SOURCE_PATHS: Record<SeedModuleId, string> = {
   archive: 'seeds/archive.ts',
   'warning-period': 'seeds/warning-period.ts',
   collapse: 'seeds/collapse.ts',
+  dependencies: 'seeds/dependencies.ts',
+  'org-properties': 'seeds/org-properties.ts',
 };
 
 /** Source path for a module id, rejecting ids the registry does not know. */

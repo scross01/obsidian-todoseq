@@ -12,6 +12,8 @@ import { EMBED_SEEDS } from '../scripts/screenshots/scenarios/seeds/embed';
 import { SEARCH_FILTER_SEEDS } from '../scripts/screenshots/scenarios/seeds/search-filter';
 import { TASK_ENTRY_SEEDS } from '../scripts/screenshots/scenarios/seeds/task-entry';
 import { WARNING_PERIOD_SEEDS } from '../scripts/screenshots/scenarios/seeds/warning-period';
+import { DEPENDENCY_SEEDS } from '../scripts/screenshots/scenarios/seeds/dependencies';
+import { ORG_PROPERTIES_SEEDS } from '../scripts/screenshots/scenarios/seeds/org-properties';
 
 /**
  * The demo content rules from AGENTS.md, enforced rather than documented.
@@ -33,6 +35,8 @@ const ALL_SEEDS: Record<string, Record<string, string>> = {
   ARCHIVE_SEEDS,
   COLLAPSE_SEEDS,
   WARNING_PERIOD_SEEDS,
+  DEPENDENCY_SEEDS,
+  ORG_PROPERTIES_SEEDS,
 };
 
 /** Flatten the seed maps into [vaultPath, content] pairs. */
@@ -267,6 +271,21 @@ describe('seed lint', () => {
       expect(rules(problems, 'single-line-prose').map((p) => p.line)).toEqual([
         4,
       ]);
+    });
+
+    it('accepts an Org property drawer under its task', () => {
+      // A drawer is consecutive metadata lines, not a wrapped paragraph.
+      const problems = lintSeedContent(
+        [
+          'TODO Collect source data',
+          ':PROPERTIES:',
+          ':ID: source-data',
+          ':BLOCKER+: literature-03',
+          ':END:',
+          '',
+        ].join('\n'),
+      );
+      expect(problems).toEqual([]);
     });
 
     it('does not mistake a task under prose for a wrapped line', () => {

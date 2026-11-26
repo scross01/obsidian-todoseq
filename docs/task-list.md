@@ -125,6 +125,8 @@ These shortcuts help you quickly reschedule tasks without manually editing dates
 
 - **Copy** - Copy the task text to your clipboard. This includes the task keyword, priority, and task text, making it easy to paste the task elsewhere.
 
+- **Copy ID** / **Copy anchor** - Copy a stable reference to the task for links, embeds or a dependency. See [Task IDs and Anchors](task-ids.md).
+
 - **Copy to today** - Copy the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is appended to the end of today's daily note while keeping the original task in place.
 
 - **Move to today** - Move the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is removed from its original location and appended to today's daily note. This is useful when you want to consolidate tasks for the current day.

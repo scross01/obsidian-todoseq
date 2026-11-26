@@ -246,6 +246,21 @@ export const ASSET_FEATURES: Record<string, AssetFeature> = {
     tags: ['warning-periods', 'task-dates', 'task-list'],
     broadReview: false,
   },
+  'todoseq-task-dependency-blocked': {
+    scenarioId: 'docs-task-dependencies',
+    tags: ['task-dependencies', 'task-list'],
+    broadReview: false,
+  },
+  'todoseq-task-dependency-issues': {
+    scenarioId: 'docs-task-dependencies',
+    tags: ['task-dependencies', 'task-issues', 'task-list'],
+    broadReview: false,
+  },
+  'todoseq-org-properties-generated': {
+    scenarioId: 'docs-org-properties',
+    tags: ['property-drawers', 'task-dependencies', 'editor-task-styling'],
+    broadReview: false,
+  },
   'todoseq-embedded-collapse-collapsed': {
     scenarioId: 'docs-embedded-collapse',
     tags: ['embedded-task-list', 'embedded-list-collapse'],

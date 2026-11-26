@@ -317,6 +317,14 @@ WAITING Compliance sign-off from legal #admin
 DEADLINE: <YYYY-MM-DD>
 ",
   },
+  "docs-org-properties": {
+    "Release Plan.md": "Two steps of the same report, with the dependency not yet declared.
+
+TODO Collect source data
+
+TODO Draft the report
+",
+  },
   "docs-search": {
     "Backlog.md": "Everything queued but not yet started, kept in one place so the filters have something to work against.
 
@@ -405,6 +413,27 @@ SCHEDULED: <YYYY-MM-DD>
 
 WAITING Compliance sign-off from legal #admin
 DEADLINE: <YYYY-MM-DD>
+",
+  },
+  "docs-task-dependencies": {
+    "Dependency issue.md": "This task names a prerequisite that no note defines.
+
+TODO Verify the appendix
+:PROPERTIES:
+:BLOCKER: missing-review
+:END:
+",
+    "Dependency waiting.md": "The second task waits for the first, and both are ordinary tasks in this note.
+
+TODO Collect source data
+:PROPERTIES:
+:ID: source-data
+:END:
+
+TODO Draft the report
+:PROPERTIES:
+:BLOCKER: source-data
+:END:
 ",
   },
   "docs-task-entry": {

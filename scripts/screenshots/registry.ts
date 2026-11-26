@@ -34,7 +34,9 @@ export type SeedModuleId =
   | 'dashboard'
   | 'archive'
   | 'warning-period'
-  | 'collapse';
+  | 'collapse'
+  | 'dependencies'
+  | 'org-properties';
 
 /** One entry in the scenario registry. */
 export interface ScenarioDef {
@@ -115,6 +117,16 @@ export const SCENARIOS: Record<string, ScenarioDef> = {
     script: 'embedded-collapse.ts',
     kind: 'stills',
     seeds: ['collapse'],
+  },
+  'docs-task-dependencies': {
+    script: 'task-dependencies.ts',
+    kind: 'stills',
+    seeds: ['dependencies'],
+  },
+  'docs-org-properties': {
+    script: 'org-properties.ts',
+    kind: 'stills',
+    seeds: ['org-properties'],
   },
   'docs-task-entry': {
     script: 'task-entry.ts',

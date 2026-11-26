@@ -86,7 +86,7 @@ Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states. The 
 
 ### Queued Task Updates
 
-State, priority, scheduled-date and deadline-date changes are saved one at a time per note. If another edit moves the task while a change is waiting, TODOseq follows the task's ID or block anchor instead of trusting the old line. An anonymous task is followed while the row at its captured position still matches, or to the one row in the note with the same content; if the captured row changed and no unique match remains, the queued change is dropped and the note is left unchanged.
+State, priority, scheduled-date and deadline-date changes are saved one at a time per note. If another edit moves the task while a change is waiting, TODOseq follows the task's [ID or block anchor](task-ids.md) instead of trusting the old line. An anonymous task is followed while the row at its captured position still matches, or to the one row in the note with the same content; if the captured row changed and no unique match remains, the queued change is dropped and the note is left unchanged.
 
 ### Table Cell Tasks
 
