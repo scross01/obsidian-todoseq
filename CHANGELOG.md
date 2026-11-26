@@ -1,69 +1,26 @@
 # Change Log
 
-## Unreleased
-
-- Tag searches in embedded task lists and saved searches no longer come back empty after a note's tasks have been displayed.
-- Embedded task list checkboxes now line up with the task keyword in Reader view, including rows with a dependency lock or warning marker.
-- Tasks that block an incomplete dependent now gain a small urgency boost in urgency sorting and embedded urgency displays, so prerequisites rise ahead of the work waiting on them.
-- Property drawers now report malformed entries and date or description metadata placed inside them, instead of failing silently; other well-formed unknown properties are still preserved without a warning.
-- Scheduled and deadline dates on tasks inside nested blockquotes are now recognised, including from the date picker and recurrence rollover, while a date quoted more deeply than its task stays body text.
-- **Add description** now finds an existing description at any blockquote depth or indentation and moves the cursor to its text, instead of adding a duplicate line; date lines still follow the description.
-- Scheduled and deadline changes from a table date picker now leave the table unchanged and report a failure if the task row is replaced while the picker is open. A unique moved row is still followed.
-- A recurring task now recognises its own ID drawer anywhere in its block instead of stopping at a fixed distance; prose, a heading or the next task still ends the block, and a description line with extra quote markers or no indentation no longer ends it early.
-- Table-cell editor actions now show the reason when an update cannot be verified instead of failing silently, and leave the table unchanged.
-- A repeating task whose date line sits in a blockquote under an unquoted task now rolls that line over in place, instead of refusing the rollover or adding a second date line.
-- Completing an Org task no longer rewrites `CLOSED:` or `STARTED:` text that appears inside the note's prose, and a properties drawer below a line carrying an inline schedule still identifies the entry for rollover.
-- Changing a scheduled or deadline date from the date picker now keeps the task's warning period, and a warning chosen in the picker is saved instead of ignored.
-- Anonymous queued updates and recurrence rollovers no longer adopt a same-title row that has its own ID or block anchor. A drawer quoted separately from the task is also no longer treated as the task's identity.
-- Cycling a recurring task in a Markdown table cell from the editor now advances its inline SCHEDULED/DEADLINE date and preserves warning periods. Previously the command dropped the inline recurrence metadata and left the completed occurrence unchanged.
-- Queued state, priority and date changes now stay with the task you edited when another change moves it, instead of changing a same-title task that took its old line. A row that cannot be matched to the task or its ID/anchor is left unchanged.
-- Recurrence rollovers now refuse a same-title replacement block that has gained an ID or block anchor, and a delayed rollover no longer overwrites a warning-period edit made while it was waiting. A valid drawer ID with trailing whitespace now rolls over normally.
-- Fixed recurrence rollovers on indented tasks and stopped a delayed rollover from overwriting a repeater mode changed to `.+` or `++` while it was waiting. Org recurrence now ignores planning-looking property values, and a property drawer below description or other body text is no longer taken as the entry's identity, so such entries roll over normally.
-- Fixed queued completions and recurrence rollovers following a same-title task with a different block anchor. They now require the requested task's ID or anchor, and a recurrence stops if its date or repeater was edited while it was waiting.
-- Fixed Org recurrence overwriting a fixed DEADLINE that shares a line with a repeating SCHEDULED date, and stopped a delayed rollover from accepting a longer title at the old row.
-- Completing a task now stays blocked until its prerequisite is actually saved, even if another file finishes scanning or the completion is requested again from a row that already looks complete. The dependency check and the write use the same verified row, so a duplicate identity or an unidentifiable row is refused instead of completing a neighbor.
-- Fixed a queued completion after a failed write being applied to a different task that had moved into the original row's position; it now follows its own task or leaves the note unchanged.
-- Fixed a delayed recurrence rollover writing to a task that took its old line, and restored rollover for nested Org tasks by using the note's registered parser.
-- Task updates that are still being saved are no longer overwritten by a vault scan that starts at the same time.
-- Recurring tasks now roll forward after a successful completion even when another edit to the same note is queued, and a delayed recurrence follows the task if that edit moves its row or refuses when the target is removed or ambiguous. Migrated quoted property drawers no longer leave duplicate IDs behind, and transfer notices distinguish notes that could not be scanned from links that failed to update, including when reference discovery failed completely.
-- Adding a scheduled or deadline date from the editor now uses the same date-writing path as other task updates, so ordering, indentation and block anchors stay consistent.
-- Task property and dependency problems no longer interrupt editing with repeated notices. They remain visible on the affected task and in a new issue count in the Task List, which opens the full list.
-- Completed and archived task titles fade into muted text and strikethrough, while their keywords now wash into the page background instead of gaining contrast, so finished work recedes consistently in light and dark themes. Priority badges on those lines mute to a neutral chip, completed or archived blockquote keywords fade with the rest of the line, and embedded task-list keywords stay uncolored.
-- Blocked-task messages now state the problem and next step once, and blocked: searches explain invalid values or when blocked status is still loading.
-- Blocked and dependency-warning markers now update when a `BLOCKER` property is added or removed, including property-only edits, without waiting for another edit.
-- The blocked-completion notice now points to the Complete anyway override, and dependency problem notices name the task's file and line. The blocked marker has a larger click target, and the blocked dashboard bucket uses a warning colour.
-- Blocked tasks now show the lock immediately before the keyword in every view, with no dimmed row. Broken dependency references show the warning triangle in the Task List and embedded lists too.
-- Fixed Copy anchor placing a task's block anchor where Obsidian could not resolve it when the task had a schedule, deadline, description or property drawer. The anchor now goes at the end of the task's metadata block, existing task-line anchors are moved there by Copy anchor, and anchors on date, description and `:END:` lines are recognised when scanning.
-- Fixed an anchor on a date, description or property-drawer line picking up TODOseq's muted metadata styling instead of Obsidian's own anchor style; an anchored `:END:` now also closes the drawer styling.
-- Property drawers under tasks now appear as quiet metadata in the editor and reading view, including on top-level tasks; previously the drawer lines were left unstyled.
-- Closed task property drawers can now be folded in the editor with Obsidian's native fold control, leaving the `:PROPERTIES:` line visible and tucking the entries and `:END:` behind the usual ellipsis.
-- Task property drawers can now be collapsed in Reading view. A new Reading-view-only **Hide task properties in Reading view** setting hides all task-owned property blocks, including empty ones, and is off by default.
-- A blocked task's checkbox now springs back instead of staying checked, and archive runs report blocked tasks as skipped rather than counting them as archived. A queued completion is checked again before writing, including recurring tasks, and dependents wait until a prerequisite's completion is actually saved.
-- Blocked locks are now keyboard and tap accessible in task lists, embedded lists and reader views, including plain, heading, bullet and table reader tasks.
-- Blocked-task locks now appear in the editor as well as the reading view, and dependency warnings now appear in the reading view as well as the editor. Both markers sit immediately before the keyword, and a source diagnostic replaces the lock instead of stacking beside it.
-- Moving a task now repairs links to nested anchored tasks too, and failed reference repairs offer a Retry button instead of requiring the command palette. Archive runs surface failed dependent updates with the same retry action.
-- Archiving a prerequisite now leaves ambiguous duplicate references active, and dependency repairs no longer recreate a reference you already removed. Structural and checkbox blocking stay consistent while the dependency index is still loading.
-- Migrating a task now removes IDs and block anchors from the nested rows left in the source, so the moved block is the only owner. A transfer scans every anchor in the block once and reports notes it could not read.
-- Archiving a prerequisite now moves each dependent's `BLOCKER` reference into `ARCHIVED_BLOCKER` history, so the dependent is no longer stranded; restoring the prerequisite moves the reference back. Dependents that cannot be updated stay blocked and are reported.
-- Moving a task now updates the `BLOCKER` links, prose links and embeds that pointed at it, while copying gives the copy its own ID and block anchor; migrating leaves the old line without a duplicate identity.
-- Added Org-style `:PROPERTIES:` drawers under Markdown and Org tasks. TODOseq reads `:ID:`, `:BLOCKER:` and `:ARCHIVED_BLOCKER:` while preserving every other property, and copy, move and migrate carry the drawer with the task.
-- Tasks can now derive a blocked state from `BLOCKER` IDs and file-qualified block links. Completed prerequisites release dependents immediately, broken or ambiguous references keep them blocked, and archived references become active again if their exact target is restored.
-- Added `blocked:true` and `blocked:false` search filters and dashboard grouping, so you can find waiting work or exclude it from a query.
-- Blocked tasks now show a lock in task lists, and completing them is refused until their dependencies are done. Use Complete anyway when you need to override it; the task menu can also copy a task ID or block anchor and add a copied link as a blocker.
-- Added optional parent, `ORDERED` and checkbox dependency rules, plus local `NOBLOCKING` and `BLOCKER: previous-sibling` support for Org-style workflows.
-- Optional structural dependencies now respect non-task headings and dedented prose as boundaries, count keywordless checkboxes, keep archived branches out of outer checks, stop Org checkbox checks at the next headline, and refresh immediately when either structural setting changes.
-- Blocked tasks now show their lock in reader views, broken dependency references show a warning in the editor, and new dependency problems are announced once instead of staying silent until you search for them.
-- Copying a task anchor again now reuses the anchor already saved on the task instead of adding a second one.
-- Fixed task-list dependency actions becoming unavailable after changing settings; adding a copied link as a blocker now keeps working.
-
 ## 0.23.0
 
-- Task searches and suggestions now find accented words and spellings such as `café`, `Łódź` and `Straße` when you type `cafe`, `lodz` or `strasse`; quoted phrases, tags, states and property values follow the same rule.
-- Fixed quoted property filters matching the wrong tasks in task lists and dashboards, including empty strings, the word `null`, and quoted key names.
-- Search operators `OR`/`AND` now also match in lowercase (`or`/`and`), matching Obsidian's search grammar; quote them (`"or"`) to search the literal word.
-- Added `tag:none` to find tasks without any tags, with matching dashboard “No tags” grouping and tag autocomplete; `#none` remains a literal tag.
-- Fixed dashboard's **No tags** group treating tasks with emoji or other non-ASCII tags (such as `#🏠`) as untagged.
-- Developer tooling: manual fixture generation now uses the same deterministic corpus as the performance tests, with fixed `s`/`m`/`l` presets and reproducible seed/date inputs; `npm run generate-content` remains as a deprecated alias and rejects arbitrary file/task counts instead of writing unsupported task syntax.
+- Added Org-style `:PROPERTIES:` drawers below Markdown and Org tasks. TODOseq reads ID and dependency properties while preserving other values, and copy, move, and migrate carry the drawer along.
+- Added task dependencies using `BLOCKER` properties IDs, or Obsidian anchor links, to tasks in other notes. Blocked tasks show a lock and cannot be completed until their prerequisites are done. #92
+- Added optional parent/child, `ORDERED`, and checkbox dependency rules
+- Search supports `blocked:true` and `blocked:false` for searches and dashboard grouping.
+- Urgency calculation now takes blocking tasks into considerations.
+- Copy a reference to a task using the new Copy anchor and Copy ID actions.
+- Broken or ambiguous references and malformed/misplaced property drawers surface as warning markers and a new Issues section in the main task list.
+- Recurring and pending task changes now stay with the task you edited when it moves, leave the note unchanged when the target is ambiguous or removed, and preserve edits made while a rollover is waiting.
+- Scheduled and deadline dates on nested blockquoted tasks are now recognised by editing, the date picker, and recurrence. A date quoted more deeply than its task stays body text.
+- Adding a scheduled or deadline date from the editor now keeps the task's ordering, indentation, and block anchor consistent with other date edits.
+- Date pickers now preserve warning periods, including a warning chosen in the picker, and report a failed table update without changing the row. Cycling a recurring table task advances its own inline date and keeps its warning period.
+- **Add description** now finds an existing description at any quote depth or indentation, moves the cursor there, and does not add a duplicate.
+- Completing an Org task no longer rewrites `CLOSED:` or `STARTED:` text in the note's prose.
+- Search now matches accented words and spellings such as `café` when you type `cafe`.
+- Search operators `OR` and `AND` work in lowercase `or` and `and`.
+- Search `tag:none` finds tasks without tags, with matching dashboard grouping and autocomplete; `#none` remains a literal tag.
+- Fixed quoted property filters matching the wrong tasks, including empty strings, `null`, and quoted key names.
+- Fixed dashboard **No tags** groups miscounting tasks with emoji or other non-ASCII tags, and tag searches in embedded lists and saved searches coming back empty after a note's tasks had been displayed.
+- Completed and archived tasks now have a more consistent fade into theme-native muted text and keywords, including in blockquotes, with muted priority badges; embedded task-list keywords stay uncolored.
 
 ## 0.22.1
 
