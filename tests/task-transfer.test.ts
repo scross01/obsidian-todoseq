@@ -602,6 +602,34 @@ describe('TaskWriter transfer reference repair', () => {
     expect(h.store.get(SOURCE)).toContain(':ID: water-1');
   });
 
+  it('preserves dollar sequences in aliases when remapping copied links', async () => {
+    const source = [
+      'Intro',
+      '',
+      '- [ ] TODO Water the plants ^water',
+      ':PROPERTIES:',
+      ':ID: water-1',
+      ':BLOCKER: [[notes/source#^water|Cost $& $1]]',
+      ':END:',
+      '',
+    ].join('\n');
+    const h = harness({ [SOURCE]: source, [DEST]: '' });
+
+    const result = await h.writer.transferTask(
+      anchoredTask(),
+      h.file(DEST),
+      'copy',
+    );
+
+    expect(result.status).toBe('success');
+    const destination = h.store.get(DEST) ?? '';
+    const copiedAnchor = /\^todoseq-[a-z0-9]+/.exec(destination)?.[0];
+    expect(copiedAnchor).toBeDefined();
+    expect(destination).toContain(
+      `:BLOCKER: [[notes/today#${copiedAnchor}|Cost $& $1]]`,
+    );
+  });
+
   it('gives separate copies distinct anchors', async () => {
     const h = harness({
       [SOURCE]: ANCHORED_SOURCE,

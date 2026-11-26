@@ -137,6 +137,23 @@ describe('TaskReferenceService', () => {
     expect(outcome.failedEdits).toEqual([edits[1]]);
   });
 
+  it('preserves dollar sequences in aliases while repairing references', async () => {
+    const h = harness({
+      'notes/source.md': 'TODO Moved ^water\n',
+      'a.md': '[[notes/source#^water|Cost $& $1]]',
+    });
+    const scan = await h.service.collectAnchorReferences({
+      sourcePath: 'notes/source.md',
+      anchors: ['water'],
+      destinationPath: 'notes/today.md',
+    });
+
+    const outcome = await h.service.apply(scan.edits);
+
+    expect(outcome.reports[0].applied).toBe(1);
+    expect(h.store.get('a.md')).toBe('[[notes/today#^water|Cost $& $1]]');
+  });
+
   it('reports every edit when the note is gone', async () => {
     const h = harness({});
     const edit: TaskReferenceEdit = {

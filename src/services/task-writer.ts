@@ -974,7 +974,12 @@ export class TaskWriter {
         description = i;
         continue;
       }
-      if (classifyTaskMetadataLine(line, taskIndent)) {
+      const metadataKind = classifyTaskMetadataLine(line, taskIndent);
+      if (metadataKind === 'description') {
+        description = i;
+        continue;
+      }
+      if (metadataKind !== null) {
         lastDate = i;
         continue;
       }
@@ -1648,8 +1653,7 @@ export class TaskWriter {
           if (!token.anchor) continue;
           const next = anchorMap.get(token.anchor.slice(1));
           if (!next || !this.linkTargetsTask(token.target, task.path)) continue;
-          line = line.replace(
-            token.raw,
+          line = line.replace(token.raw, () =>
             buildWikiLink(
               token.embed,
               destinationTarget,

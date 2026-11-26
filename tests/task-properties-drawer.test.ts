@@ -116,6 +116,30 @@ describe('TaskWriter properties drawers', () => {
     );
   });
 
+  it('inserts a drawer before a quoted DESCRIPTION line', async () => {
+    const content = [
+      'TODO Parent',
+      '> DESCRIPTION: Keep me',
+      'Child prose',
+    ].join('\n');
+    const h = harness({ [PATH]: content });
+    const task = h.parse(PATH);
+
+    const result = await h.writer.setTaskDependency(task, 'data-02', true);
+
+    expect(result.status).toBe('success');
+    expect(h.store.get(PATH)).toBe(
+      [
+        'TODO Parent',
+        ':PROPERTIES:',
+        ':BLOCKER: data-02',
+        ':END:',
+        '> DESCRIPTION: Keep me',
+        'Child prose',
+      ].join('\n'),
+    );
+  });
+
   it('adds and removes references while preserving unknown entries', async () => {
     const content = [
       'TODO Parent',

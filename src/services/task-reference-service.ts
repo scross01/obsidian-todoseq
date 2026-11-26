@@ -214,7 +214,10 @@ export class TaskReferenceService {
         failed.push(edit);
         continue;
       }
-      lines[edit.line] = original.replace(edit.reference, edit.replacement);
+      lines[edit.line] = original.replace(
+        edit.reference,
+        () => edit.replacement,
+      );
       report.applied++;
     }
     return failed;
