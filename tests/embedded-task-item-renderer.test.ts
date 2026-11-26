@@ -6,6 +6,7 @@ import { EmbeddedTaskItemRenderer } from '../src/view/embedded-task-list/embedde
 import { createBaseTask } from './helpers/test-helper';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 import { getTaskKey } from '../src/utils/task-utils';
+import { TAG_PATTERN } from '../src/utils/patterns';
 
 /**
  * Update `renderer.plugin.keywordManager.getSettings` to a specific
@@ -657,6 +658,18 @@ describe('EmbeddedTaskItemRenderer', () => {
       const tagSpan = parent.querySelector('.todoseq-embedded-task-tag');
       expect(tagSpan).toBeTruthy();
       expect(tagSpan?.textContent).toBe('#tag');
+    });
+
+    it('does not leave the shared tag pattern mid-scan', () => {
+      // This text ends with the tag, so the scan finishes inside a successful
+      // match. Sharing TAG_PATTERN would then skip that tag for the next
+      // `tag:` search, which is how embedded lists showed "No tasks found".
+      TAG_PATTERN.lastIndex = 0;
+      const parent = document.createElement('span');
+      const task = createBaseTask({ text: 'Task with #tag' });
+      renderer.renderTaskTextWithLinks(task, parent);
+
+      expect(TAG_PATTERN.lastIndex).toBe(0);
     });
 
     it('handles text with no special content', () => {

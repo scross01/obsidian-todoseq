@@ -19,6 +19,16 @@ const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   completed: 'completedKeywords',
 };
 
+/**
+ * Dedicated matcher for `tag:` filters.
+ *
+ * Renderers advance the exported TAG_PATTERN while scanning a task's text, and
+ * `matchAll` copies the offset of the pattern it is given. Sharing that one
+ * made a tag filter skip every tag before the leftover offset — embedded lists
+ * reported "No tasks found" after rendering rows whose text ended in a tag.
+ */
+const TAG_FILTER_PATTERN = new RegExp(TAG_PATTERN.source, TAG_PATTERN.flags);
+
 /** Batch-local resolution shared by every row in one search pass. */
 export interface SearchBatchContext {
   /** Raw group alias -> normalized keyword sets (exact and lowercase). */
@@ -688,7 +698,11 @@ export class SearchEvaluator {
     if (!task.rawText) return false;
 
     // Extract from the original line, then fold each tag for comparison.
-    const matches = [...task.rawText.matchAll(TAG_PATTERN)].map(
+    // `matchAll` copies the offset of the pattern it is given, so it must not
+    // be the exported TAG_PATTERN: renderers advance that one while scanning a
+    // task's text, and a stale offset silently skips the tags before it.
+    TAG_FILTER_PATTERN.lastIndex = 0;
+    const matches = [...task.rawText.matchAll(TAG_FILTER_PATTERN)].map(
       (match) => match[0],
     );
     const fold = (text: string) =>

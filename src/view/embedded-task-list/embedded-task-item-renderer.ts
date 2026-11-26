@@ -869,7 +869,9 @@ export class EmbeddedTaskItemRenderer {
       { type: 'wiki', regex: new RegExp(WIKI_LINK_REGEX) },
       { type: 'md', regex: new RegExp(MD_LINK_REGEX) },
       { type: 'url', regex: new RegExp(URL_REGEX) },
-      { type: 'tag', regex: TAG_PATTERN },
+      // A private copy: this scan advances lastIndex, and the exported pattern
+      // is used by search filters, which must not depend on what was rendered.
+      { type: 'tag', regex: new RegExp(TAG_PATTERN) },
     ];
 
     let i = 0;

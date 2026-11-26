@@ -32,8 +32,10 @@ export default defineScript({
   id: 'docs-embedded-reader',
   title: 'docs embedded + reader scenarios',
   format: 'mp4',
-  width: 1400,
-  height: 900,
+  // The docs' committed captures use this window size: a larger one only adds
+  // empty canvas below the note.
+  width: 1024,
+  height: 640,
   stills: { mode: 'only', scale: 1 },
   setup: {
     // The recorder hides Obsidian's ribbon and status bar by default
@@ -67,6 +69,16 @@ export default defineScript({
       name: 'Embedded task list (reading mode)',
       actions: [
         waitForPlugin(),
+        // Let the first vault scan finish before opening the note, so the
+        // captures document a settled app rather than its loading state.
+        {
+          type: 'wait-for',
+          fn: `() => {
+            const plugin = window.app?.plugins?.plugins?.todoseq;
+            return !!plugin?.vaultScanner?.hasCompletedInitialScan() && plugin.getTasks().length > 0;
+          }`,
+          timeout: 30000,
+        },
         { type: 'open-file', name: 'Embedded Demo' },
         { type: 'wait-for', selector: '.cm-editor' },
         TOGGLE_VIEW_MODE,
@@ -75,6 +87,14 @@ export default defineScript({
           type: 'wait-for',
           fn: `() => !!document.querySelector('.todoseq-embedded-task-list-container')`,
           timeout: 10000,
+        },
+        // Wait for the rows instead of a fixed delay: the empty state is also
+        // a valid render, so asserting the four matches is what keeps this
+        // scene from silently capturing the wrong thing.
+        {
+          type: 'wait-for',
+          fn: `() => document.querySelectorAll('.markdown-preview-view .todoseq-embedded-task-list-container .todoseq-embedded-task-item').length >= 4`,
+          timeout: 15000,
         },
         { type: 'wait', ms: 800 },
         {

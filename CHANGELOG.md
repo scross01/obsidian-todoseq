@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Tag searches in embedded task lists and saved searches no longer come back empty after a note's tasks have been displayed.
 - Embedded task list checkboxes now line up with the task keyword in Reader view, including rows with a dependency lock or warning marker.
 - Tasks that block an incomplete dependent now gain a small urgency boost in urgency sorting and embedded urgency displays, so prerequisites rise ahead of the work waiting on them.
 - Property drawers now report malformed entries and date or description metadata placed inside them, instead of failing silently; other well-formed unknown properties are still preserved without a warning.
