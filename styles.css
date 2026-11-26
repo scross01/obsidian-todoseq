@@ -366,34 +366,10 @@
   top: -0.08em;
 }
 
-/* Editor checkbox styling for active tasks when NOT using themed styles */
-.cm-editor .cm-task-checkbox[data-task='/'] {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent, #7f6df2) 33%,
-    transparent
-  );
-}
-
-/* Checkbox styling for active tasks when NOT using themed styles */
-.todoseq-panel .todoseq-task-checkbox[data-task='/'] {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent, #7f6df2) 33%,
-    transparent
-  );
-}
-
-/* Reader view checkbox styling for active tasks */
-.markdown-preview-view .task-list-item-checkbox[data-task='/'] {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent, #7f6df2) 33%,
-    transparent
-  );
-}
-
-/* Embedded task list checkbox styling for active tasks */
+/* Active-task tint shared by the editor, task panel, reading view and embedded lists */
+.cm-editor .cm-task-checkbox[data-task='/'],
+.todoseq-panel .todoseq-task-checkbox[data-task='/'],
+.markdown-preview-view .task-list-item-checkbox[data-task='/'],
 .todoseq-embedded-task-checkbox[data-task='/'] {
   background-color: color-mix(
     in srgb,
