@@ -13,10 +13,15 @@ class MemoryFile extends TFile {
   }
 }
 
-function harness(files: Record<string, string>, unreadable: string[] = []) {
+function harness(
+  files: Record<string, string>,
+  unreadable: string[] = [],
+  configDir = '.obsidian',
+) {
   const store = new Map(Object.entries(files));
   const app = {
     vault: {
+      configDir,
       getAbstractFileByPath: (path: string) =>
         store.has(path) ? new MemoryFile(path) : null,
       getFiles: () => [...store.keys()].map((path) => new MemoryFile(path)),
@@ -90,6 +95,25 @@ describe('TaskReferenceService', () => {
     expect(scan.edits[0].replacement).toBe('[[notes/today#^water]]');
     expect(scan.edits[1].replacement).toBe('[[notes/today#^water|Local]]');
     expect(scan.unreadable).toEqual([]);
+  });
+
+  it('excludes the configured config directory from the reference scan', async () => {
+    const h = harness(
+      {
+        '.vault-config/plugins/todoseq/settings.md': '[[notes/source#^water]]',
+        'a.md': '[[notes/source#^water]]',
+      },
+      [],
+      '.vault-config',
+    );
+
+    const scan = await h.service.collectAnchorReferences({
+      sourcePath: 'notes/source.md',
+      anchors: ['water'],
+      destinationPath: 'notes/today.md',
+    });
+
+    expect(scan.edits.map((edit) => edit.path)).toEqual(['a.md']);
   });
 
   it('collects every block anchor in one pass and reports unreadable notes', async () => {

@@ -225,9 +225,10 @@ export class TaskReferenceService {
 
   private listTextFiles(): TFile[] {
     const files = this.app.vault.getFiles?.() ?? [];
+    const configPrefix = `${this.app.vault.configDir}/`;
     return files.filter(
       (file) =>
-        /\.(md|org)$/i.test(file.path) && !file.path.startsWith('.obsidian/'),
+        /\.(md|org)$/i.test(file.path) && !file.path.startsWith(configPrefix),
     );
   }
 
