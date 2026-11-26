@@ -64,7 +64,10 @@ stages a throwaway vault, and `manifest.json` recording what produced each file.
 
 **If you change anything a screenshot shows** — a plugin view, the task list, the
 dashboard, the settings UI, the editor or reading-mode rendering, or a colour in
-`styles.css` — you must recapture, or the docs will show the old UI.
+`styles.css` — the images may no longer match. Run the [manual staleness
+check](#checking-what-is-stale) below when you want to know which, read a stale
+row as a heads-up rather than as work this change owes, and review every image
+you do regenerate by hand. Leaving an image stale is a valid outcome.
 
 ### Prerequisites
 
@@ -185,12 +188,19 @@ report on every PR is noise rather than signal. Run it yourself when you touch
 plugin sources, and read a stale row as "these images may need updating", not as
 work this change owes.
 
-### Workflow after a visual change
+### Workflow when you choose to regenerate
+
+Nothing here is required after a visual change: the check is manual, and a stale
+row is often the honest outcome (see [Checking what is stale](#checking-what-is-stale)).
+When you decide the change is one the docs should show, this is the sequence:
 
 1. `npm run build` — the capture stages the build output, not your sources.
 2. `npm run docs:screenshots` — or `--only=<scenario>` for the one you touched,
    if you are confident nothing else renders that change.
-3. `npm run docs:screenshots -- --check` — expect `all N fresh` and exit 0.
+3. `npm run docs:screenshots -- --check` — every asset you actually recaptured
+   must report `FRESH`. An unrelated stale row is allowed: `--only` regenerates
+   the images you picked and leaves the rest of the corpus alone, so the command
+   exiting non-zero on those rows is expected as long as your own are fresh.
 4. **Eyeball every changed image against its docs section.** The driver cannot
    tell a correct screenshot of a broken state from a correct screenshot of a
    working one; a stale capture is exactly what a passing run produces.
@@ -214,7 +224,9 @@ have regenerated but cannot review, revert `docs/assets/` and
 
 - **Editing `scenarios/helpers.ts` invalidates every scenario.** It holds the
   shared vault seeds and wait predicates, and it is part of every scenario's
-  hash. Any edit there means a full recapture, not `--only`.
+  hash, so `--check` will flag every scenario. That is a fact about the
+  dependency, not an instruction: whether to recapture those images remains
+  your deliberate choice, and `--only` still works for the ones you pick.
 - **Never hand-write a light-mode scenario.** The driver generates a light twin
   of each scenario (`lightVariantScriptPath()`) that imports the real one and
   only overrides the base theme and a `-light` suffix on each screenshot id. A

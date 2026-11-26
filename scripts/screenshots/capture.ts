@@ -607,11 +607,12 @@ function checkMode(): void {
   for (const u of unreferenced) rows.push({ asset: u, status: 'UNREFERENCED' });
   rows.sort((a, b) => a.asset.localeCompare(b.asset));
   console.log(formatCheckReport(rows));
-  // Non-zero on drift, so the command is a real check. Whether that fails a
-  // build is the caller's decision: the CI job runs it with
-  // continue-on-error, because a parser fix cannot be expected to recapture
-  // 52 screenshots, and a hard failure on every such PR would teach everyone
-  // to ignore the one job that is trying to catch a lying screenshot.
+  // Non-zero on drift, so the command is a real check. Nothing runs it
+  // automatically: no CI job gates on it, because staleness still fires on
+  // commits that change no rendered pixel, and a hard failure on every such PR
+  // would teach everyone to ignore the one signal that catches a screenshot
+  // documenting a plugin that no longer looks like that. The exit status is for
+  // whoever runs the check deliberately.
   if (summarizeRows(rows).bad > 0) process.exitCode = 1;
 }
 
