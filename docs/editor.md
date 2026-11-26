@@ -1,6 +1,6 @@
 # Editor Integration
 
-TODOseq seamlessly integrates with Obsidian's Markdown editor, providing visual feedback and interactive controls for managing your tasks directly within your notes. This guide explains how tasks are displayed and how you can interact with them in the editor.
+TODOseq styles tasks and adds controls directly in Obsidian's Markdown editor. This page covers how tasks appear there and how to interact with them.
 
 For information about task display and interaction in Reader view (Reading/Preview mode), see the [Reader View documentation](reader.md).
 
@@ -9,11 +9,11 @@ For information about task display and interaction in Reader view (Reading/Previ
 
 ## Task Display in the Editor
 
-When you create tasks using TODOseq's keyword-based format, they appear in your Markdown editor with special styling that helps you quickly identify and manage them.
+Task lines are styled as you type, so they stand out from the prose around them.
 
 ### Visual Task Representation
 
-As you type or when you open a note containing tasks, TODOseq automatically applies visual styling to make tasks stand out:
+Styling applies as you type and when you open a note:
 
 ```markdown
 TODO [#A] Write documentation for new feature
@@ -38,7 +38,7 @@ TODOseq provides several ways to interact with tasks directly in the editor:
 
 ### Clicking Task Keywords
 
-The most intuitive way to update task states is by clicking on the state keyword. Click on any state keyword (e.g., `TODO`) to cycle through the task states.
+Click a state keyword to cycle through its states.
 
 Tasks follow logical state sequences:
 
@@ -48,9 +48,7 @@ Tasks follow logical state sequences:
 
 ### Right-Click Context Menu
 
-For more control over task state transitions, right-click on any task keyword to see all available next states. A context menu appears showing all possible next states. Select the desired state from the menu.
-
-This is particularly useful when you want to jump to a specific state without cycling through all intermediate states.
+Right-click a keyword to pick a next state from a menu instead, without cycling through the ones in between.
 
 ### Keyboard Shortcut
 
@@ -198,15 +196,15 @@ This synchronization happens automatically as you interact with tasks in the edi
 
 ## Editor-Specific Features
 
-While many task interactions work similarly in both Edit mode and Reader view, the editor offers some unique capabilities:
+The editor adds a few things Reader view does not have:
 
 ### Real-time Styling
 
-Task formatting appears as you type in Edit mode. As soon as you type a valid task keyword, it receives styling immediately. This instant feedback helps you confirm that TODOseq recognizes your task syntax.
+A valid task keyword is styled as soon as you type it, which confirms TODOseq recognizes the line.
 
 ### Code Block Styling
 
-When "Include tasks inside code blocks" is enabled, TODOseq can apply styling to task keywords within code blocks in the editor. This makes tasks in code examples visually distinct. Note that code block styling is only applied in Edit mode; Reader view always displays code blocks without task formatting to preserve code readability.
+With **Include tasks inside code blocks** enabled, keywords inside code blocks are styled too. This applies in Edit mode only; Reader view always shows code blocks without task formatting.
 
 ### Tasks in Tables
 
@@ -287,11 +285,11 @@ The following limitations apply to Markdown table tasks:
 
 ### Cursor Position Awareness
 
-Editor interactions respect your cursor position. The Ctrl+Enter keyboard shortcut works based on where your cursor is placed, allowing you to toggle task states without precisely clicking on keywords.
+Ctrl+Enter acts on the task on the cursor's line, so you do not have to click the keyword.
 
 ### Command Palette Commands
 
-TODOseq provides several editor-specific commands to modify task that can be accessed through Obsidian's Command Palette (Ctrl/Cmd+P) and keyboard shortcuts. Task specific commands only appear when your cursor is on a valid task line
+Several editor commands are available in the Command Palette (Ctrl/Cmd+P) and can be bound to shortcuts. Task-specific commands appear only when the cursor is on a task line.
 
 See [Command Palette](command-palette.md) for more details.
 
@@ -303,4 +301,4 @@ If the recognized date has no line of its own yet, the first existing date line 
 
 ## Disabling or reloading the plugin
 
-Turning the plugin off or reloading it releases the editor interactions it added, including the right-click task keyword menu. Delayed editor setup and pending delayed task updates are cancelled with it, so they cannot reattach handlers or run after the plugin is gone. A file write that is already in progress is not rolled back by disabling the plugin.
+Turning the plugin off or reloading it removes the editor interactions it added, including the right-click keyword menu, and cancels delayed task updates that have not run yet. A file write already in progress is not rolled back.

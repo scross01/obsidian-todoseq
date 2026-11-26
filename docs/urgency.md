@@ -1,12 +1,12 @@
 # Task Urgency
 
-The Urgency sorting feature in TODOseq helps you prioritize your tasks by calculating a numeric score for each task based on multiple factors. This approach is inspired by [Taskwarrior's urgency system](https://taskwarrior.org/docs/urgency/), where tasks are ranked according to their importance and timeliness.
+Urgency sorting ranks tasks by a calculated score, inspired by [Taskwarrior's urgency system](https://taskwarrior.org/docs/urgency/).
 
 ## Understanding Urgency
 
 Urgency is a calculated score that represents how important and time-sensitive a task is. When you select the "Urgency" sort option in the Task List view, tasks are ordered from highest to lowest urgency, putting the most critical tasks at the top of your list.
 
-The urgency score considers various aspects of your tasks:
+The score adds up contributions from:
 
 - **Due dates**: Tasks that are due today or overdue receive the highest urgency boost
 - **Priority**: High priority tasks (`[#A]`) are more urgent than medium (`[#B]`) or low (`[#C]`) priority tasks
@@ -49,7 +49,7 @@ urgency.waiting.coefficient = -3.0         # the task is in a waiting keyword st
 urgency.blocking.coefficient = 3.0         # the task blocks at least one incomplete dependent (0 disables)
 ```
 
-The highest coefficient (12.0) is assigned to deadline dates, meaning tasks with deadlines will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).
+Deadlines carry the highest coefficient (12.0), priorities follow (6.0), and waiting tasks reduce the score (-3.0).
 
 ## Blocking Urgency
 
@@ -84,7 +84,7 @@ The tag urgency contribution is calculated as: `urgency.tags.coefficient × tag_
 - Task with 2 tags: `1.0 × 0.9 = 0.9` urgency contribution
 - Task with 3+ tags: `1.0 × 1.0 = 1.0` urgency contribution
 
-This approach provides diminishing returns for additional tags, encouraging focused tagging rather than tag spam.
+The second and third tag add less than the first, so a few tags carry most of the benefit.
 
 ## How Scheduled and Deadline Dates Are Calculated
 
@@ -226,15 +226,4 @@ For advanced users who want to fine-tune the urgency calculation, you can modify
 3. Adjust the coefficient values to match your workflow preferences
 4. Reload the TODOseq plugin or restart Obsidian for the changes to take effect
 
-Note that this is an advanced feature and the default coefficients are carefully balanced for most use cases. Reload the plugin after changing the file. Older custom files that omit `urgency.blocking.coefficient` inherit the default `+3.0`.
-
-## Urgency in Practice
-
-The urgency system helps you focus on what's truly important by automatically surfacing tasks that:
-
-- Are due soon or overdue
-- Have high priority
-- Are actively being worked on
-- Have been waiting for attention
-
-By using urgency sorting, you can quickly identify which tasks need your immediate attention and which can wait.
+The defaults are balanced for most workflows; changing them is an advanced step. Older custom files that omit `urgency.blocking.coefficient` inherit the default `+3.0`.

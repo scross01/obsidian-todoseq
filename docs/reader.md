@@ -1,31 +1,33 @@
 # Reader View
 
-TODOseq brings the same interactive task experience from the editor into Obsidian's Reader view (also called Reading mode or Preview mode). When you're reading your notes rather than editing them, your tasks remain fully functional—you can click keywords to change states, use context menus, and see the same visual styling that helps you quickly identify task status.
+TODOseq keeps tasks interactive in Obsidian's Reader view (also called Reading mode or Preview mode). While you read, click a keyword to change its state, open the context menu, and see the same styling as in the editor.
 
 ![TODOseq in reader View](./assets/todoseq-reader-view.png){.ts-img-full .ts-img-dark}
 ![TODOseq in reader View](./assets/todoseq-reader-view-light.png){.ts-img-full .ts-img-light}
 
 ## What You Get in Reader View
 
-When the "Format task keywords" setting is enabled, TODOseq transforms how tasks appear in Reader view. Task keywords like `TODO`, `DOING`, and `DONE` receive distinctive styling with bold formatting and your theme's accent color. Completed tasks display with a line-through effect, making it immediately obvious which items are finished. SCHEDULED, DEADLINE, CLOSED, and STARTED lines also receive special formatting to stand out from regular text. That styling is limited to the date line itself: the color and font size of other paragraphs are left to your theme, so colors set by themes and other plugins — including markdown they render inside their own containers — are preserved.
+With **Format task keywords** enabled, keywords such as `TODO`, `DOING` and `DONE` are bold and use your theme's accent color, and completed tasks are struck through. SCHEDULED, DEADLINE, CLOSED and STARTED lines get their own styling.
 
-Tasks declared in headings are also fully supported in Reader view, with keywords styled to match the heading size.
+Styling stops at the date line: other paragraphs keep your theme's color and size, including markdown rendered by other plugins.
+
+Tasks on heading lines work too, with the keyword sized to the heading.
 
 ## Interacting with Tasks
 
-In the Reader view you can update the tasks state without switching back to edit mode.
+Tasks can be updated without switching to edit mode.
 
 ### Click to Cycle States
 
-Single-click any task keyword to cycle through its state sequence. Click `TODO` and it becomes `DOING`. Click again and it becomes `DONE`. The cycle continues, letting you progress tasks through their natural workflow with a simple click.
+Click any task keyword to cycle its state: `TODO` becomes `DOING`, then `DONE`. Clicking again continues the cycle.
 
 ### Right-Click for Direct State Selection
 
-Jump to a specific state without cycling through intermediate ones. Right-click any task keyword to open a context menu showing all available next states. Select the desired state directly from the menu.
+Right-click a keyword to pick a next state directly, without cycling through the ones in between.
 
 ### Checkbox Tasks
 
-When tasks include checkboxes, clicking the checkbox toggles between checked and unchecked states. The task keyword automatically synchronizes with the checkbox—checking a box marks the task as DONE, unchecking returns it to TODO.
+With checkboxes, clicking the box checks or unchecks it and the keyword follows: checked is DONE, unchecked is TODO.
 
 ## Property Drawers
 
@@ -35,6 +37,6 @@ If you do not want task-owned property metadata in Reading view at all, enable *
 
 ## Code Blocks in Reader View
 
-TODOseq intentionally does not apply task styling to code blocks in Reader view. Code blocks maintain their original formatting without keyword highlighting or interactive elements. This preserves the readability of your code examples and prevents task keywords in code from being mistaken for actual tasks.
+Code blocks are left alone in Reader view: no keyword styling and no interactive elements, so code examples stay readable and a keyword inside code is never treated as a task.
 
-Note that code block styling only applies in the editor when the relevant setting is enabled. In Reader view, code blocks always appear as plain code.
+Code block styling applies only in the editor, and only when that setting is enabled. In Reader view, code blocks are always plain.

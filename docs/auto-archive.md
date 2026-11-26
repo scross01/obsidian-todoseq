@@ -1,12 +1,12 @@
 # Auto-Archive
 
-Auto-Archive rewrites completed task keywords (e.g. `DONE`) to an archived keyword (e.g. `ARCHIVED`) once a task's CLOSED date is at least the threshold days old. The tasks stay in your notes with their history intact — they just stop appearing in the Task List. You can run it manually from a preview dialog, or opt in to automatic runs after vault scans.
+Auto-Archive rewrites completed task keywords (e.g. `DONE`) to an archived keyword (e.g. `ARCHIVED`) once a task's CLOSED date is at least the threshold days old. The tasks stay in your notes with their history intact; they just stop appearing in the Task List. You can run it manually from a preview dialog, or opt in to automatic runs after vault scans.
 
 ## Why Archive?
 
-Renaming a note does not bring its archived tasks back into the Task List: archived keywords stay excluded when a file is renamed, just as they are during a scan.
-
 Completed tasks accumulate forever. `DONE` lines are useful history, but after a while they bury the work that still matters. Archiving keeps the record in the note — the line and its CLOSED date are unchanged apart from the keyword — while removing the task from the Task List, because archived tasks are not collected during vault scans (see [Task Entry](task-entry.md)).
+
+Renaming a note does not bring its archived tasks back: archived keywords stay excluded when a file is renamed, just as they are during a scan.
 
 ## How It Works
 

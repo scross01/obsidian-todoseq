@@ -1,6 +1,8 @@
 ## Sort Methods
 
-Choose how tasks are ordered using the sort method dropdown:
+Choose how tasks are ordered using the sort method dropdown.
+
+Every sort except Default and Keyword breaks ties the same way: keyword group and position, then file path and line number.
 
 ### 1. Default (File Path + Line Number)
 
@@ -8,27 +10,27 @@ Tasks sorted alphabetically by vault file path and file name. Within each file, 
 
 ### 2. Scheduled Date
 
-Tasks sorted by their SCHEDULED date. Tasks without scheduled dates appear at the end, with earlier dates appearing first. When two tasks have the same scheduled date, they are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by their SCHEDULED date, earliest first. Tasks without a scheduled date appear at the end.
 
 ### 3. Deadline Date
 
-Tasks sorted by their DEADLINE date. Tasks without deadline dates appear at the end, with earlier deadlines appearing first. When two tasks have the same deadline date, they are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by their DEADLINE date, earliest first. Tasks without a deadline appear at the end.
 
 ### 4. Closed Date
 
-Tasks sorted by their CLOSED date (the date when the task was marked as completed). Tasks without a closed date appear at the end, with earlier closed dates appearing first. When two tasks have the same closed date, they are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by their CLOSED date (when the task was marked completed), earliest first. Tasks without a closed date appear at the end.
 
 ### 5. Started Date
 
-Tasks sorted by their STARTED date (when the task entered an active state). Tasks without a started date appear at the end, with earlier started dates appearing first. When two tasks have the same started date, they are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by their STARTED date (when the task entered an active state), earliest first. Tasks without a started date appear at the end.
 
 ### 6. Priority
 
-Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority. Within each priority level, tasks are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by priority: High (`[#A]`) > Medium (`[#B]`) > Low (`[#C]`) > No priority. Within each level, ties use the shared order above.
 
 ### 7. Urgency
 
-Tasks sorted by calculated urgency score (highest to lowest). Urgency is calculated based on multiple factors including due dates, priority, tags, and task state. Tasks with no urgency score appear at the end, and completed tasks are not included in urgency sorting. When two tasks have the same urgency score, they are sorted by keyword group and position, then by file path and line number.
+Tasks sorted by calculated urgency score (highest to lowest). Urgency is calculated based on multiple factors including due dates, priority, tags, and task state. Tasks with no urgency score appear at the end, and completed tasks are not included in urgency sorting.
 
 ### 8. Keyword
 

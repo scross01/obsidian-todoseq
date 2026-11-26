@@ -1,6 +1,6 @@
 # Settings
 
-TODOseq provides configuration options to customize the plugin to your workflow. This guide covers all available settings and their impact on functionality.
+These are the settings TODOseq adds to Obsidian, with their defaults and effects.
 
 ![TODOseq Settings](./assets/todoseq-settings.png){.ts-img-full .ts-img-dark}
 ![TODOseq Settings](./assets/todoseq-settings-light.png){.ts-img-full .ts-img-light}

@@ -1,13 +1,12 @@
 # Dashboards
 
-Dashboard cards embed aggregated task counts directly in any note. Where an
-[embedded task list](/embedded-task-lists) shows the tasks themselves, a
-dashboard answers "where is my work concentrated?" — counts grouped by state,
-priority, keyword, tag, or date bucket, with one-click drill-through into the
-Task List.
+Dashboard cards embed aggregated task counts in any note. Where an
+[embedded task list](/embedded-task-lists) shows the tasks themselves, a card
+shows counts grouped by state, priority, keyword, tag or date bucket, with
+one-click drill-through into the Task List.
 
-Because cards aggregate with the same search engine the Task List uses, the
-counts always agree with what the Task List shows for the same filter.
+Cards use the same search engine as the Task List, so the same filter gives
+the same counts.
 
 ## Basic Usage
 
@@ -71,8 +70,7 @@ Lines starting with `#` inside the block are treated as comments.
 
 ## Display Forms
 
-Every form below has a worked example with a screenshot further down this
-page.
+Each form has an example below.
 
 - **bar** — the default: one row per group with a color swatch, label, and a
   track filled proportionally to the largest group

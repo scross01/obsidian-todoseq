@@ -1,6 +1,6 @@
 # Task Entry Structure
 
-This guide covers how TODOseq recognizes, parses, and manages tasks in your Obsidian vault.
+This page covers how TODOseq recognizes tasks and how each part of a task line is read.
 
 ## Task Recognition Patterns
 
@@ -109,11 +109,23 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 
 \*Note: If you modify the checkbox directly in the Obsidian editor, the task state keyword will not be automatically updated.
 
-## Task Keywords
+## Tasks in Other Contexts
 
-### Additional Formats
+TODOseq recognizes tasks in lists, tables, headings, quotes, callouts, code blocks, comments and footnotes. Table tasks follow the same keyword syntax as regular tasks; for programming language files, enable "Scan code files for comments" in experimental features.
 
-TODOseq supports tasks in Markdown tables, headings, quotes, callouts, code blocks, and comments. Tasks in tables follow the same keyword syntax as regular tasks. For tasks in programming language files, enable "Scan code files for comments" in experimental features.
+### Tasks in Lists
+
+TODOseq preserves list structure and markers:
+
+```markdown
+- TODO Task in bullet list
+  - DOING Subtask with indentation
+    - DONE Deeply nested subtask
+
+1. TODO First numbered task
+2. DOING Second numbered task
+3. DONE Third numbered task
+```
 
 ### Tasks in Tables
 
@@ -141,7 +153,7 @@ See [Editor Integration](editor.md#tasks-in-tables) for full details on table ce
 
 ### Tasks in Headings
 
-TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you structure your notes hierarchically with projects as headings and tasks as sub-headings, similar to Org-mode and Logseq.
+Task keywords also work in Markdown headings (H1–H6), so projects can be headings and tasks sub-headings, as in Org-mode and Logseq.
 
 ```markdown
 # TODO Project Alpha
@@ -150,7 +162,7 @@ TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you s
 ## TODO Implementation
 ```
 
-Heading tasks support all the same features as regular tasks — priority tokens, SCHEDULED/DEADLINE dates, and DESCRIPTION lines. Date and description lines go on the next line without indentation.
+Heading tasks support priorities, SCHEDULED/DEADLINE dates and DESCRIPTION lines like any other task; date and description lines go on the next line, unindented.
 
 ```markdown
 # TODO Launch new feature
@@ -370,7 +382,7 @@ DONE [#C] Documentation update
 
 TODOseq supports Logseq-style SCHEDULED and DEADLINE dates for task organization.
 
-TODOseq treats all dates and times as timezone-independent values that assume local time. When you schedule a task for "2026-01-31 22:00", TODOseq interprets this in your local timezone rather than UTC. If your device changes timezone, "2026-01-31 22:00" represents Jan 31st 10pm in your new timezone. TODOseq does not make timezone adjustments and does not currently support timezone-aware date handling.
+Dates and times are local: `2026-01-31 22:00` means 10pm wherever your device is, not a fixed UTC instant. TODOseq makes no timezone adjustments and does not support timezone-aware dates.
 
 ### Date Formats
 
@@ -400,7 +412,7 @@ DEADLINE: <2025-01-20 Mon 17:00>
 
 ### Smart Date Entry
 
-When Smart Date Recognition is enabled, you can type dates in plain language at the end of a task line. When you finish typing or move the cursor away, TODOseq automatically converts the phrase to a structured `SCHEDULED:` or `DEADLINE:` date line. The table below lists every pattern that is recognised on a task line.
+With Smart Date Recognition enabled, a plain-language date at the end of a task line becomes a `SCHEDULED:` or `DEADLINE:` line when you finish typing or move the cursor away. The table below lists every pattern that is recognised on a task line.
 
 #### One-shot dates
 
@@ -685,126 +697,6 @@ SCHEDULED: <2026-06-10 Wed +1w --2d>
 # First occurrence delayed 2 days, subsequent weeks on time
 ```
 
-## Tasks in Different Contexts
-
-### Tasks in Lists
-
-TODOseq preserves list structure and markers:
-
-```markdown
-- TODO Task in bullet list
-  - DOING Subtask with indentation
-    - DONE Deeply nested subtask
-
-1. TODO First numbered task
-2. DOING Second numbered task
-3. DONE Third numbered task
-```
-
-### Tasks in Headings
-
-TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you structure your notes hierarchically with projects as headings and tasks as sub-headings, similar to Org-mode and Logseq.
-
-```markdown
-# TODO Project Alpha
-## DOING Design phase
-### DONE Research completed
-## TODO Implementation
-```
-
-Heading tasks support all the same features as regular tasks — priority tokens, SCHEDULED/DEADLINE dates, and DESCRIPTION lines. Date and description lines go on the next line without indentation.
-
-```markdown
-# TODO Launch new feature
-SCHEDULED: <2026-07-20>
-DEADLINE: <2026-08-01>
-```
-
-### Tasks in Quotes and Callouts
-
-When "Include tasks inside quote and callout blocks" is enabled:
-
-```markdown
-> TODO Task in a quote block
-
-> > TODO Task in a nested quote block
-
-> > > TODO Task in three level nested quote block
-
-> [!info]
-> TODO Task in an info callout
-
-> [!todo]-
->
-> - [ ] TODO Checkbox task in collapsible todo block
-```
-
-### Tasks in Comment Blocks
-
-When "Include tasks inside comment blocks" is enabled:
-
-```markdown
-%% TODO Task in single-line comment block %%
-
-%%
-TODO Task in multi-line comment block
-DEADLINE: <2025-11-01>
-%%
-```
-
-### Tasks in Code Blocks
-
-When "Include tasks inside code blocks" is enabled:
-
-<pre>
-```txt
-TODO task in code block
-TODO another task in code block
-```
-</pre>
-
-### Tasks in Footnotes
-
-TODOseq can detect tasks in footnote definitions:
-
-```markdown
-This text has a footnote[^1]
-
-[^1]: TODO task in the footnote
-```
-
-### Language-Aware Comment Tasks
-
-TODOseq supports extracting tasks from comments in 20+ programming languages:
-
-**Python, Ruby, Shell, YAML, TOML, Dockerfile:**
-
-```python
-# TODO Write documentation
-# FIXME Handle edge cases
-```
-
-**JavaScript, Java, C++, C#, Go, Swift, Kotlin, Rust, PowerShell:**
-
-```javascript
-// TODO Implement feature
-// HACK Temporary fix
-```
-
-**SQL:**
-
-```sql
--- TODO Optimize query
--- DOING Add indexes
-```
-
-**INI:**
-
-```ini
-; TODO Configure settings
-; FIXME Broken config
-```
-
 ## Subtasks
 
 TODOseq supports subtasks by detecting indented checkbox items under a task line. Subtasks are displayed in the task list with a progress indicator showing completed and total count.
@@ -902,7 +794,7 @@ Numeric footnote definitions follow the same inclusion settings as other tasks: 
 
 ## Escaped pipes in tables
 
-A backslash-escaped pipe (`\|`) inside a table cell is not a cell delimiter. Tasks in a row that contains one keep their displayed cell index, and state or date changes rewrite only that cell — every other byte of the row is left as it was.
+A backslash-escaped pipe (`\|`) inside a table cell is not a cell delimiter. Tasks in a row that contains one keep their displayed cell index, and a state or date change rewrites only that cell, leaving the rest of the row untouched.
 
 ## Optimistic subtask progress
 

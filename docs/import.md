@@ -12,7 +12,7 @@ Existing markdown checkbox based tasks in the Obsidian Vault will not be recogni
 
 A simple way to bring existing tasks into TODOseq is to do a find and replace to add the `TODO` keyword.
 
-For each page in the vault that you want to capture checkbox based tasks from:
+In each page whose checkbox tasks you want to capture:
 
 Select **Edit > Replace** from the Obsidian menu
 

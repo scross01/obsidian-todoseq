@@ -1,6 +1,6 @@
 # Search Functionality
 
-The search field in the TODOseq Task List provides a powerful search system that allows you to quickly find and filter tasks across your entire vault. This guide covers all aspects of the search functionality, from basic filtering to advanced query syntax.
+The search field filters tasks across the vault as you type. This page covers the syntax, from plain words to prefixed and boolean queries.
 
 ![Search Options](./assets/todoseq-search-options-menu.png){.ts-img-detail .ts-img-dark}
 ![Search Options](./assets/todoseq-search-options-menu-light.png){.ts-img-detail .ts-img-light}
@@ -81,7 +81,7 @@ Click the "A/a" button in the toolbar to toggle case-sensitive matching.
 
 ## Advanced Search Syntax
 
-TODOseq supports sophisticated search queries with boolean logic and grouping.
+Queries can combine terms with boolean logic and grouping.
 
 ### Exact Phrase Search
 
@@ -312,7 +312,7 @@ Group keywords must be lowercase (`state:active`, `state:inactive`, `state:waiti
 
 ## Date Filter Expressions
 
-TODOseq provides powerful date-based filtering expressions.
+Dates can be filtered with the expressions below.
 
 ### Basic Date Expressions
 
@@ -610,7 +610,7 @@ Blocked status comes from `BLOCKER` references and is derived, never written to 
 
 ## Property Search
 
-You can search for tasks based on page properties (frontmatter/YAML metadata). This allows you to filter tasks by the properties set on your markdown files, providing a powerful way to organize and find tasks based on document context.
+Tasks can be found by the frontmatter properties of their notes.
 
 ### Basic Property Search
 
@@ -624,7 +624,7 @@ This syntax is consistent with Obsidian's native property search format, making 
 
 ### Key-Only Search
 
-You can also search for pages that have a specific property regardless of its value. Use `[type:]` or just `[type]` to find all pages with the `type` property set. This is useful when you want to see all tasks on pages of a certain category, regardless of their specific status or other property values.
+You can also search for pages that have a specific property regardless of its value. Use `[type:]` or just `[type]` to find all pages with the `type` property set. Use it to list tasks on pages of one category, whatever their status.
 
 ```txt
 [type:]
@@ -649,8 +649,6 @@ You can exclude pages with specific properties using the minus sign. For example
 ```txt
 -[type:Personal]
 ```
-
-This is particularly useful when you want to focus on work-related tasks and exclude personal ones.
 
 ### Null Values
 
@@ -718,13 +716,11 @@ This finds tasks on pages where "work" appears anywhere in the tags array.
 
 ### Property Search Cache
 
-TODOseq builds its own index of all properties across your vault for fast, efficient searching. This approach ensures that property searches work even for files that haven't been recently accessed, providing comprehensive coverage of your entire vault.
-
-The property search engine automatically updates when files change, ensuring that your search results are always current.
+TODOseq indexes properties across the vault, so a property search works even for notes that have not been opened recently. The index updates as files change.
 
 ## Combining Search Techniques
 
-TODOseq allows combining all search features for powerful, targeted filtering.
+Prefixes, phrases and boolean operators can be combined in one query.
 
 ### Complex Query Examples
 

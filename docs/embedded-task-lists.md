@@ -1,6 +1,6 @@
 # Embedded Task Lists
 
-The TODOseq plugin supports rendering filtered task lists directly within your notes using special code blocks. This feature allows you to create dynamic, interactive task lists that are filtered and sorted according to your specifications.
+A `todoseq` code block renders a filtered, sorted task list inside a note. The list stays live and updates as tasks change.
 
 ![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist.png){.ts-img-full .ts-img-dark}
 ![TODOseq embedded task list](./assets/todoseq-editor-embedded-tasklist-light.png){.ts-img-full .ts-img-light}
@@ -26,7 +26,7 @@ The block above matches every task tagged `#phoenix`, orders them by urgency, an
 
 ## Code Block Parameters
 
-Using the following parameters within the `todoseq` code block you define which tasks are displayed.
+The parameters below decide which tasks the block shows.
 
 | Parameter                             | Description                                                                                                                                                                                                    | Default                                                             |
 | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -194,7 +194,7 @@ The `show-query:` parameter controls whether the search query and filter paramet
 - `true` or `show` - Show the query header (default)
 - `false` or `hide` - Hide the query header
 
-This is useful when you want a cleaner look, especially when combined with a title:
+Useful for a cleaner header, especially with a title:
 
 ````txt
 ```todoseq
@@ -224,7 +224,7 @@ wrap-content: true
 ```
 ````
 
-The default `dynamic` mode provides the best experience across devices. To disable this responsive behavior and always truncate:
+`dynamic` is the default. To always truncate:
 
 ````txt
 ```todoseq
@@ -292,7 +292,7 @@ The `collapse:` parameter makes the task list collapsible, allowing you to save 
 - `true` - Task list starts collapsed with a chevron toggle
 - `false` - Task list is always expanded (default)
 
-When enabled, the task list initially displays in a collapsed state and a chevron icon (›) indicates the expand/collapse state. Click the header to toggle between expanded and collapsed. When collapsed, a footer shows the count of matching tasks (e.g., "5 matching tasks").
+The block starts collapsed, with a chevron and a footer counting the hidden tasks. Click the header to expand or collapse it.
 
 > **Note:** The `collapse` option requires either a `title:` to be set OR `show-query: true`. This ensures there's a visible header to click for toggling.
 
@@ -317,7 +317,7 @@ Clicking the header rotates the chevron and reveals the list:
 
 ### Warning Period Overrides
 
-The warning period parameters override the global [warning period settings](settings.md#warning-period-settings) for a specific embedded task list. This is useful when different views need different visibility rules.
+The warning period parameters override the global [warning period settings](settings.md#warning-period-settings) for one embedded list, so different views can use different visibility rules.
 
 ````txt
 ```todoseq
@@ -359,9 +359,12 @@ limit: 10
 
 ## Visual Date Indicators
 
-The task lists provide subtle visual cues to help you quickly identify task urgency based on scheduled and deadline dates. When a task has either a scheduled or deadline date, you'll see a gentle background color that indicates its time sensitivity without being distracting.
+Rows with a scheduled or deadline date are tinted by urgency:
 
-Tasks with dates that have passed appear with a soft red background, making it easy to spot what needs immediate attention. Tasks due today show a warm orange background, helping you focus on today's priorities. For tasks coming up within the next week, you'll see a soft green background that signals they're on your radar. Tasks with dates further out in the future maintain their default appearance, keeping your view clean and uncluttered.
+- **Overdue**: soft red
+- **Due today**: warm orange
+- **Within 7 days**: soft green
+- **Later**: no tint
 
 When a task has a warning period set, arrow indicators appear next to the date to provide additional context:
 
@@ -374,7 +377,7 @@ These arrows appear in both inline date badges (truncated/dynamic mode) and date
 
 ### Toggle Task State
 
-Click the checkbox next to a task to toggle its state between TODO and DONE. The task will be updated in the original file, and the embedded list will refresh automatically.
+Clicking the checkbox toggles the task between TODO and DONE, and the list refreshes from the file.
 
 ### Change Task State
 
@@ -386,15 +389,15 @@ Right-click anywhere on a task row to access additional actions through the cont
 
 ### Navigate to Task
 
-Click on the task text to navigate to the task's location in the original file.
+Click the task text to jump to it in its file.
 
-**Simple click** opens the file in the current active page or bringing the existing open page into focus.
+**Simple click** reuses an existing tab or opens the note in the active pane.
 
-**Shift-click** creates a new split pane and opens the file there. This is perfect for when you want to reference the task while working on something else in your main workspace.
+**Shift-click** opens a new split pane.
 
-**Ctrl/Cmd-click** always opens the file in a brand new tab, ensuring you have a fresh workspace for the task without disrupting your current view.
+**Ctrl/Cmd-click** opens a new tab.
 
-In all cases, TODOseq navigates to the exact line containing the task and focuses the editor for immediate editing.
+In every case the cursor lands on the task's line.
 
 ## Error Handling
 
@@ -403,7 +406,7 @@ If no tasks are found or the search query is invalid:
 ![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty.png){.ts-img-wide .ts-img-dark}
 ![TODOseq embedded list no tasks found](./assets/todoseq-embedded-list-empty-light.png){.ts-img-wide .ts-img-light}
 
-If there's an error with one of the sort or filter options, an error message will be displayed accordingly. The error message indicates what went wrong and suggests how to fix it.
+An invalid sort or filter option shows an error explaining what is wrong and how to fix it.
 
 ![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error.png){.ts-img-dark}
 ![TODOseq embedded task list errors](./assets/todoseq-embedded-list-error-light.png){.ts-img-light}
