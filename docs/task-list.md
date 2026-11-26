@@ -191,7 +191,7 @@ See [Search Functionality](search.md) for details.
 
 ### Completed Task Indicators
 
-Tasks with DONE, CANCELED, or CANCELLED states are visually marked as completed. Completed tasks appear with strikethrough formatting, and state badges show completed states in distinct colors.
+Tasks with DONE, CANCELED, or CANCELLED states are visually marked as completed. Their state badge keeps only a faint blend of the theme accent, while the title fades into heavily muted text with strikethrough. Completed rows also mute their priority badge to a neutral chip. Archived tasks fade further still in the editor and Reader view. Embedded task-list keywords remain uncolored.
 
 ### Priority Badges
 

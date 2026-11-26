@@ -9,7 +9,7 @@ A `todoseq` code block renders a filtered, sorted task list inside a note. The l
 
 To create an embedded task list, use a code block with the `todoseq` language:
 
-Embedded task rows render with the checkbox vertically aligned with the task keyword in both the editor and Reader view; a dependency lock or warning marker sits between the checkbox and keyword on the same line.
+Embedded task rows render with the checkbox vertically aligned with the task keyword in both the editor and Reader view; a dependency lock or warning marker sits between the checkbox and keyword on the same line. Keywords in embedded lists are intentionally uncolored — active rows use normal text ink and completed rows use muted ink, including a muted priority badge — so an embedded list reads as reporting rather than a second capture surface.
 
 ````txt
 ```todoseq

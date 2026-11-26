@@ -7,7 +7,7 @@ TODOseq keeps tasks interactive in Obsidian's Reader view (also called Reading m
 
 ## What You Get in Reader View
 
-With **Format task keywords** enabled, keywords such as `TODO`, `DOING` and `DONE` are bold and use your theme's accent color, and completed tasks are struck through. SCHEDULED, DEADLINE, CLOSED and STARTED lines get their own styling.
+With **Format task keywords** enabled, keywords such as `TODO`, `DOING` and `DONE` are bold and use your theme's accent color. Completed and archived keywords keep only a faint version of that accent, and their task titles fade into heavily muted text with strikethrough. Archived tasks fade further than completed ones. Priority badges on those lines mute to neutral chips too. SCHEDULED, DEADLINE, CLOSED and STARTED lines get their own styling.
 
 Styling stops at the date line: other paragraphs keep your theme's color and size, including markdown rendered by other plugins.
 

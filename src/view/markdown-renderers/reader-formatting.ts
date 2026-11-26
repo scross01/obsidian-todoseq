@@ -1925,6 +1925,11 @@ export class ReaderViewFormatter {
         if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
         }
+
+        // Apply archived task text styling if needed
+        if (isArchived) {
+          this.applyArchivedTaskStylingToTaskContainer(taskContainer);
+        }
       }
     }
   }
@@ -2192,6 +2197,11 @@ export class ReaderViewFormatter {
     // Apply completed task text styling if needed
     if (isCompleted) {
       this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
+    }
+
+    // Apply archived task text styling if needed
+    if (isArchived) {
+      this.applyArchivedTaskStylingToTaskContainer(taskContainer);
     }
   }
 

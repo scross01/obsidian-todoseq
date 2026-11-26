@@ -27,7 +27,7 @@ DONE [#C] Fix critical bug in payment processing
 ![Editor Task Styling Example](./assets/todoseq-editor-task-styling-light.png){.ts-img-wide .ts-img-light}
 
 - **State keywords** (TODO, DOING, DONE, etc.) are highlighted with bold font and your theme's accent color
-- **Completed tasks** (DONE, CANCELED, CANCELLED) display with a line-through decoration
+- **Completed tasks** (DONE, CANCELED, CANCELLED) keep a faint version of the keyword accent, while the task title uses heavily muted text and a line-through decoration. Archived tasks fade one step further still. A priority badge on either line becomes a neutral chip instead of keeping its priority colour.
 - **Checkboxes** (when used) are synchronized with the task state
 - SCHEDULED and DEADLINE date lines are formatted with special styling (CLOSED and STARTED date lines too)
 - The styling is applied in real-time as you type

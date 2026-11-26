@@ -3955,6 +3955,29 @@ describe('ReaderViewFormatter', () => {
 
       activeDocument.body.removeChild(li);
     });
+
+    test('should apply archived styling for an archived keyword', () => {
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      li.appendChild(activeDocument.createTextNode('ARCHIVED archived task'));
+      activeDocument.body.appendChild(li);
+
+      const processTaskListItemDirectly = (
+        formatter as unknown as {
+          processTaskListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processTaskListItemDirectly;
+
+      processTaskListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-archived-task-text')).not.toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
   });
 
   describe('processListItemDirectly', () => {
@@ -4003,6 +4026,24 @@ describe('ReaderViewFormatter', () => {
         '.todoseq-completed-task-text',
       );
       expect(completedContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
+
+    test('should apply archived styling for an archived keyword', () => {
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('ARCHIVED archived task'));
+      activeDocument.body.appendChild(li);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-archived-task-text')).not.toBeNull();
 
       activeDocument.body.removeChild(li);
     });

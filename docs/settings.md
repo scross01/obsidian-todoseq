@@ -32,7 +32,7 @@ When you install TODOseq for the first time, it starts with the defaults below, 
 
 **Visual Effects When Enabled:**
 
-Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task states use your Obsidian theme's accent color. See [Editor Integration](editor.md) and [Reader View](reader.md) documentation for full details.
+Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. Active task states use a blend of your Obsidian theme's accent color; completed and archived states fade to a much quieter accent, muted title text and a neutral priority badge. Embedded task-list keywords stay uncolored so reporting lists remain distinct from capture. See [Editor Integration](editor.md), [Reader View](reader.md) and [Embedded Task Lists](embedded-task-lists.md) for full details.
 
 ## Reader View Settings
 
