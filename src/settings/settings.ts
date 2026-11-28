@@ -86,6 +86,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     (value: unknown) => Promise<void> | void
   > = {
     formatTaskKeywords: () => this.plugin.updateTaskFormatting(),
+    hideTaskPropertiesInReadingView: () =>
+      this.plugin.refreshReaderViewFormatter(),
     includeCalloutBlocks: () => this.rescanAndRefresh(),
     includeCommentBlocks: () => this.rescanAndRefresh(),
     includeCodeBlocks: (value) => {
@@ -113,6 +115,8 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     defaultScheduledWarningPeriod: () => this.refreshViews(),
     skipScheduledWarningPeriodIfDeadline: () => this.refreshViews(),
     skipDeadlinePrewarningIfScheduled: () => this.refreshViews(),
+    enforceTaskHierarchyDependencies: () => this.refreshDependencySurfaces(),
+    enforceCheckboxDependencies: () => this.refreshDependencySurfaces(),
     migrateToTodayState: () => {
       this.plugin.embeddedTaskListProcessor?.updateSettings();
       return this.refreshViews();
@@ -242,6 +246,12 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
     return this.refreshAllTaskListViews();
   }
 
+  /** Structural gates change the graph without changing any task revision. */
+  private refreshDependencySurfaces(): void {
+    this.plugin.taskDependencyManager?.clearCache();
+    this.plugin.lifecycleManager?.scheduleDependencySurfaceRefresh();
+  }
+
   async setControlValue(key: string, value: unknown): Promise<void> {
     (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
     await this.sideEffectHandlers[key]?.(value);
@@ -275,6 +285,14 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
         name: 'Format task keywords',
         desc: 'Highlight task keywords (todo, doing, etc.) in bold with accent color in the editor.',
         control: { type: 'toggle', key: 'formatTaskKeywords' },
+      },
+      {
+        name: 'Hide task properties in Reading view',
+        desc: 'When enabled, task property drawers are hidden in Reading view. The note and its properties are unchanged.',
+        control: {
+          type: 'toggle',
+          key: 'hideTaskPropertiesInReadingView',
+        },
       },
       {
         type: 'group',
@@ -669,6 +687,27 @@ export class TodoTrackerSettingTab extends PluginSettingTab {
             name: 'Track closed date',
             desc: 'Add closed: timestamp when tasks are marked as completed.',
             control: { type: 'toggle', key: 'trackClosedDate' },
+          },
+          {
+            name: 'Enforce blocked tasks',
+            desc: 'Block completion while a BLOCKER dependency is incomplete or unresolved. To override, use Complete anyway in the task menu or the Complete blocked task command.',
+            control: { type: 'toggle', key: 'enforceBlockedTasks' },
+          },
+          {
+            name: 'Respect parent and ordered task dependencies',
+            desc: 'When enabled, an incomplete child task blocks its parent, and an ORDERED task blocks later siblings. Explicit BLOCKER references always apply.',
+            control: {
+              type: 'toggle',
+              key: 'enforceTaskHierarchyDependencies',
+            },
+          },
+          {
+            name: 'Require checkboxes to be complete',
+            desc: 'When enabled, unchecked descendant checkboxes block an incomplete parent. This is independent of parent and ORDERED dependencies.',
+            control: {
+              type: 'toggle',
+              key: 'enforceCheckboxDependencies',
+            },
           },
           {
             name: 'Track started date',

@@ -33,6 +33,14 @@ const VALID_PRIORITY_VALUES = new Set([
  * (a value that IS a date must be a valid one).
  */
 function validatePrefixValue(field: SearchPrefix, value: string): void {
+  if (field === 'blocked') {
+    if (value !== 'true' && value !== 'false') {
+      throw new SearchError(
+        'blocked: accepts only true or false. Use blocked:true or blocked:false.',
+      );
+    }
+    return;
+  }
   if (field === 'priority') {
     const normalized = value.toLowerCase();
     if (!VALID_PRIORITY_VALUES.has(normalized)) {
@@ -414,6 +422,9 @@ class PrattParser {
     ) {
       const field = prefixToken.value as SearchPrefix; // Will be validated in evaluator
       const value = valueToken.value;
+      if (field === 'blocked' && valueToken.type === 'prefix_value_quoted') {
+        throw new SearchError('blocked: accepts only unquoted true or false.');
+      }
       // Fail loud on closed-domain values the evaluator can never match
       // (quoting does not bypass validation — the domain is closed either way).
       validatePrefixValue(field, value);

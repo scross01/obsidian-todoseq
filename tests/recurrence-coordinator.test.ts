@@ -267,7 +267,9 @@ describe('RecurrenceCoordinator', () => {
 
     it('should return success for scheduled date recurrence', async () => {
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -284,7 +286,9 @@ describe('RecurrenceCoordinator', () => {
 
     it('should return success for deadline date recurrence', async () => {
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('deadline');
@@ -307,7 +311,9 @@ describe('RecurrenceCoordinator', () => {
 
     it('should return success for both scheduled and deadline recurrence', async () => {
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockImplementation(
@@ -390,7 +396,9 @@ describe('RecurrenceCoordinator', () => {
 
     it('should pass correct parameters to updateTaskRecurrence', async () => {
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1173,7 +1181,9 @@ describe('RecurrenceCoordinator', () => {
       (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([leaf]);
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1203,7 +1213,9 @@ describe('RecurrenceCoordinator', () => {
       ]);
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1225,7 +1237,9 @@ describe('RecurrenceCoordinator', () => {
       (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([leaf]);
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1239,7 +1253,9 @@ describe('RecurrenceCoordinator', () => {
       (mockApp.workspace.getLeavesOfType as jest.Mock).mockReturnValue([]);
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1262,7 +1278,9 @@ describe('RecurrenceCoordinator', () => {
       ]);
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1296,7 +1314,9 @@ describe('RecurrenceCoordinator', () => {
       ]);
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');
@@ -1313,7 +1333,9 @@ describe('RecurrenceCoordinator', () => {
       delete (mockApp as Record<string, unknown>).workspace;
 
       const mockUpdateCoordinator = {
-        updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+        updateTaskRecurrence: jest
+          .fn()
+          .mockResolvedValue({ status: 'applied' }),
       };
       coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator as any);
       mockParser.getDateLineType.mockReturnValue('scheduled');

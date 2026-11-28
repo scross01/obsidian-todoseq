@@ -26,6 +26,8 @@ import { DashboardAggregator } from '../../src/view/embedded-dashboard/aggregati
 import { NaturalDateParser } from '../../src/parser/natural-date-parser';
 import { RegexCache } from '../../src/utils/regex-cache';
 import { DateUtils } from '../../src/utils/date-utils';
+import { Task } from '../../src/types/task';
+import { createBaseTask } from '../../tests/helpers/test-helper';
 
 /** Parse every fixture file through the parser that owns its format. */
 const parseFile: BenchScenario = {
@@ -254,6 +256,78 @@ const searchBulk: BenchScenario = {
  * Dashboard aggregation across every group-by dimension over the full
  * task set.
  */
+/** Deterministic multilingual corpus, built once outside every timed pass. */
+let internationalTasks: Task[] | null = null;
+
+function getInternationalTasks(): Task[] {
+  if (internationalTasks) return internationalTasks;
+  const rows: Array<[string, Partial<Task>]> = [
+    [
+      'Visit café',
+      { tags: ['café/clients'], rawText: 'TODO Visit café #café/clients' },
+    ],
+    ['Send to Straße', {}],
+    ['Plain note', { path: 'Łódź/Note.md' }],
+    ['東京 office', {}],
+    ['été planning', {}],
+    ['Release C++', {}],
+    ['Résumé review', { path: 'notes/Résumé.md' }],
+    ['TERMINÉ archive', { state: 'TERMINÉ' }],
+  ];
+  internationalTasks = rows.map(([text, overrides], index) =>
+    createBaseTask({
+      line: index,
+      path: 'notes/note.md',
+      text,
+      rawText: `TODO ${text}`,
+      ...overrides,
+    }),
+  );
+  return internationalTasks;
+}
+
+/**
+ * Accent folding and Unicode phrase boundaries over the bulk facade. The
+ * typing sequence and multi-term queries are separate shapes: candidate
+ * folding is mostly inert during single-term typing, so both must be timed.
+ * Every case asserts its expected match count, so a skipped pass or a query
+ * that silently matches nothing cannot look fast.
+ */
+const searchInternational: BenchScenario = {
+  name: 'search-international (folding + phrase boundaries, bulk)',
+  async runOnce(ctx: BenchContext): Promise<void> {
+    const tasks = getInternationalTasks();
+    const cases: Array<[string, boolean, number]> = [
+      ['ca', false, 1],
+      ['caf', false, 1],
+      ['cafe', false, 1],
+      ['strasse', false, 1],
+      ['lodz', false, 1],
+      ['"ete"', false, 1],
+      ['content:"東京"', false, 1],
+      ['tag:cafe', false, 1],
+      ['state:termine', false, 1],
+      ['cafe OR strasse', false, 2],
+      ['cafe -strasse', false, 1],
+      ['cafe', true, 0],
+    ];
+
+    for (const [query, caseSensitive, expected] of cases) {
+      const kept = await Search.filterTasks(
+        tasks,
+        query,
+        caseSensitive,
+        ctx.settings,
+      );
+      if (kept.length !== expected) {
+        throw new Error(
+          `search-international "${query}": expected ${expected}, got ${kept.length}`,
+        );
+      }
+    }
+  },
+};
+
 const dashboardAggregate: BenchScenario = {
   name: 'dashboard-aggregate (6 groupings)',
   async runOnce(ctx: BenchContext): Promise<void> {
@@ -374,6 +448,7 @@ export const SCENARIOS: BenchScenario[] = [
   classifyRefreshPair,
   search,
   searchBulk,
+  searchInternational,
   dashboardAggregate,
   naturalDate,
   dateFormat,

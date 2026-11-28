@@ -3,6 +3,7 @@ import { DateUtils } from '../utils/date-utils';
 import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TaskStateManager } from './task-state-manager';
 import type { PropertyQueryDescriptor } from '../search/search-types';
+import { foldSearchText } from '../search/search-text';
 
 // Minimal interface for the vault scanner status this engine polls during init
 export interface IVaultScannerStatusProvider {
@@ -221,7 +222,8 @@ export class PropertySearchEngine {
     await this.initialize();
     if (!filter.key) return new Set();
 
-    // A quoted key is exact regardless of the global match-case setting.
+    // A quoted key, like a quoted value, is exact regardless of the global
+    // match-case setting.
     const keyCaseSensitive =
       filter.keyExact || filter.exact ? true : caseSensitive;
     const { maps, existence } = this.getEntriesForKey(
@@ -282,11 +284,13 @@ export class PropertySearchEngine {
   } {
     const maps: Map<unknown, Set<string>>[] = [];
     const existence = new Set<string>();
-    const lowerKey = key.toLowerCase();
+    const foldedKey = caseSensitive ? key : foldSearchText(key);
 
     this.propertyCache.forEach((valueMap, cacheKey) => {
       if (
-        caseSensitive ? cacheKey === key : cacheKey.toLowerCase() === lowerKey
+        caseSensitive
+          ? cacheKey === key
+          : foldSearchText(cacheKey) === foldedKey
       ) {
         maps.push(valueMap);
         this.propertyExistence
@@ -443,7 +447,7 @@ export class PropertySearchEngine {
     exact: boolean,
   ): Set<string> {
     const results = new Set<string>();
-    const search = caseSensitive ? searchValue : searchValue.toLowerCase();
+    const search = caseSensitive ? searchValue : foldSearchText(searchValue);
     const numeric = Number(searchValue);
     const lowerSearch = searchValue.toLowerCase();
 
@@ -455,7 +459,9 @@ export class PropertySearchEngine {
           if (exact) {
             matches = cacheKey === searchValue;
           } else {
-            const candidate = caseSensitive ? cacheKey : cacheKey.toLowerCase();
+            const candidate = caseSensitive
+              ? cacheKey
+              : foldSearchText(cacheKey);
             matches = candidate.includes(search);
           }
         } else if (typeof cacheKey === 'number') {

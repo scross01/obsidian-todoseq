@@ -18,6 +18,20 @@
 - `npm run docs:preview` — Preview static production docs
 - `npm run docs:screenshots` — Recapture the docs screenshots (see below)
 
+## Fixture Generation
+
+Manual fixture vaults use the same deterministic corpus as the performance
+harness:
+
+```bash
+npm run perf:fixture -- --size s --seed 4242 --today 2026-11-10 --out /tmp/todoseq-vault
+```
+
+`--size` must be `s`, `m` or `l`; `--out` (also `--output`/`-o`) is required.
+See `scripts/perf/README.md` for presets, determinism and output behavior.
+`npm run generate-content` is a deprecated alias; its arbitrary file/line/task
+count flags are rejected because they cannot be mapped exactly to the presets.
+
 ## Integration Tests
 
 Integration tests launch a real isolated Obsidian instance via Electron, connect over CDP (Chrome DevTools Protocol), and run Playwright tests against the actual plugin.
@@ -32,7 +46,10 @@ Key details:
 
 - Obsidian is launched with `--user-data-dir` pointing at an ephemeral fixtures directory for full isolation.
 - A single Obsidian instance is shared across all test files via CDP (port 9334 by default, overridable via `OBSIDIAN_CDP_PORT`; chosen to avoid collisions with other local apps).
-- The `obsidian-restart` project tests settings persistence across a real process restart.
+- A port conflict is an error: the harness never automatically terminates an existing application. Choose an unused `OBSIDIAN_CDP_PORT` or close the known test instance manually. Wrapper commands that leave a detached descendant holding the port fail closed.
+- The runner owns lifecycle control. It holds `test-results/obsidian-owner.lock` and publishes the authenticated endpoint and paths in `test-results/obsidian-owner.json`; the descriptor token is not logged. If a shutdown cannot be confirmed, the lease and fixtures are left for manual recovery after verifying no owned Obsidian process remains.
+- Each test starts from the complete baseline corpus and workspace. `resetVaultState` saves and detaches dirty markdown leaves, removes every nonbaseline file and empty folder through the Obsidian vault API while preserving `.obsidian/**` and the plugin install, recreates the shared baseline markdown map, restores baseline settings, waits for the rescan to publish the exact baseline task identities, resets Task List controls, and opens `inbox.md` in source mode. Tests must explicitly seed any extra content after this reset.
+- The `obsidian-restart` project tests settings persistence across a real process restart. It deliberately preserves the current `data.json` between close and launch, so it must not run a full reset mid-restart.
 - **No keyboard shortcuts** — all Obsidian commands are invoked via `page.evaluate(() => app.commands.executeCommandById(...))` to avoid triggering unintended actions.
 - DOM selectors are version-specific (e.g. Obsidian 1.12+ uses `.vertical-tab-nav-item`, not `.vertical-tab-list-item`).
 
@@ -47,7 +64,10 @@ stages a throwaway vault, and `manifest.json` recording what produced each file.
 
 **If you change anything a screenshot shows** — a plugin view, the task list, the
 dashboard, the settings UI, the editor or reading-mode rendering, or a colour in
-`styles.css` — you must recapture, or the docs will show the old UI.
+`styles.css` — the images may no longer match. Run the [manual staleness
+check](#checking-what-is-stale) below when you want to know which, read a stale
+row as a heads-up rather than as work this change owes, and review every image
+you do regenerate by hand. Leaving an image stale is a valid outcome.
 
 ### Prerequisites
 
@@ -168,12 +188,40 @@ report on every PR is noise rather than signal. Run it yourself when you touch
 plugin sources, and read a stale row as "these images may need updating", not as
 work this change owes.
 
-### Workflow after a visual change
+#### Reviewing one feature at a time
+
+When you know which feature a change touches, `--features` groups the report so
+the stills most likely to show it come first:
+
+```bash
+npm run docs:screenshots -- --check --features=date-autocomplete
+```
+
+Tags live in `scripts/screenshots/asset-features.ts`, keyed by asset id and
+shared with the generated light twin. The report lists matching plugin drift
+first, then unmatched plugin drift (still stale), then everything else:
+scenario drift, missing or unreferenced assets, and overview images marked
+_broad review_, whose crop cannot prove which part of the frame a change
+affects. Totals and the exit status are unchanged. The report reflects drift
+accumulated since each capture, not only your change, so a matching row is a
+review lead rather than proof that its pixels differ. A selected feature with no
+captured asset says so — an empty match is not evidence of freshness. Tag the
+feature a screenshot actually shows when adding one, and run the plain check
+when a change spans several features or you are unsure.
+
+### Workflow when you choose to regenerate
+
+Nothing here is required after a visual change: the check is manual, and a stale
+row is often the honest outcome (see [Checking what is stale](#checking-what-is-stale)).
+When you decide the change is one the docs should show, this is the sequence:
 
 1. `npm run build` — the capture stages the build output, not your sources.
 2. `npm run docs:screenshots` — or `--only=<scenario>` for the one you touched,
    if you are confident nothing else renders that change.
-3. `npm run docs:screenshots -- --check` — expect `all N fresh` and exit 0.
+3. `npm run docs:screenshots -- --check` — every asset you actually recaptured
+   must report `FRESH`. An unrelated stale row is allowed: `--only` regenerates
+   the images you picked and leaves the rest of the corpus alone, so the command
+   exiting non-zero on those rows is expected as long as your own are fresh.
 4. **Eyeball every changed image against its docs section.** The driver cannot
    tell a correct screenshot of a broken state from a correct screenshot of a
    working one; a stale capture is exactly what a passing run produces.
@@ -195,9 +243,17 @@ have regenerated but cannot review, revert `docs/assets/` and
 
 ### Things that will waste your time otherwise
 
-- **Editing `scenarios/helpers.ts` invalidates every scenario.** It holds the
-  shared vault seeds and wait predicates, and it is part of every scenario's
-  hash. Any edit there means a full recapture, not `--only`.
+- **Shared helpers invalidate every scenario; a seed module invalidates its
+  own.** `scenarios/helpers.ts` holds the wait predicates and date helpers every
+  scenario imports, so editing it flags every scenario. Seed notes live in
+  `scenarios/seeds/<name>.ts`, and each scenario hashes only the modules it
+  declares in `registry.ts` — editing `seeds/dashboard.ts` flags the dashboards,
+  not the settings shot. Both are facts about the dependency, not instructions:
+  whether to recapture an image remains your deliberate choice, and `--only`
+  still works for the ones you pick. A hash-input change — a new seed module, or
+  an edited one — can flag every historical row at once; that is expected, and
+  those images stay stale until a maintainer deliberately recaptures and
+  reviews them.
 - **Never hand-write a light-mode scenario.** The driver generates a light twin
   of each scenario (`lightVariantScriptPath()`) that imports the real one and
   only overrides the base theme and a `-light` suffix on each screenshot id. A

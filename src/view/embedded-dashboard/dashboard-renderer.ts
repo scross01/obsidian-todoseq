@@ -70,6 +70,13 @@ const NEUTRAL_LADDER = [
   'var(--color-yellow)',
 ];
 
+/** Two-bucket dependency grouping: the exception carries the warning hue. */
+export function blockedGroupColor(key: string): string {
+  return key === 'blocked:true'
+    ? 'color-mix(in srgb, var(--color-orange) 65%, var(--background-secondary))'
+    : 'color-mix(in srgb, var(--text-muted) 45%, var(--background-secondary))';
+}
+
 /** Accent steps for color: mono (N% accent over the well background). */
 const MONO_STEPS = [100, 82, 64, 46, 30];
 
@@ -1156,6 +1163,11 @@ export class DashboardRenderer {
           DATE_BUCKET_COLORS[group.key] ??
           NEUTRAL_LADDER[index % NEUTRAL_LADDER.length]
         );
+      case 'blocked':
+        if (group.key.endsWith(':none') || group.key === 'more') {
+          return 'var(--text-faint)';
+        }
+        return blockedGroupColor(group.key);
       case 'tag':
       case 'keyword':
       default:

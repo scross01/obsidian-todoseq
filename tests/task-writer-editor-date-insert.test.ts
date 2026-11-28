@@ -148,6 +148,37 @@ describe('TaskWriter - editor-path date-line insert at end of document', () => {
     expect(lines[1]).toBe('SCHEDULED: <2026-01-20 Tue>');
   });
 
+  test('inserts a date after a quoted description under an unquoted task', () => {
+    lines = ['- [ ] TODO Task text', '> DESCRIPTION: Notes'];
+
+    const result = taskWriter.insertDateLineFromEditor(
+      mockEditor,
+      makeTask({ rawText: '- [ ] TODO Task text' }),
+      'SCHEDULED',
+      '<2026-02-01 Sun>',
+    );
+
+    expect(result.line).toBe(2);
+    expect(lines[1]).toBe('> DESCRIPTION: Notes');
+    expect(lines[2]).toBe('  SCHEDULED: <2026-02-01 Sun>');
+  });
+
+  test('public editor entry point returns the actual inserted date row', () => {
+    lines = ['TODO Task text', 'DEADLINE: <2026-01-21 Wed>'];
+
+    const result = taskWriter.insertDateLineFromEditor(
+      mockEditor,
+      makeTask(),
+      'SCHEDULED',
+      '<2026-01-20 Tue>',
+    );
+
+    expect(result.line).toBe(1);
+    expect(result.lineDelta).toBe(1);
+    expect(lines[1]).toMatch(/^SCHEDULED: <2026-01-20/);
+    expect(lines[2]).toBe('DEADLINE: <2026-01-21 Wed>');
+  });
+
   test('sanity: mid-document insert keeps the classic placement (SCHEDULED before an existing DEADLINE)', async () => {
     lines = ['TODO Task text', 'DEADLINE: <2026-01-21 Wed>'];
 
@@ -156,5 +187,85 @@ describe('TaskWriter - editor-path date-line insert at end of document', () => {
     expect(lines).toHaveLength(3);
     expect(lines[1]).toMatch(/^SCHEDULED: <2026-01-20/);
     expect(lines[2]).toBe('DEADLINE: <2026-01-21 Wed>');
+  });
+
+  test('updates a same-depth nested-quoted SCHEDULED line in place', async () => {
+    lines = [
+      '> > - [ ] TODO Task text',
+      '> > SCHEDULED: <2026-01-20 Tue>',
+      '> > - [ ] TODO sibling',
+    ];
+
+    await taskWriter.updateTaskScheduledDate(
+      makeTask({
+        rawText: '> > - [ ] TODO Task text',
+        indent: '> > ',
+      }),
+      new Date(2026, 0, 22),
+    );
+
+    expect(lines[1]).toMatch(/^> > SCHEDULED: <2026-01-22/);
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toBe('> > - [ ] TODO sibling');
+  });
+
+  test('updating a nested date keeps an anchored drawer identity', async () => {
+    lines = [
+      '> > - [ ] TODO Task text',
+      '> > SCHEDULED: <2026-01-20 Tue>',
+      '> > :PROPERTIES:',
+      '> > :ID: nested-1',
+      '> > :END: ^nested-anchor',
+    ];
+
+    await taskWriter.updateTaskScheduledDate(
+      makeTask({
+        rawText: '> > - [ ] TODO Task text',
+        indent: '> > ',
+        id: 'nested-1',
+        embedReference: '^nested-anchor',
+      }),
+      new Date(2026, 0, 22),
+    );
+
+    expect(lines).toEqual([
+      '> > - [ ] TODO Task text',
+      '> > SCHEDULED: <2026-01-22 Thu>',
+      '> > :PROPERTIES:',
+      '> > :ID: nested-1',
+      '> > :END: ^nested-anchor',
+    ]);
+  });
+
+  test('updating an anchored SCHEDULED line keeps the suffix', async () => {
+    lines = ['TODO Task text', 'SCHEDULED: <2026-01-20 Tue> ^water'];
+
+    await taskWriter.updateTaskScheduledDate(makeTask(), new Date(2026, 0, 22));
+
+    expect(lines[1]).toMatch(/^SCHEDULED: <2026-01-22 .*> \^water$/);
+  });
+
+  test('adding a DEADLINE moves a task-line anchor to the new final line', async () => {
+    lines = ['TODO Task text ^legacy', 'SCHEDULED: <2026-01-20 Tue>'];
+
+    await taskWriter.updateTaskDeadlineDate(
+      makeTask({
+        rawText: 'TODO Task text ^legacy',
+        embedReference: '^legacy',
+      }),
+      new Date(2026, 0, 21),
+    );
+
+    expect(lines[0]).toBe('TODO Task text');
+    expect(lines[2]).toMatch(/^DEADLINE: <2026-01-21 .*> \^legacy$/);
+  });
+
+  test('removing the anchored date line moves the anchor to the task line', async () => {
+    lines = ['TODO Task text', 'SCHEDULED: <2026-01-20 Tue> ^water'];
+
+    await taskWriter.removeTaskScheduledDate(makeTask());
+
+    expect(lines[0]).toBe('TODO Task text ^water');
+    expect(lines.join('\n')).not.toContain('SCHEDULED');
   });
 });

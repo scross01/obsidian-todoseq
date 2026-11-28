@@ -1,6 +1,8 @@
 import { VaultScanner } from '../src/services/vault-scanner';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import { TaskParser } from '../src/parser/task-parser';
+import { OrgModeTaskParser } from '../src/parser/org-mode-task-parser';
+import { getDefaultCoefficients } from '../src/utils/task-urgency';
 import { ParserRegistry } from '../src/parser/parser-registry';
 import {
   createBaseSettings,
@@ -258,6 +260,22 @@ describe('VaultScanner', () => {
       expect(parser).toBeInstanceOf(TaskParser);
     });
 
+    it('should resolve a parser from the path extension without scanning', () => {
+      const keywordManager = createTestKeywordManager(settings);
+      const orgParser = OrgModeTaskParser.create(
+        keywordManager,
+        null,
+        getDefaultCoefficients(),
+      );
+      vaultScanner.getParserRegistry().register(orgParser);
+
+      expect(vaultScanner.getParserForPath('folder/note.org')).toBe(orgParser);
+      expect(vaultScanner.getParserForPath('folder/note.md')).toBeInstanceOf(
+        TaskParser,
+      );
+      expect(vaultScanner.getParserForPath('folder/no-extension')).toBeNull();
+    });
+
     it('should return null for getParser when no markdown parser registered', () => {
       // Create a new vault scanner without any parsers
       const keywordManager = createTestKeywordManager(settings);
@@ -336,6 +354,29 @@ describe('VaultScanner', () => {
       const newKeywords = vaultScanner.getKeywordManager().getAllKeywords();
       // NEXT should be in the new keywords
       expect(newKeywords).toContain('NEXT');
+    });
+
+    it('notifies urgency surfaces when the blocking coefficient changes', async () => {
+      const schedule = jest.fn();
+      (
+        vaultScanner as unknown as {
+          plugin: {
+            lifecycleManager: { scheduleDependencySurfaceRefresh: jest.Mock };
+          };
+        }
+      ).plugin = {
+        lifecycleManager: { scheduleDependencySurfaceRefresh: schedule },
+      } as never;
+      const zeroBlocking = {
+        ...getDefaultCoefficients(),
+        blocking: 0,
+      };
+
+      await vaultScanner.updateSettings(createBaseSettings(), zeroBlocking);
+      expect(schedule).toHaveBeenCalledTimes(1);
+
+      await vaultScanner.updateSettings(createBaseSettings(), zeroBlocking);
+      expect(schedule).toHaveBeenCalledTimes(1);
     });
 
     it('should update all parsers with new config', async () => {

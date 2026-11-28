@@ -2,6 +2,7 @@ import { VaultScanner } from '../src/services/vault-scanner';
 import { TaskStateManager } from '../src/services/task-state-manager';
 import {
   createBaseSettings,
+  createBaseTask,
   createTestKeywordManager,
 } from './helpers/test-helper';
 import { Task } from '../src/types/task';
@@ -73,6 +74,73 @@ describe('VaultScanner.tasksIdentical', () => {
       // @ts-ignore - Accessing private method for testing
       const result = vaultScanner.tasksIdentical(tasks1, tasks2);
       expect(result).toBe(true);
+    });
+
+    const dependencyPropertyChanges: Array<[string, Partial<Task>]> = [
+      ['BLOCKER', { blockedBy: ['blocker'] }],
+      ['ARCHIVED_BLOCKER', { archivedBlockers: ['archived'] }],
+      ['ID', { id: 'task-1' }],
+      ['ORDERED', { ordered: true }],
+      ['NOBLOCKING', { noblocking: true }],
+      ['properties', { properties: { BLOCKER: 'blocker' } }],
+      [
+        'property issues',
+        {
+          propertyIssues: [
+            {
+              code: 'invalid-reference',
+              line: 2,
+              message: 'Invalid reference.',
+            },
+          ],
+        },
+      ],
+      ['embed reference', { embedReference: '^task-anchor' }],
+    ];
+
+    test.each(dependencyPropertyChanges)(
+      'should return false when dependency property %s changes',
+      (_property, change) => {
+        // @ts-ignore - Accessing private method for testing
+        expect(
+          vaultScanner.tasksIdentical(
+            [createBaseTask()],
+            [createBaseTask(change)],
+          ),
+        ).toBe(false);
+      },
+    );
+
+    test('should return true when dependency properties are value-identical', () => {
+      const properties = { BLOCKER: 'blocker' };
+      const issue = {
+        code: 'invalid-reference' as const,
+        line: 2,
+        message: 'Invalid reference.',
+      };
+      // @ts-ignore - Accessing private method for testing
+      expect(
+        vaultScanner.tasksIdentical(
+          [
+            createBaseTask({
+              properties,
+              blockedBy: ['blocker'],
+              id: 'task-1',
+              ordered: true,
+              propertyIssues: [issue],
+            }),
+          ],
+          [
+            createBaseTask({
+              properties: { ...properties },
+              blockedBy: ['blocker'],
+              id: 'task-1',
+              ordered: true,
+              propertyIssues: [{ ...issue }],
+            }),
+          ],
+        ),
+      ).toBe(true);
     });
 
     test('should return false when scheduled date changes', () => {

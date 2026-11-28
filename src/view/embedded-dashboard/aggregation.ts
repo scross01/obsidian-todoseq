@@ -1,9 +1,13 @@
 import { Task, KeywordGroup } from '../../types/task';
 import { Search } from '../../search/search';
 import { SearchEvaluator } from '../../search/search-evaluator';
-import { SearchError } from '../../search/search-types';
+import {
+  DependencyStatusProvider,
+  SearchError,
+} from '../../search/search-types';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { KeywordManager } from '../../utils/keyword-manager';
+import { getTaskKey } from '../../utils/task-utils';
 import { PropertySearchEngine } from '../../services/property-search-engine';
 
 /**
@@ -20,7 +24,13 @@ import { PropertySearchEngine } from '../../services/property-search-engine';
  */
 
 export type DashboardGroupBy =
-  'priority' | 'state' | 'keyword' | 'tag' | 'scheduled' | 'deadline';
+  | 'priority'
+  | 'state'
+  | 'keyword'
+  | 'tag'
+  | 'scheduled'
+  | 'deadline'
+  | 'blocked';
 
 export type DashboardDisplay =
   'bar' | 'column' | 'donut' | 'tiles' | 'heatmap' | 'strip';
@@ -252,6 +262,7 @@ const DEFAULT_SORT: Record<DashboardGroupBy, DashboardSort> = {
   tag: 'count-desc',
   scheduled: 'fixed',
   deadline: 'fixed',
+  blocked: 'label',
 };
 
 const DEFAULT_MAX_GROUPS = 8;
@@ -285,6 +296,7 @@ export class DashboardAggregator {
   private settings: TodoTrackerSettings;
   private keywordManager: KeywordManager;
   private propertySearchEngine: PropertySearchEngine | null;
+  private dependencyStatus: DependencyStatusProvider | null;
   private version = 0;
   private cache: CacheEntry | null = null;
 
@@ -292,10 +304,12 @@ export class DashboardAggregator {
     settings: TodoTrackerSettings,
     keywordManager: KeywordManager,
     propertySearchEngine: PropertySearchEngine | null = null,
+    dependencyStatus: DependencyStatusProvider | null = null,
   ) {
     this.settings = settings;
     this.keywordManager = keywordManager;
     this.propertySearchEngine = propertySearchEngine;
+    this.dependencyStatus = dependencyStatus;
   }
 
   /** Invalidate the memo (version bump → next aggregate recomputes). */
@@ -366,6 +380,7 @@ export class DashboardAggregator {
       false,
       this.settings,
       this.propertySearchEngine ?? undefined,
+      this.dependencyStatus ?? undefined,
     );
   }
 
@@ -386,9 +401,38 @@ export class DashboardAggregator {
       case 'scheduled':
       case 'deadline':
         return this.resolveDateBucketGroups(groupBy, matched);
+      case 'blocked':
+        return this.resolveBlockedGroups(matched);
       default:
         return [];
     }
+  }
+
+  private resolveBlockedGroups(matched: Task[]): DashboardGroup[] {
+    if (!this.dependencyStatus) {
+      throw new SearchError(
+        "Blocked status isn't available yet. Wait for the vault scan to finish, then try again.",
+      );
+    }
+    const blockedKeys = this.dependencyStatus.getBlockedKeys();
+    let blocked = 0;
+    for (const task of matched) {
+      if (blockedKeys.has(getTaskKey(task))) blocked++;
+    }
+    return [
+      {
+        key: 'blocked:true',
+        label: 'Blocked',
+        filter: 'blocked:true',
+        count: blocked,
+      },
+      {
+        key: 'blocked:false',
+        label: 'Unblocked',
+        filter: 'blocked:false',
+        count: matched.length - blocked,
+      },
+    ];
   }
 
   private resolvePriorityGroups(matched: Task[]): DashboardGroup[] {
@@ -465,12 +509,26 @@ export class DashboardAggregator {
         counts.set(tag, (counts.get(tag) ?? 0) + 1);
       }
     }
-    return Array.from(counts.entries()).map(([name, count]) => ({
-      key: `tag:${name}`,
-      label: `#${name}`,
-      filter: `tag:${name}`,
-      count,
-    }));
+    const groups: DashboardGroup[] = Array.from(counts.entries()).map(
+      ([name, count]) => ({
+        key: `tag:${name}`,
+        label: `#${name}`,
+        filter: `tag:${name}`,
+        count,
+      }),
+    );
+    const untagged = matched.filter(
+      (task) => (task.tags?.length ?? 0) === 0,
+    ).length;
+    if (untagged > 0) {
+      groups.push({
+        key: 'tag:none',
+        label: 'No tags',
+        filter: 'tag:none',
+        count: untagged,
+      });
+    }
+    return groups;
   }
 
   /**
@@ -514,13 +572,17 @@ export class DashboardAggregator {
             engineFiles.set(
               resolution.key,
               await SearchEvaluator.resolveEngineFiles(
-                resolution.query,
+                resolution.descriptor,
                 resolution.effectiveCaseSensitive,
                 this.propertySearchEngine,
               ),
             );
           }
         }
+        const batchContext = SearchEvaluator.buildBatchContext(
+          ast,
+          this.settings,
+        );
         evaluate = (task: Task) => {
           try {
             return SearchEvaluator.evaluateSync(
@@ -529,6 +591,7 @@ export class DashboardAggregator {
               false,
               this.settings,
               engineFiles,
+              batchContext,
             );
           } catch (error) {
             // Per-row contract of Search.evaluate: a SearchError during

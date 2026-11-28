@@ -13,15 +13,11 @@ describe('StatusBarManager', () => {
   let mockPlugin: any;
   let manager: StatusBarManager;
 
-  /** TFile-like mock: Obsidian patches String#contains, so emulate it. */
   function makeFile(path: string, parentPath: string | null): TFile {
-    const pathObj = new String(path) as unknown as Record<string, unknown>;
-    pathObj.contains = (substr: string) =>
-      String.prototype.includes.call(pathObj, substr);
     const segments = path.split('/');
     const basename = segments[segments.length - 1].replace(/\.md$/, '');
     return Object.assign(Object.create(TFile.prototype), {
-      path: pathObj,
+      path,
       basename,
       extension: 'md',
       parent: parentPath ? { path: parentPath } : null,
@@ -228,6 +224,7 @@ describe('StatusBarManager', () => {
 
     it('includes the path filter for files with a parent directory', () => {
       const file = makeFile('projects/notes.md', 'projects');
+      expect(typeof file.path).toBe('string');
       // instanceof TFile gates the path filter in production.
       Object.setPrototypeOf(file, TFile.prototype);
       mockPlugin.app.workspace.getActiveFile.mockReturnValue(file);
@@ -344,10 +341,8 @@ describe('StatusBarManager', () => {
       const consoleSpy = jest
         .spyOn(console, 'error')
         .mockImplementation(() => {});
-      const pathObj = new String('test.md') as any;
-      pathObj.contains = (substr: string) => pathObj.includes(substr);
       const mockFile = {
-        path: pathObj,
+        path: 'test.md',
         basename: 'test',
         extension: 'md',
         parent: null,

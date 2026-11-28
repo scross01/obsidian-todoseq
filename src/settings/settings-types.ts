@@ -95,6 +95,7 @@ export interface TodoTrackerSettings {
   languageCommentSupport: boolean; // language-specific comment support settings
   weekStartsOn: 'Monday' | 'Sunday'; // controls which day the week starts on for date filtering
   formatTaskKeywords: boolean; // format task keywords in editor
+  hideTaskPropertiesInReadingView: boolean; // hide task-owned property blocks in Reading view
   additionalFileExtensions: string[]; // additional file extensions to scan for tasks (e.g., ['.org', '.txt']) - hidden from UI, managed by detectOrgModeFiles
   detectOrgModeFiles: boolean; // experimental: when enabled, adds .org to additionalFileExtensions and registers org-mode parser
   scanCodeFiles: boolean; // experimental: when enabled, scans code files for TODO-style comments
@@ -109,6 +110,9 @@ export interface TodoTrackerSettings {
   stateTransitions: StateTransitionSettings;
   // Task completion settings
   trackClosedDate: boolean; // when true, adds CLOSED: timestamp when tasks are marked as completed
+  enforceBlockedTasks: boolean; // refuse plugin completion while a task has incomplete dependencies
+  enforceTaskHierarchyDependencies: boolean; // opt-in unfinished child and ORDERED gates
+  enforceCheckboxDependencies: boolean; // opt-in unchecked descendant checkbox gate
   trackStartedDate: boolean; // when true, adds STARTED: timestamp when tasks first enter active state
   startedDateMode: 'first' | 'last'; // 'first' = first-ever-start (written once); 'last' = re-stamp on each fresh entry into an active state
   // Auto-archive settings
@@ -177,12 +181,16 @@ export const DefaultSettings: TodoTrackerSettings = {
   languageCommentSupport: false,
   weekStartsOn: 'Monday', // Default to Monday as requested
   formatTaskKeywords: true, // Default to enabled
+  hideTaskPropertiesInReadingView: false, // Reading view shows drawers by default
   additionalFileExtensions: [], // No additional extensions by default - managed by detectOrgModeFiles
   detectOrgModeFiles: false, // Experimental feature - disabled by default
   scanCodeFiles: false, // Experimental feature - disabled by default
   migrateToTodayState: '', // Default state to set on source task after migrating (empty = disabled)
   stateTransitions: DefaultStateTransitionSettings,
   trackClosedDate: false, // Disabled by default
+  enforceBlockedTasks: true, // Hard block by default; Complete anyway remains available
+  enforceTaskHierarchyDependencies: false, // Opt-in structural gate
+  enforceCheckboxDependencies: false, // Opt-in checkbox gate
   trackStartedDate: false, // Disabled by default
   startedDateMode: 'first', // Preserve first-ever-start semantics by default
   taskArchive: DefaultTaskArchiveSettings, // Auto-archive defaults (opt-in, 90 days)

@@ -1,7 +1,15 @@
 import { App, TFile } from 'obsidian';
 import { Task } from '../types/task';
 import { CHECKBOX_DETECTION_REGEX, BULLET_LIST_PATTERN } from './patterns';
-import { getIndentLength } from './task-line-utils';
+import {
+  getIndentLength,
+  getOwnedQuotedDateLineContent,
+  parseDescriptionLineInfo,
+} from './task-line-utils';
+import {
+  isPropertiesDrawerStart,
+  readTaskPropertiesDrawer,
+} from './task-properties';
 
 /**
  * Metadata lines that belong to the task above them when a task block is
@@ -37,9 +45,13 @@ export function classifyTaskMetadataLine(
   if (trimmed === '') return null;
 
   if (trimmed.startsWith('>')) {
-    const contentAfterArrow = trimmed.replace(/^>\s*/, '');
+    // DESCRIPTION belongs at every quoted depth, but a date line belongs to
+    // this task only at depth one or the task's own quote depth.
+    if (parseDescriptionLineInfo(line) !== null) return 'description';
+    const content = getOwnedQuotedDateLineContent(line, taskIndent);
+    if (content === null) return null;
     for (const [prefix, type] of METADATA_PREFIXES) {
-      if (contentAfterArrow.startsWith(prefix)) return type;
+      if (type !== 'description' && content.startsWith(prefix)) return type;
     }
     return null;
   }
@@ -71,10 +83,23 @@ export function buildRemovalRange(
   taskIndent?: string,
 ): { start: number; end: number } {
   const indent = taskIndent ?? leadingIndent(lines[taskLine]);
+  const format = /^\*+$/.test(indent) ? 'org' : 'markdown';
   let end = taskLine;
-  for (let i = taskLine + 1; i < lines.length; i++) {
+  let i = taskLine + 1;
+  while (i < lines.length) {
+    if (isPropertiesDrawerStart(lines[i], format)) {
+      const drawer = readTaskPropertiesDrawer(lines, i, format, {
+        allowAnyIndent: true,
+      });
+      if (drawer) {
+        end = drawer.endLine;
+        i = drawer.endLine + 1;
+        continue;
+      }
+    }
     if (classifyTaskMetadataLine(lines[i], indent)) {
       end = i;
+      i++;
     } else {
       break;
     }

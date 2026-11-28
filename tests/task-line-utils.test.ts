@@ -7,13 +7,16 @@ import {
   findDateLine,
   findDateLineWithParser,
   findDescriptionLine,
+  findOrgPlanningToken,
   getIndentLength,
   getDateLineIndent,
 } from '../src/utils/task-line-utils';
 import { Task } from '../src/types/task';
 import { KeywordManager } from '../src/utils/keyword-manager';
+import { TaskParser } from '../src/parser/task-parser';
 
 const keywordManager = new KeywordManager({});
+const parser = TaskParser.create(keywordManager, null);
 
 describe('task-line-utils', () => {
   describe('getTaskIndent', () => {
@@ -378,23 +381,23 @@ describe('task-line-utils', () => {
       expect(result).toBe(-1);
     });
 
-    it('should not find date line at wrong quote level', () => {
+    it('finds an unquoted date line at the quoted task indent', () => {
+      // getDateLineType compares lengths only: '> ' and two spaces are equal.
       const lines = ['> TODO task c', '  SCHEDULED: <2026-03-10>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '> ', keywordManager);
+      expect(result).toBe(1);
+    });
+
+    it('should not find an unquoted date line shallower than the task', () => {
+      const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
       expect(result).toBe(-1);
     });
 
-    it('should find date line at any indent level', () => {
-      // With new behavior, any indent level is allowed for non-quoted lines
-      const lines = ['  TODO task d', 'SCHEDULED: <2026-03-10>'];
+    it('should not find an unindented date line under an indented bullet task', () => {
+      const lines = ['  - TODO task e', 'SCHEDULED: <2026-03-10>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(1);
-    });
-
-    it('should not find date line without indent for bullet task', () => {
-      const lines = ['- TODO task e', 'SCHEDULED: <2026-03-10>'];
-      const result = findDateLine(lines, 1, 'SCHEDULED', '  ', keywordManager);
-      expect(result).toBe(1);
+      expect(result).toBe(-1);
     });
 
     it('should find CLOSED date line', () => {
@@ -421,11 +424,10 @@ describe('task-line-utils', () => {
       expect(result).toBe(1);
     });
 
-    // New behavior tests - any indent level is allowed for non-quoted lines
-    it('should find date line at any indent level for non-quoted task', () => {
+    it('should not find an unindented date line under an indented task', () => {
       const lines = ['   TODO test 1', 'SCHEDULED: <2026-03-20>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '   ', keywordManager);
-      expect(result).toBe(1);
+      expect(result).toBe(-1);
     });
 
     it('should find date line at deeper indent for non-quoted task', () => {
@@ -440,10 +442,12 @@ describe('task-line-utils', () => {
       expect(result).toBe(1);
     });
 
-    it('should not find date line at different quote level', () => {
+    it('should find a quoted date line under an unquoted task, as the parser owns it', () => {
+      // TaskParser.getDateLineType strips one quote marker and ignores the
+      // task's own quote level, so this line is the task's date.
       const lines = ['TODO test 1', '> SCHEDULED: <2026-03-20>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
-      expect(result).toBe(-1);
+      expect(result).toBe(1);
     });
 
     it('should not find date line without quotes when task has quotes', () => {
@@ -452,8 +456,30 @@ describe('task-line-utils', () => {
       expect(result).toBe(-1);
     });
 
-    it('should not find date line with quotes when task has no quotes', () => {
-      const lines = ['TODO test 1', '> SCHEDULED: <2026-03-20>'];
+    it('should find a quoted date line under a double-quoted task', () => {
+      // getDateLineType strips exactly one marker, so this is the task's date.
+      const lines = ['> > TODO test 3', '> SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(
+        lines,
+        1,
+        'SCHEDULED',
+        '> > ',
+        keywordManager,
+      );
+      expect(result).toBe(1);
+    });
+
+    it('should not find a date line whose quote is indented', () => {
+      // The parser only treats '>' in the first column as a quote marker.
+      const lines = ['TODO test 1', '  > SCHEDULED: <2026-03-20>'];
+      const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
+      expect(result).toBe(-1);
+    });
+
+    it('should not find a double-quoted date line the parser does not own', () => {
+      // getDateLineType removes exactly one quote marker, so the remaining
+      // '> SCHEDULED:' is body text, not a date.
+      const lines = ['TODO test 1', '> > SCHEDULED: <2026-03-20>'];
       const result = findDateLine(lines, 1, 'SCHEDULED', '', keywordManager);
       expect(result).toBe(-1);
     });
@@ -672,9 +698,9 @@ describe('task-line-utils', () => {
       expect(findDescriptionLine(lines, 1, '')).toBe(-1);
     });
 
-    it('should return -1 at wrong quote level', () => {
+    it('finds an unquoted DESCRIPTION under a quoted task', () => {
       const lines = ['> - [ ] TODO task', 'DESCRIPTION: Unquoted desc'];
-      expect(findDescriptionLine(lines, 1, '> ')).toBe(-1);
+      expect(findDescriptionLine(lines, 1, '> ')).toBe(1);
     });
 
     it('should stop at non-date, non-keyword line', () => {
@@ -695,13 +721,13 @@ describe('task-line-utils', () => {
       expect(findDescriptionLine(lines, 1, '')).toBe(-1);
     });
 
-    it('should search only 9 lines', () => {
+    it('searches past nine blank lines like the parser', () => {
       const lines = [
         '- [ ] TODO task',
         ...Array(10).fill(''),
-        'DESCRIPTION: Too far',
+        'DESCRIPTION: After blanks',
       ];
-      expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+      expect(findDescriptionLine(lines, 1, '')).toBe(11);
     });
 
     it('should continue past empty lines', () => {
@@ -725,6 +751,675 @@ describe('task-line-utils', () => {
         'DESCRIPTION: After other task',
       ];
       expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+    });
+
+    it.each([
+      [
+        'unquoted task with a quoted description',
+        'TODO task',
+        '> DESCRIPTION: Quoted desc',
+        '',
+        'Quoted desc',
+      ],
+      [
+        'quoted task with an unquoted description',
+        '> TODO task',
+        'DESCRIPTION: Unquoted desc',
+        '> ',
+        'Unquoted desc',
+      ],
+      [
+        'nested-quoted task with a single-quoted description',
+        '> > TODO task',
+        '> DESCRIPTION: Nested desc',
+        '> > ',
+        'Nested desc',
+      ],
+      [
+        'quoted task with a deeper quoted description',
+        '> TODO task',
+        '> > DESCRIPTION: Deeper desc',
+        '> ',
+        'Deeper desc',
+      ],
+      [
+        'indented task with an unindented description',
+        '  TODO task',
+        'DESCRIPTION: Indented desc',
+        '  ',
+        'Indented desc',
+      ],
+    ])(
+      '%s agrees with TaskParser',
+      (_name, taskLine, descLine, indent, value) => {
+        const lines = [taskLine, descLine];
+        expect(
+          parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+        ).toBe(value);
+        expect(findDescriptionLine(lines, 1, indent)).toBe(1);
+      },
+    );
+
+    it('does not own a quoted description with leading indentation', () => {
+      const lines = ['TODO task', '  > DESCRIPTION: Hidden'];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        undefined,
+      );
+      expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+    });
+
+    it('finds an empty owned description even though it has no value', () => {
+      const lines = ['TODO task', 'DESCRIPTION:'];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        undefined,
+      );
+      expect(findDescriptionLine(lines, 1, '')).toBe(1);
+    });
+
+    it('skips an indented quoted drawer owned by the task', () => {
+      const lines = [
+        '  > TODO task',
+        '  > :PROPERTIES:',
+        '  > :ID: probe-1',
+        '  > :END:',
+        '> DESCRIPTION: After drawer',
+      ];
+      const task = parser.parseFile(lines.join('\n'), 'test.md')[0];
+      expect(task.description).toBe('After drawer');
+      expect(findDescriptionLine(lines, 1, task.indent)).toBe(4);
+    });
+
+    it('stops at prose inside an unclosed drawer', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        ':ID: probe-1',
+        'Some prose',
+        ':END:',
+        'DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+    });
+
+    it('does not treat a drawer metadata line as a task boundary', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        'TODO: note',
+        ':END:',
+        'DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a colon-bearing heading as a drawer boundary', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        '# Heading: keep',
+        ':END:',
+        'DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a Markdown star bullet as a drawer boundary', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        '* item: keep',
+        ':END:',
+        'DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a numbered checkbox without a keyword as a task', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        '1. [ ] plain: keep',
+        ':END:',
+        'DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a quoted checkbox without a keyword as a task', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> - [ ] plain: keep',
+        '> :END:',
+        '> DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a keyword-looking heading as a task', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        '# TODO: keep',
+        ':END:',
+        'DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(4);
+    });
+
+    it.each([
+      [
+        'a list followed by a quote',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          '- > TODO other: keep',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+      [
+        'a numbered list followed by a quote',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          '1. > TODO other: keep',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+      [
+        'a heading followed by a quote',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          '# > TODO other: keep',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+      [
+        'two list markers',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          '- - TODO other: keep',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+      [
+        'a quoted list followed by a quote',
+        [
+          '> TODO task',
+          '> :PROPERTIES:',
+          '> - > TODO other: keep',
+          '> :END:',
+          '> DESCRIPTION: After',
+        ],
+        '> ',
+      ],
+      [
+        'a quoted list followed by a second list',
+        [
+          '> TODO task',
+          '> :PROPERTIES:',
+          '> - - TODO other: keep',
+          '> :END:',
+          '> DESCRIPTION: After',
+        ],
+        '> ',
+      ],
+    ])('does not treat %s as a task boundary', (_name, lines, indent) => {
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After',
+      );
+      expect(findDescriptionLine(lines, 1, indent, keywordManager)).toBe(4);
+    });
+
+    it.each([
+      [
+        'a punctuated keyword',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          'TODO! keep: detail',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+      [
+        'a list before a punctuated keyword',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          '- TODO! keep: detail',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+      [
+        'a quoted list before a punctuated keyword',
+        [
+          '> TODO task',
+          '> :PROPERTIES:',
+          '> - TODO! keep: detail',
+          '> :END:',
+          '> DESCRIPTION: After',
+        ],
+        '> ',
+      ],
+      [
+        'a numbered checkbox before a punctuated keyword',
+        [
+          'TODO task',
+          ':PROPERTIES:',
+          '1. [ ] TODO! keep: detail',
+          ':END:',
+          'DESCRIPTION: After',
+        ],
+        '',
+      ],
+    ])('does not treat %s as a task boundary', (_name, lines, indent) => {
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After',
+      );
+      expect(findDescriptionLine(lines, 1, indent, keywordManager)).toBe(4);
+    });
+
+    it.each([
+      ['lowercase', 'todo other: keep'],
+      ['mixed-case', 'Todo other: keep'],
+      ['lowercase heading', '# todo other: keep'],
+    ])('does not treat a %s keyword as a task boundary', (_name, candidate) => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        candidate,
+        ':END:',
+        'DESCRIPTION: After',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After',
+      );
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a nested callout task as a drawer boundary', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> > [!note] TODO other task: keep',
+        '> :END:',
+        '> DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a nested callout checkbox task as a drawer boundary', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> > [!note] - [ ] TODO other task: keep',
+        '> :END:',
+        '> DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a quoted heading task as a drawer boundary', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> # TODO other task: keep',
+        '> :END:',
+        '> DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(4);
+    });
+
+    it('does not treat a callout heading task as a drawer boundary', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> [!note] # TODO other task: keep',
+        '> :END:',
+        '> DESCRIPTION: After drawer',
+      ];
+      expect(parser.parseFile(lines.join('\n'), 'test.md')[0].description).toBe(
+        'After drawer',
+      );
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(4);
+    });
+
+    it('stops at a heading task with a colon before an unclosed drawer closes', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        '# TODO other task: detail',
+        ':END:',
+        'DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(-1);
+    });
+
+    it('stops at a numbered task with a colon before an unclosed drawer closes', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        ':ID: probe-1',
+        '1. TODO other task: detail',
+        ':END:',
+        'DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(-1);
+    });
+
+    it('stops at a task before an unclosed drawer closes', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        ':ID: probe-1',
+        '- [ ] TODO other task',
+        ':END:',
+        'DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+    });
+
+    it('stops at a keyword-only task before an unclosed drawer closes', () => {
+      const lines = [
+        'TODO task',
+        ':PROPERTIES:',
+        ':ID: probe-1',
+        'DOING other task',
+        ':END:',
+        'DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '', keywordManager)).toBe(-1);
+    });
+
+    it('stops at a quoted callout task before an unclosed drawer closes', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> [!note] TODO other task',
+        '> :END:',
+        '> DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(-1);
+    });
+
+    it('stops at a quoted checkbox task before an unclosed drawer closes', () => {
+      const lines = [
+        '> TODO task',
+        '> :PROPERTIES:',
+        '> :ID: probe-1',
+        '> - [ ] TODO other task',
+        '> :END:',
+        '> DESCRIPTION: Too far',
+      ];
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '> ', keywordManager)).toBe(-1);
+    });
+
+    it.each([
+      ['prose', ['TODO task', 'Plain prose', 'DESCRIPTION: Too far']],
+      ['a heading', ['TODO task', '# Heading', 'DESCRIPTION: Too far']],
+      [
+        'the next task',
+        ['TODO task', '- [ ] TODO other', 'DESCRIPTION: Too far'],
+      ],
+      [
+        'a date-looking line the parser rejects',
+        ['TODO task', '> > SCHEDULED: <2026-07-10>', 'DESCRIPTION: Too far'],
+      ],
+      [
+        'a properties drawer with a different quote level',
+        [
+          'TODO task',
+          '> :PROPERTIES:',
+          ':ID: probe-1',
+          ':END:',
+          'DESCRIPTION: Too far',
+        ],
+      ],
+    ])('stops at %s', (_name, lines) => {
+      expect(
+        parser.parseFile(lines.join('\n'), 'test.md')[0].description,
+      ).toBeUndefined();
+      expect(findDescriptionLine(lines, 1, '')).toBe(-1);
+    });
+  });
+
+  describe('findDateLine with an anchored drawer end', () => {
+    it('skips a drawer closed by :END: with a block anchor', () => {
+      const lines = [
+        '- [ ] TODO task',
+        '  :PROPERTIES:',
+        '  :ID: task-1',
+        '  :END: ^todoseq-abc123',
+        '  SCHEDULED: <2026-11-23 Mon>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '', keywordManager)).toBe(4);
+    });
+
+    it('skips an anchored drawer when looking for DESCRIPTION', () => {
+      const lines = [
+        '- [ ] TODO task',
+        '  :PROPERTIES:',
+        '  :ID: task-1',
+        '  :END: ^todoseq-abc123',
+        '  DESCRIPTION: details',
+      ];
+      expect(findDescriptionLine(lines, 1, '')).toBe(4);
+    });
+  });
+
+  describe('findOrgPlanningToken', () => {
+    it('skips a bounded properties drawer', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':SCHEDULED: <2026-06-30 Tue>',
+        ':END:',
+        '   SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')?.dateText).toBe(
+        '<2026-06-24 Wed +1d>',
+      );
+    });
+
+    it('does not read an unclosed drawer across the next headline', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':SCHEDULED: <2026-06-24 Wed +1d>',
+        '* TODO Next',
+        '   SCHEDULED: <2026-06-25 Thu +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+
+    it('does not accept a Markdown-only anchored :END: in Org', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':SCHEDULED: <2026-06-30 Tue>',
+        ':END: ^anchor',
+        '   SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+
+    it('finds CLOSED only at the start of a line', () => {
+      // The Org parser anchors CLOSED to the line start; prose is body text.
+      const lines = [
+        '* TODO Task',
+        'Archived note CLOSED: [2026-06-20 Sat]',
+        '   CLOSED: [2026-06-21 Sun]',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'CLOSED')?.dateText).toBe(
+        '[2026-06-21 Sun]',
+      );
+    });
+
+    it('stops at a leading star that is not a spaced heading', () => {
+      // extractTaskDates breaks on any line whose first character is '*'.
+      const lines = [
+        '* TODO Task',
+        '*bold* note',
+        'SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+
+    it('treats a leading star inside a drawer as an unclosed boundary', () => {
+      const lines = [
+        '* TODO Task',
+        ':PROPERTIES:',
+        ':ID: x',
+        '*bold* line',
+        ':END:',
+        'SCHEDULED: <2026-06-24 Wed +1d>',
+      ];
+      expect(findOrgPlanningToken(lines, 1, 'SCHEDULED')).toBeNull();
+    });
+  });
+
+  describe('nested-quoted date ownership', () => {
+    it('finds a date at the task quote depth', () => {
+      const lines = [
+        '> > TODO test',
+        '> > SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '> > ', keywordManager)).toBe(
+        1,
+      );
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(1);
+    });
+
+    it('finds a depth-one date under a nested task', () => {
+      const lines = [
+        '> > TODO test',
+        '> SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '> > ', keywordManager)).toBe(
+        1,
+      );
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(1);
+    });
+
+    it('does not find a date quoted deeper than the task', () => {
+      const lines = [
+        '> > TODO test',
+        '> > > SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(findDateLine(lines, 1, 'SCHEDULED', '> > ', keywordManager)).toBe(
+        -1,
+      );
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(-1);
+    });
+
+    it('finds a date after an owned DESCRIPTION and drawer', () => {
+      const lines = [
+        '> > TODO test',
+        '> > DESCRIPTION: Still the task',
+        '> > :PROPERTIES:',
+        ':ID: nested-id',
+        ':END:',
+        '> > SCHEDULED: <2026-03-20 Fri>',
+      ];
+      expect(
+        findDateLineWithParser(
+          lines,
+          1,
+          'SCHEDULED',
+          '> > ',
+          parser,
+          keywordManager,
+        ),
+      ).toBe(5);
     });
   });
 

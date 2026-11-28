@@ -4,10 +4,14 @@
 
 import {
   parseUrgencyCoefficients,
+  parseUrgencyCoefficientsFromContent,
   calculateTaskUrgency,
+  createUrgencyScoreAccessor,
   getDefaultCoefficients,
+  getEffectiveUrgency,
   UrgencyContext,
 } from '../src/utils/task-urgency';
+import { getTaskKey } from '../src/utils/task-utils';
 import { Task } from '../src/types/task';
 import { App, Vault, DataAdapter } from 'obsidian';
 import { createBaseTask, createDate } from './helpers/test-helper';
@@ -150,6 +154,116 @@ urgency.waiting.coefficient = -3.0
   });
 });
 
+describe('Blocking Coefficient Parsing', () => {
+  const parse = (line: string) =>
+    parseUrgencyCoefficientsFromContent(
+      `urgency.blocking.coefficient = ${line}`,
+    ).blocking;
+
+  it('inherits +3 when an older custom INI omits the key', () => {
+    const coefficients = parseUrgencyCoefficientsFromContent(
+      'urgency.deadline.coefficient = 12.0',
+    );
+    expect(coefficients.blocking).toBe(3.0);
+  });
+
+  it('parses zero, signed decimals, and an inline comment', () => {
+    expect(parse('0')).toBe(0);
+    expect(parse('+3.5 # weak boost')).toBe(3.5);
+    expect(parse('-3.5')).toBe(-3.5);
+  });
+
+  it.each(['3.5oops', '3..5', 'Infinity', 'NaN', ''])(
+    'keeps the default for malformed value %p',
+    (value) => {
+      expect(parse(value)).toBe(3.0);
+    },
+  );
+
+  it('preserves other keys while validating blocking independently', () => {
+    const coefficients = parseUrgencyCoefficientsFromContent(`
+urgency.deadline.coefficient = 12.0
+urgency.blocking.coefficient = 3.5oops
+urgency.priority.high.coefficient = 6.0
+`);
+    expect(coefficients.deadline).toBe(12.0);
+    expect(coefficients.blocking).toBe(3.0);
+    expect(coefficients.priorityHigh).toBe(6.0);
+  });
+
+  it('does not treat a blocking subcategory as the scalar coefficient', () => {
+    const coefficients = parseUrgencyCoefficientsFromContent(
+      'urgency.blocking.time.coefficient = 9.0',
+    );
+    expect(coefficients.blocking).toBe(3.0);
+  });
+});
+
+describe('Effective Blocking Urgency', () => {
+  it('adds the coefficient once for a task that blocks a dependent', () => {
+    const blocker = createTestTask({ urgency: 1 });
+    const context = {
+      blockingKeys: new Set([getTaskKey(blocker)]),
+      blockingCoefficient: 3,
+    };
+
+    expect(getEffectiveUrgency(blocker, context)).toBe(4);
+  });
+
+  it('adds only one boost with multiple dependents', () => {
+    const blocker = createTestTask({ urgency: 1 });
+    const first = createTestTask({
+      path: 'first.md',
+      line: 0,
+      urgency: 2,
+    });
+    const second = createTestTask({
+      path: 'second.md',
+      line: 0,
+      urgency: 2,
+    });
+    const context = {
+      blockingKeys: new Set([getTaskKey(blocker)]),
+      blockingCoefficient: 3,
+    };
+    const accessor = createUrgencyScoreAccessor(
+      [blocker, first, second],
+      context,
+    );
+
+    expect(accessor(blocker)).toBe(4);
+    expect(accessor(first)).toBe(2);
+    expect(accessor(second)).toBe(2);
+  });
+
+  it('leaves completed, null, disabled, and unblocked scores unchanged', () => {
+    const task = createTestTask({ urgency: 1 });
+    const context = {
+      blockingKeys: new Set([getTaskKey(task)]),
+      blockingCoefficient: 3,
+    };
+
+    expect(
+      getEffectiveUrgency(
+        createTestTask({ urgency: 1, completed: true }),
+        context,
+      ),
+    ).toBe(1);
+    expect(
+      getEffectiveUrgency(createTestTask({ urgency: null }), context),
+    ).toBeNull();
+    expect(
+      getEffectiveUrgency(task, { ...context, blockingCoefficient: 0 }),
+    ).toBe(1);
+    expect(
+      getEffectiveUrgency(createTestTask({ urgency: 1 }), {
+        ...context,
+        blockingKeys: new Set(),
+      }),
+    ).toBe(1);
+  });
+});
+
 describe('Urgency Calculation', () => {
   const defaultCoefficients = getDefaultCoefficients();
 
@@ -201,6 +315,103 @@ describe('Urgency Calculation', () => {
     // + age factor (1.0) * age coefficient (2.0) = 2.0
     // Total ≈ 10.8
     expect(urgency).toBeCloseTo(10.8, 2);
+  });
+
+  it('uses the supplied todayStart instead of the wall clock', () => {
+    jest.useFakeTimers().setSystemTime(createDate(2026, 4, 15));
+    const task = createTestTask({
+      deadlineDate: createDate(2026, 4, 20),
+      tags: [],
+      isDailyNote: false,
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 20),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+
+    // The deadline is today from the context date, not five days future from
+    // the fake wall clock.
+    expect(urgency).toBeCloseTo(10.8, 2);
+  });
+
+  it('does not normalize a new today when todayStart is supplied', () => {
+    const task = createTestTask({
+      isDailyNote: true,
+      dailyNoteDate: createDate(2026, 4, 15),
+      tags: [],
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 15),
+    };
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      calculateTaskUrgency(task, defaultCoefficients, context);
+      expect(startOfDay).not.toHaveBeenCalled();
+    } finally {
+      startOfDay.mockRestore();
+    }
+  });
+
+  it('uses the supplied todayStart for scheduled dates', () => {
+    const task = createTestTask({
+      scheduledDate: createDate(2026, 4, 16),
+      tags: [],
+      isDailyNote: false,
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 20),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+
+    // The scheduled date is past from the context day, not future from the
+    // fake wall clock.
+    expect(urgency).toBe(7.0);
+  });
+
+  it('uses the supplied todayStart for daily-note age', () => {
+    const task = createTestTask({
+      isDailyNote: true,
+      dailyNoteDate: createDate(2026, 4, 5),
+      tags: [],
+    });
+    const context: UrgencyContext = {
+      todayStart: createDate(2026, 4, 25),
+    };
+
+    const urgency = calculateTaskUrgency(task, defaultCoefficients, context);
+
+    // 20 days of age, not the 10 days measured from the fake wall clock.
+    expect(urgency).toBeCloseTo((20 / 365) * 2, 3);
+  });
+
+  it('keeps the wall-clock fallback when todayStart is omitted', () => {
+    const task = createTestTask({
+      deadlineDate: createDate(2026, 4, 20),
+      tags: [],
+      isDailyNote: false,
+    });
+
+    const fallback = calculateTaskUrgency(task, defaultCoefficients);
+    const explicit = calculateTaskUrgency(task, defaultCoefficients, {
+      todayStart: DateUtils.getStartOfDay(referenceDate),
+    });
+
+    expect(fallback).toBe(explicit);
+  });
+
+  it('does not normalize today for a task with no dates or daily-note age', () => {
+    const task = createTestTask({ tags: [], isDailyNote: false });
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      calculateTaskUrgency(task, defaultCoefficients);
+      expect(startOfDay).not.toHaveBeenCalled();
+    } finally {
+      startOfDay.mockRestore();
+    }
   });
 
   it('should add urgency for future deadline dates', () => {
@@ -583,6 +794,7 @@ describe('Default Coefficients', () => {
     expect(defaults.age).toBe(2.0);
     expect(defaults.tags).toBe(1.0);
     expect(defaults.waiting).toBe(-3.0);
+    expect(defaults.blocking).toBe(3.0);
   });
 
   it('should return a new object each time (no mutation)', () => {

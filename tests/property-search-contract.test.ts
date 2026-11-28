@@ -6,18 +6,24 @@ import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { PropertyEvaluator } from '../src/utils/property-evaluator';
 import { Search } from '../src/search/search';
 import type { PropertyQueryDescriptor } from '../src/search/search-types';
+import { createBaseSettings, createBaseTask } from './helpers/test-helper';
 
 type Frontmatter = Record<string, unknown>;
 
 const frontmatters: Record<string, Frontmatter> = {
-  'a.md': { type: 'Project' },
-  'b.md': { type: 'project' },
-  'c.md': { type: 'Project backlog' },
-  'd.md': { type: null },
-  'e.md': { type: [] },
-  'f.md': { type: '' },
-  'g.md': { Type: 'Project' },
+  'a.md': { type: 'Project', place: '' },
+  'b.md': { type: 'project', place: 'Café' },
+  'c.md': { type: 'Project backlog', place: 'Other backlog' },
+  'd.md': { type: null, place: null },
+  'e.md': { type: [], place: [] },
+  'f.md': { type: '', place: 'null' },
+  'g.md': { Type: 'Project', Place: 'Other' },
   'h.md': { title: 'no type key' },
+  'i.md': { place: 'Other' },
+  'j.md': { résumé: 'Café' },
+  'k.md': { resume: 'cafe' },
+  'l.md': { place: 'Łódź' },
+  'm.md': { résumé: ['Straße', 'Other'] },
 };
 
 function tfile(path: string): TFile {
@@ -122,6 +128,154 @@ describe('property search contract', () => {
     expect(Search.parse('[type:null]').property?.kind).toBe('null');
     expect(Search.parse('[type:""]').property?.kind).toBe('string');
     expect(Search.parse('[type:""]').property?.exact).toBe(true);
+  });
+
+  it('gives bulk and per-row the same quoted, null and key-exact intent', async () => {
+    const engine = new PropertySearchEngine(app as never, {
+      taskStateManager: taskStateManager as never,
+      refreshAllTaskListViews: jest.fn(),
+      vaultScanner: {
+        isScanning: () => false,
+        isObsidianInitializing: () => false,
+      },
+    });
+    await engine.initialize();
+    const settings = createBaseSettings({ app } as never);
+    const tasks = Object.keys(frontmatters).map((path) =>
+      createBaseTask({ path, line: 0 }),
+    );
+
+    const present = ['a.md', 'b.md', 'c.md', 'd.md', 'e.md', 'f.md', 'g.md', 'i.md', 'l.md'];
+    const cases: Array<[string, string[]]> = [
+      ['[place]', present],
+      ['[place:]', present],
+      ['[place:""]', ['a.md']],
+      ['[place:"null"]', ['f.md']],
+      ['[place:null]', ['d.md']],
+      ['[place:"Other"]', ['i.md']],
+      ['["Place":Other]', ['g.md']],
+      ['[place:Other]', ['c.md', 'g.md', 'i.md']],
+      ['[place:null] OR ["place":Other]', ['c.md', 'd.md', 'i.md']],
+      ['["place":Other] OR [place:null]', ['c.md', 'd.md', 'i.md']],
+      ['[place:null] OR [place:"null"]', ['d.md', 'f.md']],
+      ['[place:""] OR ["Place":Other]', ['a.md', 'g.md']],
+    ];
+
+    for (const [query, expected] of cases) {
+      const bulk = await Search.filterTasks(
+        tasks,
+        query,
+        false,
+        settings,
+        engine,
+      );
+      expect({ query, files: bulk.map((task) => task.path).sort() }).toEqual({
+        query,
+        files: expected,
+      });
+
+      const perRow: string[] = [];
+      for (const task of tasks) {
+        if (await Search.evaluate(query, task, false, settings, engine)) {
+          perRow.push(task.path);
+        }
+      }
+      expect({ query, files: perRow.sort() }).toEqual({
+        query,
+        files: expected,
+      });
+
+      const parsed = Search.parse(query);
+      const property = parsed.property;
+      if (parsed.type === 'property_filter' && property) {
+        const direct = Array.from(
+          await engine.searchProperty(property, false),
+        ).sort();
+        expect({ query, files: direct }).toEqual({ query, files: expected });
+
+        const fallback = tasks
+          .filter((task) =>
+            PropertyEvaluator.matchesPropertyFilter(
+              frontmatters[task.path],
+              property,
+              false,
+            ),
+          )
+          .map((task) => task.path)
+          .sort();
+        expect({ query, files: fallback }).toEqual({ query, files: expected });
+      }
+    }
+  });
+
+  it('keeps exact and keyExact distinct when global match-case is on', async () => {
+    expect(
+      await search({ key: 'place', value: 'Other', exact: true }, true),
+    ).toEqual(['i.md']);
+    expect(
+      await search(
+        { key: 'Place', value: 'Other', keyExact: true },
+        true,
+      ),
+    ).toEqual(['g.md']);
+  });
+
+  it('folds unquoted keys and string values in both property paths', async () => {
+    const engine = new PropertySearchEngine(app as never, {
+      taskStateManager: taskStateManager as never,
+      refreshAllTaskListViews: jest.fn(),
+      vaultScanner: {
+        isScanning: () => false,
+        isObsidianInitializing: () => false,
+      },
+    });
+    await engine.initialize();
+    const settings = createBaseSettings({ app } as never);
+    const tasks = Object.keys(frontmatters).map((path) =>
+      createBaseTask({ path, line: 0 }),
+    );
+
+    const cases: Array<[string, string[]]> = [
+      ['[résumé:cafe]', ['j.md', 'k.md']],
+      ['[place:lodz]', ['l.md']],
+      ['[place:"lodz"]', []],
+      ['[place:"Łódź"]', ['l.md']],
+      ['["résumé":cafe]', ['j.md']],
+    ];
+
+    for (const [query, expected] of cases) {
+      const bulk = await Search.filterTasks(
+        tasks,
+        query,
+        false,
+        settings,
+        engine,
+      );
+      expect({ query, files: bulk.map((task) => task.path).sort() }).toEqual({
+        query,
+        files: expected,
+      });
+
+      const fallback = tasks
+        .filter((task) =>
+          PropertyEvaluator.matchesPropertyFilter(
+            frontmatters[task.path],
+            descriptor(
+              Search.parse(query).property ?? {
+                key: '',
+                kind: 'existence',
+                value: '',
+                exact: false,
+                keyExact: false,
+              },
+            ),
+            false,
+          ),
+        )
+        .map((task) => task.path)
+        .sort();
+      expect({ query, files: fallback }).toEqual({ query, files: expected });
+    }
   });
 
   it('gives the metadata fallback the same answers as the index', async () => {

@@ -1,6 +1,6 @@
 ---
 name: TODOseq docs site
-description: Docs and marketing visual system for the TODOseq VitePress site. Not used by the plugin UI.
+description: Docs and marketing visual system and documentation voice for the TODOseq VitePress site. Not used by the plugin UI.
 colors:
   accent: '#6D28D9'
   accent-hover: '#5B21B6'
@@ -174,6 +174,41 @@ Corner language: buttons `8px`, cards/media `10px`. Borders are 1px hairlines in
 - VitePress default nav/sidebar; Install remains an external link
 - Sidebar may group destinations but must not invent new product IA
 
+## Documentation Voice
+
+**Scope:** the prose in `docs/` guide pages. The visual rules above still apply; this section covers how the text reads. CHANGELOG wording and demo-content rules live in `AGENTS.md` and are not repeated here.
+
+**Register:** a knowledgeable colleague explaining a feature. Second person, present tense, plain words. The page answers "what does this do, and what happens when I use it" — it does not sell the feature.
+
+### Rules
+
+**State the behaviour, not its quality.** Cut `seamless`, `powerful`, `comprehensive`, `intuitive`, `robust`, `cutting-edge`, `smart`. A feature described precisely sounds capable without the adjective.
+
+**One idea per sentence.** Split sentences that join a fact to its benefit with "which", "allowing you to", or an em-dash aside, and delete the half that only restates the other.
+
+**Replace usefulness claims with the condition.** "This is useful when you want X" becomes "Use it when X", or better, just describe X. A reader who has X will recognise themselves.
+
+**Describe what the user sees and does.** Internals — task writers, atomic appends, handlers, timers, retry bookkeeping, byte offsets — belong in `ARCHITECTURE.md` or code comments. Say "the rest of the row is left untouched", not "every other byte of the row is left as it was".
+
+**Say a shared rule once.** If six sort methods share a tie-break, state it above the list and refer back. Repeating it per item buries the line that actually differs.
+
+**One concept, one home.** A section that repeats another with the same heading and example is a bug: keep one copy and link to it. Check `grep -nE '^#{2,3} ' docs/<page>.md` before adding a section that may already exist.
+
+**Prefer structure for lists.** Three or more parallel facts read faster as a short table or bullets than as a paragraph. Do not reach for a table with two rows.
+
+**Keep examples executable.** Real keyword syntax, dates relative to today, and no placeholder that looks like working syntax but is not. See the Demo Content Guidelines in `AGENTS.md`.
+
+**No rhetorical questions, no "simply" or "just", no exclamation marks.** Steps are imperative; optional steps say "Optional".
+
+### Before / after
+
+| Instead of                                                                           | Write                                                   |
+| ------------------------------------------------------------------------------------ | ------------------------------------------------------- |
+| "provides a powerful search system that allows you to quickly find and filter tasks" | "filters tasks across the vault as you type"            |
+| "This is useful when different views need different visibility rules."               | "so different views can use different visibility rules" |
+| "every other byte of the row is left as it was"                                      | "leaving the rest of the row untouched"                 |
+| The same tie-break sentence in six sort entries                                      | one shared sentence above the list                      |
+
 ## Do's and Don'ts
 
 ### Do:
@@ -182,6 +217,7 @@ Corner language: buttons `8px`, cards/media `10px`. Borders are 1px hairlines in
 - **Do** lead Persuade surfaces with a left-aligned promise, Install primary, View docs + Star secondary, and the animated product demo.
 - **Do** frame product media with the shared treatment.
 - **Do** keep keyword-state colors out of marketing chrome.
+- **Do** write guide prose in the Documentation Voice above: behaviour first, shared rules once, internals left to `ARCHITECTURE.md`.
 
 ### Don't:
 
@@ -192,3 +228,4 @@ Corner language: buttons `8px`, cards/media `10px`. Borders are 1px hairlines in
 - **Don't** filter screenshots or invent testimonials/metrics.
 - **Don't** ship a second display font from a CDN unless product truth requires it.
 - **Don't** apply this system to plugin CSS or in-app UI — use the root [`DESIGN.md`](../DESIGN.md).
+- **Don't** repeat a rule in every list item, or keep two copies of the same section, to avoid restructuring a page.

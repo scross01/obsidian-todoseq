@@ -334,6 +334,7 @@ describe('TodoseqCodeBlockProcessor', () => {
           false,
           expect.any(Function),
           expect.any(String),
+          undefined,
         );
       }
     });

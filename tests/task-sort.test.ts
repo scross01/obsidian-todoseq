@@ -6,6 +6,7 @@ import {
   taskComparator,
   classifyAll,
   classifyTask,
+  classifyContext,
   TaskClassification,
   // Keyword sort types and functions
   getKeywordGroup,
@@ -16,6 +17,9 @@ import {
 import { Task } from '../src/types/task';
 import { createBaseTask } from './helpers/test-helper';
 import { KeywordManager } from '../src/utils/keyword-manager';
+import { DateUtils } from '../src/utils/date-utils';
+import { createUrgencyScoreAccessor } from '../src/utils/task-urgency';
+import { getTaskKey } from '../src/utils/task-utils';
 
 describe('Task Sorting System', () => {
   const now = new Date('2024-01-15T12:00:00Z');
@@ -35,6 +39,100 @@ describe('Task Sorting System', () => {
       tail: '',
       ...overrides,
     });
+
+  describe('blocking urgency accessor', () => {
+    const warningSettings = {
+      upcomingPeriod: 7,
+      defaultDeadlineWarningPeriod: 0,
+      defaultScheduledWarningPeriod: 0,
+      skipScheduledWarningPeriodIfDeadline: false,
+      skipDeadlinePrewarningIfScheduled: false,
+    };
+
+    it('reverses order within one bucket using the batch-local score', () => {
+      const blocker = createTask({
+        path: 'a.md',
+        line: 1,
+        text: 'Blocker',
+        urgency: 2,
+      });
+      const dependent = createTask({
+        path: 'b.md',
+        line: 1,
+        text: 'Dependent',
+        urgency: 4,
+      });
+      const args = [
+        [blocker, dependent],
+        now,
+        'showAll',
+        'showAll',
+        'sortByUrgency',
+        undefined,
+        warningSettings,
+      ] as const;
+
+      expect(
+        sortTasksWithThreeBlockSystem(...args).map((task) => task.text),
+      ).toEqual(['Dependent', 'Blocker']);
+
+      const accessor = createUrgencyScoreAccessor([blocker, dependent], {
+        blockingKeys: new Set([getTaskKey(blocker)]),
+        blockingCoefficient: 3,
+      });
+      expect(
+        sortTasksWithThreeBlockSystem(...args, undefined, accessor).map(
+          (task) => task.text,
+        ),
+      ).toEqual(['Blocker', 'Dependent']);
+    });
+
+    it('keeps null urgency last within the same block', () => {
+      const first = createTask({ path: 'a.md', line: 1, urgency: 1 });
+      const nullTask = createTask({ path: 'b.md', line: 1, urgency: null });
+      const accessor = createUrgencyScoreAccessor([first, nullTask], {
+        blockingKeys: new Set([getTaskKey(first)]),
+        blockingCoefficient: 3,
+      });
+
+      expect(
+        sortTasksWithThreeBlockSystem(
+          [nullTask, first],
+          now,
+          'showAll',
+          'showAll',
+          'sortByUrgency',
+          undefined,
+          warningSettings,
+          undefined,
+          accessor,
+        ).map((task) => task.path),
+      ).toEqual(['a.md', 'b.md']);
+    });
+
+    it('keeps task tie-breaks when the boost equalizes scores', () => {
+      const blocker = createTask({ path: 'a.md', line: 1, urgency: 2 });
+      const peer = createTask({ path: 'b.md', line: 1, urgency: 5 });
+      const accessor = createUrgencyScoreAccessor([blocker, peer], {
+        blockingKeys: new Set([getTaskKey(blocker)]),
+        blockingCoefficient: 3,
+      });
+
+      expect(
+        sortTasksWithThreeBlockSystem(
+          [peer, blocker],
+          now,
+          'showAll',
+          'showAll',
+          'sortByUrgency',
+          undefined,
+          warningSettings,
+          undefined,
+          accessor,
+        ).map((task) => task.path),
+      ).toEqual(['a.md', 'b.md']);
+    });
+  });
 
   describe('classifyTask day-boundary matrix (local dates)', () => {
     const warningSettings = {
@@ -135,6 +233,71 @@ describe('Task Sorting System', () => {
       skipScheduledWarningPeriodIfDeadline: false,
       skipDeadlinePrewarningIfScheduled: false,
     };
+
+    it('does not allocate through addDays when warning periods are zero', () => {
+      const settings = {
+        upcomingPeriod: 7,
+        defaultDeadlineWarningPeriod: 0,
+        defaultScheduledWarningPeriod: 0,
+        skipScheduledWarningPeriodIfDeadline: false,
+        skipDeadlinePrewarningIfScheduled: false,
+      };
+      const now = new Date(2024, 0, 15, 12);
+      const task = createTask({
+        scheduledDate: new Date(2024, 0, 16),
+        deadlineDate: new Date(2024, 0, 18),
+      });
+      const context = classifyContext(now, settings);
+      const addDays = jest.spyOn(DateUtils, 'addDays');
+
+      try {
+        const result = classifyTask(task, now, settings, context);
+        expect(addDays).not.toHaveBeenCalled();
+        expect(result.category).toBe('upcoming');
+        expect(result.earliestDate?.getTime()).toBe(
+          task.scheduledDate?.getTime(),
+        );
+      } finally {
+        addDays.mockRestore();
+      }
+    });
+
+    it('preserves a zero-offset time component in the classification', () => {
+      const now = new Date(2024, 0, 15, 12);
+      const scheduled = new Date(2024, 0, 16, 9, 30);
+      const task = createTask({ scheduledDate: scheduled });
+
+      const result = classifyTask(
+        task,
+        now,
+        warningSettings,
+        classifyContext(now, warningSettings),
+      );
+
+      expect(result.category).toBe('upcoming');
+      expect(result.earliestDate?.getTime()).toBe(scheduled.getTime());
+    });
+
+    it('still applies a non-zero scheduled warning offset', () => {
+      const now = new Date(2024, 0, 15, 12);
+      const settings = {
+        ...warningSettings,
+        defaultScheduledWarningPeriod: 2,
+      };
+      const task = createTask({ scheduledDate: new Date(2024, 0, 16) });
+
+      const result = classifyTask(
+        task,
+        now,
+        settings,
+        classifyContext(now, settings),
+      );
+
+      expect(result.category).toBe('upcoming');
+      expect(result.earliestDate?.getTime()).toBe(
+        new Date(2024, 0, 18).getTime(),
+      );
+    });
 
     it('matches per-task classifyTask for every task (with warning settings)', () => {
       const tasks = [

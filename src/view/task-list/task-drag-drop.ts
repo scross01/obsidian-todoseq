@@ -11,6 +11,7 @@ import { EditorView } from '@codemirror/view';
 import { Task } from '../../types/task';
 import TodoTracker from '../../main';
 import { TaskTransferStatus } from '../../services/task-writer';
+import { showReferenceRepairNotice } from '../components/reference-repair-notice';
 
 export interface TaskDragDropCallbacks {
   onGetTask: (path: string, line: number) => Task | undefined;
@@ -306,6 +307,20 @@ export class TaskDragDropHandler {
       action,
       dropPos ? { insertAt: dropPos } : undefined,
     );
+    if (result.status === 'partial-references') {
+      const failed =
+        result.referenceRepairs?.reduce(
+          (total, report) => total + report.failed.length,
+          0,
+        ) ?? 0;
+      showReferenceRepairNotice(
+        writer,
+        failed,
+        result.unreadablePaths,
+        result.referenceDiscoveryFailed,
+      );
+      return;
+    }
     if (result.status !== 'success') {
       new Notice(this.transferFailureNotice(result.status));
       return;

@@ -1,0 +1,496 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`seed module registry characterizes the semantic staged vault for every scenario 1`] = `
+{
+  "docs-auto-archive": {
+    "Shipped Work.md": "Work that finished a while ago, sitting in the notes until an archive run collects it.
+
+## Closed long ago
+
+DONE Rebuild the import pipeline #platform
+CLOSED: [YYYY-MM-DD Ddd]
+
+DONE Write the migration guide #docs
+CLOSED: [YYYY-MM-DD Ddd]
+
+DONE Retire the legacy exporter #platform
+CLOSED: [YYYY-MM-DD Ddd]
+
+DONE Audit third-party licenses #admin
+CLOSED: [YYYY-MM-DD Ddd]
+
+DONE Tune the search index #platform
+CLOSED: [YYYY-MM-DD Ddd]
+
+## Too recent, and undated
+
+DONE Fix the flaky export test #platform
+CLOSED: [YYYY-MM-DD Ddd]
+
+DONE Tidy the changelog #docs
+",
+    "Still Open.md": "Work that is not finished, and so is not a candidate for archiving at all.
+
+TODO Rotate the staging credentials #platform
+SCHEDULED: <YYYY-MM-DD>
+
+DOING Review the dependency bump #platform
+SCHEDULED: <YYYY-MM-DD>
+
+WAITING Vendor confirmation on the SLA #admin
+DEADLINE: <YYYY-MM-DD>
+",
+  },
+  "docs-dashboards": {
+    "Dashboard Basic.md": "The card matches the query above it line for line.
+
+\`\`\`todoseq-dashboard
+search: tag:project scheduled:due OR scheduled:overdue
+group-by: priority
+display: bar
+title: Due & overdue
+\`\`\`
+",
+    "Dashboard Donut.md": "\`\`\`todoseq-dashboard
+search: tag:work
+group-by: state
+display: donut
+title: Work pipeline
+\`\`\`
+",
+    "Dashboard Heatmap.md": "\`\`\`todoseq-dashboard
+group-by: deadline
+display: heatmap
+heatmap-window: 12
+title: Due dates — next 3 months
+\`\`\`
+",
+    "Dashboard Strip.md": "\`\`\`todoseq-dashboard
+search: tag:project
+group-by: priority
+display: strip
+\`\`\`
+",
+    "Dashboard Tiles.md": "\`\`\`todoseq-dashboard
+group-by: scheduled
+display: tiles
+title: Scheduled workload
+show-empty: show
+\`\`\`
+",
+    "Operations.md": "Everything that is neither the launch nor the code, kept light so the tag totals differ.
+
+## Finance
+
+TODO [#B] Reconcile September invoices #work
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+TODO Month-end close checklist #work
+SCHEDULED: <YYYY-MM-DD>
+
+TODO [#C] Renew the insurance #work
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+DONE Issue the Q3 summary #work
+CLOSED: [YYYY-MM-DD Ddd]
+",
+    "Platform Work.md": "Engineering work feeding the launch, tagged both ways so the tag cards have overlap to show.
+
+## API
+
+TODO [#A] Rate-limit the public API #work #project
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+DOING [#B] Backfill request metrics #work #platform
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+TODO [#C] Deprecate the v1 responses #work
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+## Tooling
+
+TODO Move off the legacy queue #work
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+WAITING Vendor confirmation on the SLA #work
+DEADLINE: <YYYY-MM-DD>
+
+DONE Ship the audit log #work
+CLOSED: [YYYY-MM-DD Ddd]
+",
+    "Project Atlas.md": "The launch itself, tracked tightly enough that the due and overdue work is visible at a glance.
+
+## Before launch
+
+TODO [#A] Confirm the launch date #project
+SCHEDULED: <YYYY-MM-DD>
+
+TODO [#C] Chase the venue deposit #project
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Draft the migration plan #project
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+TODO [#B] Book the venue #project
+SCHEDULED: <YYYY-MM-DD>
+
+TODO [#B] Send the press kit #project
+SCHEDULED: <YYYY-MM-DD>
+
+WAITING Legal review of the launch terms #project
+DEADLINE: <YYYY-MM-DD>
+
+LATER Explore a second venue #project
+SCHEDULED: <YYYY-MM-DD>
+
+## Wrap-up
+
+TODO Write the launch retrospective #project
+
+DONE Close out the beta cohort #project
+CLOSED: [YYYY-MM-DD Ddd]
+",
+  },
+  "docs-editor": {
+    "Checkbox Demo.md": "A checkbox and a state keyword can sit on the same line — TODOseq keeps them in sync when you change state from the task list.
+
+## Tasks
+
+- [ ] TODO Task with empty checkbox
+SCHEDULED: <YYYY-MM-DD>
+
+- [x] DONE Task with checked checkbox
+CLOSED: [YYYY-MM-DD Ddd]
+
+TODO Plain keyword task, no checkbox
+",
+    "Date Demo.md": "Type a date keyword and the org-mode date is filled in for you.
+
+## Tasks
+
+TODO Book conference flights
+",
+    "Project Phoenix.md": "Tracking the work behind the Phoenix release. Tasks are declared with a state keyword, and each date lives on its own line beneath the task it belongs to.
+
+## Launch
+
+TODO [#A] Finalize launch checklist #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Implement search filters #phoenix #coding
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+## Announcements
+
+TODO Draft release announcement #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+## Closed out
+
+DONE Write integration test suite #phoenix
+CLOSED: [YYYY-MM-DD Ddd]
+",
+    "Reading List.md": "Loose threads worth picking up later.
+
+## Writing
+
+TODO Outline essay on tooling #personal
+SCHEDULED: <YYYY-MM-DD>
+",
+    "Weekly Review.md": "Recurring coordination work for the week.
+
+## Before the sync
+
+TODO Prepare agenda for team sync #admin
+SCHEDULED: <YYYY-MM-DD>
+
+## Waiting on others
+
+WAITING Compliance sign-off from legal #admin
+DEADLINE: <YYYY-MM-DD>
+",
+  },
+  "docs-embedded-collapse": {
+    "Collapse Demo.md": "A collapsible list keeps a long result set out of the way until it is wanted.
+
+\`\`\`todoseq
+title: Phoenix release
+collapse: true
+search: tag:phoenix
+sort: urgency
+\`\`\`
+
+## Launch
+
+TODO [#A] Finalize launch checklist #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Implement search filters #phoenix
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+TODO [#B] Draft release announcement #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+WAITING Compliance sign-off from legal #phoenix
+DEADLINE: <YYYY-MM-DD>
+
+DONE Write integration test suite #phoenix
+CLOSED: [YYYY-MM-DD Ddd]
+",
+  },
+  "docs-embedded-reader": {
+    "Embedded Demo.md": "An embedded list is a normal code block, so it can live anywhere a note does — and it keeps itself in step with the tasks it matches.
+
+## Live embed
+
+Tasks matching the embed below update live:
+
+\`\`\`todoseq
+search: tag:phoenix
+sort: urgency
+title: Phoenix Tasks
+\`\`\`
+",
+    "Empty Demo.md": "When a query matches nothing, the embed says so instead of rendering blank.
+
+## No matches
+
+\`\`\`todoseq
+search: tag:nonexistent-tag-xyz
+\`\`\`
+",
+    "Error Demo.md": "An unusable option is reported in place rather than failing silently.
+
+## Bad sort method
+
+\`\`\`todoseq
+sort: not-a-sort-option
+\`\`\`
+",
+    "Project Phoenix.md": "Tracking the work behind the Phoenix release. Tasks are declared with a state keyword, and each date lives on its own line beneath the task it belongs to.
+
+## Launch
+
+TODO [#A] Finalize launch checklist #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Implement search filters #phoenix #coding
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+## Announcements
+
+TODO Draft release announcement #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+## Closed out
+
+DONE Write integration test suite #phoenix
+CLOSED: [YYYY-MM-DD Ddd]
+",
+    "Reading List.md": "Loose threads worth picking up later.
+
+## Writing
+
+TODO Outline essay on tooling #personal
+SCHEDULED: <YYYY-MM-DD>
+",
+    "Weekly Review.md": "Recurring coordination work for the week.
+
+## Before the sync
+
+TODO Prepare agenda for team sync #admin
+SCHEDULED: <YYYY-MM-DD>
+
+## Waiting on others
+
+WAITING Compliance sign-off from legal #admin
+DEADLINE: <YYYY-MM-DD>
+",
+  },
+  "docs-org-properties": {
+    "Release Plan.md": "Two steps of the same report, with the dependency not yet declared.
+
+TODO Collect source data
+
+TODO Draft the report
+",
+  },
+  "docs-search": {
+    "Backlog.md": "Everything queued but not yet started, kept in one place so the filters have something to work against.
+
+## Unscheduled backlog
+
+DOING [#A] Backlog item 1 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO Backlog item 2 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO Backlog item 3 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO [#A] Backlog item 4 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+DOING Backlog item 5 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO Backlog item 6 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO [#A] Backlog item 7 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+WAITING Backlog item 8 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+DOING Backlog item 9 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO [#A] Backlog item 10 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO Backlog item 11 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO Backlog item 12 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Backlog item 13 #backlog
+SCHEDULED: <YYYY-MM-DD>
+
+TODO Backlog item 14 #backlog
+SCHEDULED: <YYYY-MM-DD>
+",
+  },
+  "docs-settings": {
+    "Project Phoenix.md": "Tracking the work behind the Phoenix release. Tasks are declared with a state keyword, and each date lives on its own line beneath the task it belongs to.
+
+## Launch
+
+TODO [#A] Finalize launch checklist #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Implement search filters #phoenix #coding
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+## Announcements
+
+TODO Draft release announcement #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+## Closed out
+
+DONE Write integration test suite #phoenix
+CLOSED: [YYYY-MM-DD Ddd]
+",
+    "Reading List.md": "Loose threads worth picking up later.
+
+## Writing
+
+TODO Outline essay on tooling #personal
+SCHEDULED: <YYYY-MM-DD>
+",
+    "Weekly Review.md": "Recurring coordination work for the week.
+
+## Before the sync
+
+TODO Prepare agenda for team sync #admin
+SCHEDULED: <YYYY-MM-DD>
+
+## Waiting on others
+
+WAITING Compliance sign-off from legal #admin
+DEADLINE: <YYYY-MM-DD>
+",
+  },
+  "docs-task-dependencies": {
+    "Dependency issue.md": "This task names a prerequisite that no note defines.
+
+TODO Verify the appendix
+:PROPERTIES:
+:BLOCKER: missing-review
+:END:
+",
+    "Dependency waiting.md": "The second task waits for the first, and both are ordinary tasks in this note.
+
+TODO Collect source data
+:PROPERTIES:
+:ID: source-data
+:END:
+
+TODO Draft the report
+:PROPERTIES:
+:BLOCKER: source-data
+:END:
+",
+  },
+  "docs-task-entry": {
+    "examples/TODOseq Task Entry Flow.md": "Example of task entry
+",
+  },
+  "docs-task-list": {
+    "Project Phoenix.md": "Tracking the work behind the Phoenix release. Tasks are declared with a state keyword, and each date lives on its own line beneath the task it belongs to.
+
+## Launch
+
+TODO [#A] Finalize launch checklist #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+DOING [#A] Implement search filters #phoenix #coding
+SCHEDULED: <YYYY-MM-DD>
+DEADLINE: <YYYY-MM-DD>
+
+## Announcements
+
+TODO Draft release announcement #phoenix
+SCHEDULED: <YYYY-MM-DD>
+
+## Closed out
+
+DONE Write integration test suite #phoenix
+CLOSED: [YYYY-MM-DD Ddd]
+",
+    "Reading List.md": "Loose threads worth picking up later.
+
+## Writing
+
+TODO Outline essay on tooling #personal
+SCHEDULED: <YYYY-MM-DD>
+",
+    "Weekly Review.md": "Recurring coordination work for the week.
+
+## Before the sync
+
+TODO Prepare agenda for team sync #admin
+SCHEDULED: <YYYY-MM-DD>
+
+## Waiting on others
+
+WAITING Compliance sign-off from legal #admin
+DEADLINE: <YYYY-MM-DD>
+",
+  },
+  "docs-warning-periods": {
+    "Quarter Close.md": "Work that has to land before the quarter closes.
+
+TODO [#B] Chase the vendor invoice
+SCHEDULED: <YYYY-MM-DD -3d>
+
+TODO [#B] File the quarterly report
+DEADLINE: <YYYY-MM-DD -7d>
+",
+  },
+}
+`;

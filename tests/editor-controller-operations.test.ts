@@ -1,3 +1,4 @@
+import { Notice } from 'obsidian';
 import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
@@ -5,8 +6,37 @@ import {
   createBaseSettings,
   createTestKeywordManager,
   createBaseTask,
+  emulateEditorReplaceRange,
 } from './helpers/test-helper';
 import { isDailyNotesPluginEnabledSync } from '../src/utils/daily-note-utils';
+
+type MockDatePickerCallbacks = {
+  onDateSelected: (
+    date: Date | null,
+    repeat: unknown,
+    mode: 'scheduled' | 'deadline',
+    warningPeriod?: unknown,
+  ) => void;
+};
+const mockDatePickerCallbacks: MockDatePickerCallbacks[] = [];
+const mockDatePickerShows: unknown[][] = [];
+
+jest.mock('obsidian', () => ({
+  ...jest.requireActual('obsidian'),
+  Notice: jest.fn(),
+}));
+
+jest.mock('../src/view/components/date-picker-menu', () => ({
+  DatePicker: jest.fn().mockImplementation((callbacks) => {
+    mockDatePickerCallbacks.push(callbacks);
+    return {
+      show: jest.fn().mockImplementation((...args: unknown[]) => {
+        mockDatePickerShows.push(args);
+        return Promise.resolve();
+      }),
+    };
+  }),
+}));
 
 jest.mock('../src/utils/daily-note-utils', () => ({
   ...jest.requireActual('../src/utils/daily-note-utils'),
@@ -27,6 +57,9 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
   let keywordManager: ReturnType<typeof createTestKeywordManager>;
 
   beforeEach(() => {
+    (Notice as unknown as jest.Mock).mockClear();
+    mockDatePickerCallbacks.length = 0;
+    mockDatePickerShows.length = 0;
     settings = createBaseSettings({
       languageCommentSupport: false,
       additionalInactiveKeywords: [],
@@ -625,6 +658,262 @@ describe('Editor Controller - Operations (copy, move, migrate, context menu)', (
       );
 
       expect(result).toBe(true);
+    });
+
+    it('reports a returned failure from a table date update', async () => {
+      mockEditor.getLine = () => '| TODO task<br>SCHEDULED: <2026-03-10 Tue> |';
+      mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+      mockView.file = { path: 'test.md' };
+      mockView.editor = {
+        cm: { coordsAtPos: jest.fn().mockReturnValue({ left: 0, top: 0 }) },
+      };
+      mockPlugin.taskUpdateCoordinator.updateTask.mockResolvedValueOnce({
+        status: 'failed',
+        reason: 'Could not verify the task row before writing.',
+      });
+
+      const result = editorController.handleOpenScheduledDatePickerAtCursor(
+        false,
+        mockEditor as any,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      const callbacks = mockDatePickerCallbacks.at(-1);
+      expect(callbacks).toBeDefined();
+      callbacks!.onDateSelected(new Date(2026, 2, 11), null, 'scheduled');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(Notice).toHaveBeenCalledTimes(1);
+      expect(Notice).toHaveBeenCalledWith(
+        'Could not verify the task row before writing.',
+      );
+    });
+
+    it('keeps a table warning period when the date picker opens and submits', async () => {
+      mockEditor.getLine = () =>
+        '| TODO task<br>SCHEDULED: <2026-03-10 Tue +1d -3d> |';
+      mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+      mockView.file = { path: 'test.md' };
+      mockView.editor = {
+        cm: { coordsAtPos: jest.fn().mockReturnValue({ left: 0, top: 0 }) },
+      };
+
+      const result = editorController.handleOpenScheduledDatePickerAtCursor(
+        false,
+        mockEditor as any,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(mockDatePickerShows.at(-1)?.[4]).toEqual({
+        value: 3,
+        unit: 'd',
+        isFirstOnly: false,
+      });
+
+      const warning = { value: 2, unit: 'd', isFirstOnly: false };
+      mockDatePickerCallbacks
+        .at(-1)!
+        .onDateSelected(new Date(2026, 2, 11), null, 'scheduled', warning);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalledWith(
+        expect.objectContaining({ newWarningPeriod: warning }),
+      );
+    });
+
+    it('keeps a warning period when the cursor date picker opens and submits', async () => {
+      mockEditor.getLine = () => 'TODO task';
+      mockEditor.getCursor = () => ({ line: 0, ch: 0 });
+      mockView.file = { path: 'test.md' };
+      mockView.editor = {
+        cm: { coordsAtPos: jest.fn().mockReturnValue({ left: 0, top: 0 }) },
+      };
+      const warning = { value: 3, unit: 'd', isFirstOnly: false };
+      mockPlugin.taskStateManager.findTaskByPathAndLine.mockReturnValueOnce({
+        scheduledDate: new Date(2026, 2, 10),
+        scheduledDateRepeat: null,
+        scheduledWarningPeriod: warning,
+      });
+
+      const result = editorController.handleOpenScheduledDatePickerAtCursor(
+        false,
+        mockEditor as any,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(mockDatePickerShows.at(-1)?.[4]).toEqual(warning);
+
+      const chosen = { value: 2, unit: 'd', isFirstOnly: true };
+      mockDatePickerCallbacks
+        .at(-1)!
+        .onDateSelected(new Date(2026, 2, 11), null, 'scheduled', chosen);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(mockPlugin.taskUpdateCoordinator.updateTask).toHaveBeenCalledWith(
+        expect.objectContaining({ newWarningPeriod: chosen }),
+      );
+    });
+  });
+
+  describe('anchor preservation in editor metadata inserts', () => {
+    const makeEditableLines = (
+      initial: string[],
+    ): { lines: string[]; editor: any } => {
+      const lines = [...initial];
+      const editor = {
+        lineCount: () => lines.length,
+        getLine: (index: number) => lines[index] ?? '',
+        replaceRange: (text: string, from: any, to: any) =>
+          emulateEditorReplaceRange(lines, text, from, to),
+        getCursor: () => ({ line: 0, ch: 0 }),
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+      };
+      return { lines, editor };
+    };
+
+    it('moves a task-line anchor onto a newly inserted date line', () => {
+      const { lines, editor } = makeEditableLines([
+        '- [ ] TODO Test task ^legacy',
+      ]);
+
+      const result = editorController['handleAddDateAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+        'SCHEDULED',
+      );
+
+      expect(result).toBe(true);
+      expect(lines[0]).toBe('- [ ] TODO Test task');
+      expect(lines[1]).toMatch(/^ {2}SCHEDULED: <\d{4}-\d{2}-\d{2}> \^legacy$/);
+    });
+
+    it('moves a task-line anchor below an inserted DESCRIPTION line', () => {
+      const { lines, editor } = makeEditableLines([
+        '- [ ] TODO Test task ^legacy',
+      ]);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(lines[0]).toBe('- [ ] TODO Test task');
+      expect(lines[1]).toBe('  DESCRIPTION: ^legacy');
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 1,
+        ch: '  DESCRIPTION: '.length,
+      });
+    });
+  });
+
+  describe('Add description ownership and cursor placement', () => {
+    const makeEditableLines = (
+      initial: string[],
+    ): { lines: string[]; editor: any } => {
+      const lines = [...initial];
+      const editor = {
+        lineCount: () => lines.length,
+        getLine: (index: number) => lines[index] ?? '',
+        replaceRange: jest.fn((text: string, from: any, to: any) =>
+          emulateEditorReplaceRange(lines, text, from, to),
+        ),
+        getCursor: () => ({ line: 0, ch: 0 }),
+        setCursor: jest.fn(),
+        setSelection: jest.fn(),
+      };
+      return { lines, editor };
+    };
+
+    it.each([
+      [
+        'an unquoted task with a nested quoted description',
+        ['> - [ ] TODO Test task', '> > DESCRIPTION: Nested desc'],
+      ],
+      [
+        'an unquoted task with a quoted description',
+        ['- [ ] TODO Test task', '> DESCRIPTION: Quoted desc'],
+      ],
+      [
+        'a quoted task with an unquoted description',
+        ['> - [ ] TODO Test task', 'DESCRIPTION: Plain desc'],
+      ],
+      [
+        'a normal unquoted control',
+        ['- [ ] TODO Test task', 'DESCRIPTION: Normal desc'],
+      ],
+    ])('reuses %s without writing', (_name, initial) => {
+      const { lines, editor } = makeEditableLines(initial);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(editor.replaceRange).not.toHaveBeenCalled();
+      expect(lines).toEqual(initial);
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 1,
+        ch: initial[1].length,
+      });
+    });
+
+    it('finds an existing description beyond the old ten-line window', () => {
+      const initial = [
+        '- [ ] TODO Test task',
+        ...Array(10).fill(''),
+        'DESCRIPTION: Far away',
+      ];
+      const { lines, editor } = makeEditableLines(initial);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(editor.replaceRange).not.toHaveBeenCalled();
+      expect(lines).toEqual(initial);
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 11,
+        ch: initial[11].length,
+      });
+    });
+
+    it('leaves a legacy task anchor alone when an owned description exists', () => {
+      const initial = [
+        '- [ ] TODO Test task ^legacy',
+        'DESCRIPTION: ^descanchor',
+      ];
+      const { lines, editor } = makeEditableLines(initial);
+
+      const result = editorController['handleAddDescriptionAtLine'](
+        false,
+        0,
+        editor,
+        mockView as any,
+      );
+
+      expect(result).toBe(true);
+      expect(editor.replaceRange).not.toHaveBeenCalled();
+      expect(lines).toEqual(initial);
+      expect(editor.setCursor).toHaveBeenLastCalledWith({
+        line: 1,
+        ch: 'DESCRIPTION: '.length,
+      });
     });
   });
 

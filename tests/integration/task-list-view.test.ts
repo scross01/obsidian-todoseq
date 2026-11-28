@@ -79,9 +79,10 @@ test.describe('Task list view', () => {
     });
     await page.waitForTimeout(200);
 
-    const taskItem = page.locator('.todoseq-task-item', {
-      hasText: 'Buy groceries',
-    });
+    const taskItem = page.locator(
+      '.workspace-leaf.mod-active .todoseq-task-item',
+      { hasText: 'Buy groceries' },
+    );
     await taskItem.click({ force: true });
     await page.waitForTimeout(1000);
 

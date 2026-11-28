@@ -7,6 +7,13 @@ import { isPhoneDevice } from '../../utils/mobile-utils';
 import { DatePicker, DatePickerMode } from './date-picker-menu';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { BaseDialog } from './base-dialog';
+import type { TaskWriter } from '../../services/task-writer';
+import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import type { TaskUpdateCoordinator } from '../../services/task-update-coordinator';
+import {
+  parseDependencyReference,
+  parseDependencyValue,
+} from '../../utils/task-properties';
 
 /**
  * Callback types for context menu actions
@@ -33,6 +40,9 @@ export type TaskContextMenuCallbacks = {
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
   ) => void | Promise<void>;
+  onCompleteAnyway?: (
+    task: Task,
+  ) => void | Promise<import('../../services/task-update-coordinator').TaskUpdateOutcome | void>;
 };
 
 /**
@@ -41,6 +51,10 @@ export type TaskContextMenuCallbacks = {
 export interface TaskContextMenuConfig {
   weekStartsOn: 'Monday' | 'Sunday';
   migrateToTodayState?: string;
+  enforceBlockedTasks?: boolean;
+  taskWriter?: TaskWriter | null;
+  dependencyManager?: TaskDependencyManager | null;
+  taskUpdateCoordinator?: TaskUpdateCoordinator | null;
 }
 
 /**
@@ -232,6 +246,9 @@ export class TaskContextMenu extends BaseDialog {
     // Copy task
     this.buildCopyTaskRow();
 
+    // Dependencies and completion escape hatch
+    this.buildDependencySection();
+
     // Copy to today (only if daily notes plugin is enabled)
     await this.buildCopyToTodayRow();
 
@@ -266,6 +283,149 @@ export class TaskContextMenu extends BaseDialog {
     });
     row.setAttribute('role', 'menuitem');
     this.focusableItems.push(row);
+  }
+
+  private buildDependencySection(): void {
+    if (!this.containerEl || !this.task) return;
+    const writer = this.config.taskWriter ?? null;
+    const manager = this.config.dependencyManager ?? null;
+    const task = this.task;
+    const canCompleteAnyway =
+      !!this.callbacks.onCompleteAnyway &&
+      this.config.enforceBlockedTasks !== false &&
+      !!manager?.isBlocked(
+        `${task.path}:${task.line}${
+          task.isTableTask && task.tableCell
+            ? `:${task.tableCell.cellIndex}`
+            : ''
+        }`,
+      );
+
+    if (!writer && !canCompleteAnyway) return;
+    this.addSeparator();
+
+    if (writer) {
+      this.focusableItems.push(
+        this.createMenuRow('Copy ID', 'fingerprint', () => {
+          void this.copyTaskId(writer, task);
+        }),
+      );
+
+      const anchorSupported =
+        !task.isTableTask &&
+        !task.path.toLowerCase().endsWith('.org') &&
+        task.sourceFormat !== 'org' &&
+        task.sourceFormat !== 'code-comment';
+      this.focusableItems.push(
+        this.createMenuRow(
+          anchorSupported ? 'Copy anchor' : 'Copy anchor (Markdown only)',
+          'link',
+          () => {
+            if (anchorSupported) void this.copyTaskAnchor(writer, task);
+            else
+              new Notice('Block anchors are available for Markdown tasks only');
+          },
+        ),
+      );
+      this.focusableItems.push(
+        this.createMenuRow('Add copied link as blocker', 'git-branch', () => {
+          void this.addBlockerFromClipboard(task);
+        }),
+      );
+    }
+
+    if (canCompleteAnyway) {
+      this.focusableItems.push(
+        this.createMenuRow('Complete anyway', 'unlock', () => {
+          void this.callbacks.onCompleteAnyway?.(task);
+          this.hide();
+        }),
+      );
+    }
+  }
+
+  private async copyTaskId(writer: TaskWriter, task: Task): Promise<void> {
+    const result = await writer.ensureTaskId(task);
+    if (result.status !== 'success' || !result.identity) {
+      new Notice(result.reason ?? 'Failed to create a task ID');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(result.identity);
+      new Notice('Task ID copied');
+    } catch {
+      new Notice('Task ID saved, but copying to the clipboard failed');
+    }
+    this.hide();
+  }
+
+  private async copyTaskAnchor(writer: TaskWriter, task: Task): Promise<void> {
+    const result = await writer.ensureBlockAnchor(task);
+    if (result.status !== 'success' || !result.link) {
+      new Notice(result.reason ?? 'Failed to create a block anchor');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(result.link);
+      new Notice('Task anchor link copied');
+    } catch {
+      new Notice('Anchor saved, but copying to the clipboard failed');
+    }
+    this.hide();
+  }
+
+  private async addBlockerFromClipboard(task: Task): Promise<void> {
+    const coordinator = this.config.taskUpdateCoordinator;
+    if (!coordinator) {
+      new Notice('Dependency updates are not ready yet');
+      return;
+    }
+    let text = '';
+    try {
+      text = (await navigator.clipboard.readText()).trim();
+    } catch {
+      new Notice('Could not read the clipboard');
+      return;
+    }
+    const parsed = parseDependencyValue(text, 'markdown');
+    if (parsed.references.length !== 1 || parsed.issues.length > 0) {
+      new Notice('Clipboard does not contain one dependency link or ID');
+      return;
+    }
+    const reference = parsed.references[0];
+    const tasks = this.taskStateManager?.getTasks() ?? [];
+    const dependency = parseDependencyReference(reference, 'markdown');
+    let matches: Task[] = [];
+    if (dependency.kind === 'id') {
+      matches = tasks.filter((candidate) => candidate.id === dependency.id);
+    } else if (dependency.kind === 'markdown-anchor') {
+      const destination = this.app.metadataCache.getFirstLinkpathDest(
+        dependency.path,
+        task.path,
+      );
+      matches = tasks.filter(
+        (candidate) =>
+          candidate.path === destination?.path &&
+          candidate.embedReference === `^${dependency.anchor}`,
+      );
+    }
+    if (matches.length !== 1) {
+      new Notice('Dependency does not resolve to exactly one task');
+      return;
+    }
+    const result = await coordinator.updateTaskDependency(task, 'add', [
+      reference,
+    ]);
+    if (result.status !== 'applied') {
+      new Notice(
+        result.status === 'failed' && result.reason
+          ? result.reason
+          : 'Failed to add the blocker',
+      );
+      return;
+    }
+    new Notice('Blocker added');
+    this.hide();
   }
 
   private async buildCopyToTodayRow(): Promise<void> {

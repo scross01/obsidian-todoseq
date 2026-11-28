@@ -1,5 +1,27 @@
 # Change Log
 
+## 0.23.0
+
+- Added Org-style `:PROPERTIES:` drawers below Markdown and Org tasks. TODOseq reads ID and dependency properties while preserving other values, and copy, move, and migrate carry the drawer along.
+- Added task dependencies using `BLOCKER` properties IDs, or Obsidian anchor links, to tasks in other notes. Blocked tasks show a lock and cannot be completed until their prerequisites are done. #92
+- Added optional parent/child, `ORDERED`, and checkbox dependency rules
+- Search supports `blocked:true` and `blocked:false` for searches and dashboard grouping.
+- Urgency calculation now takes blocking tasks into considerations.
+- Copy a reference to a task using the new Copy anchor and Copy ID actions.
+- Broken or ambiguous references and malformed/misplaced property drawers surface as warning markers and a new Issues section in the main task list.
+- Recurring and pending task changes now stay with the task you edited when it moves, leave the note unchanged when the target is ambiguous or removed, and preserve edits made while a rollover is waiting.
+- Scheduled and deadline dates on nested blockquoted tasks are now recognised by editing, the date picker, and recurrence. A date quoted more deeply than its task stays body text.
+- Adding a scheduled or deadline date from the editor now keeps the task's ordering, indentation, and block anchor consistent with other date edits.
+- Date pickers now preserve warning periods, including a warning chosen in the picker, and report a failed table update without changing the row. Cycling a recurring table task advances its own inline date and keeps its warning period.
+- **Add description** now finds an existing description at any quote depth or indentation, moves the cursor there, and does not add a duplicate.
+- Completing an Org task no longer rewrites `CLOSED:` or `STARTED:` text in the note's prose.
+- Search now matches accented words and spellings such as `café` when you type `cafe`.
+- Search operators `OR` and `AND` work in lowercase `or` and `and`.
+- Search `tag:none` finds tasks without tags, with matching dashboard grouping and autocomplete; `#none` remains a literal tag.
+- Fixed quoted property filters matching the wrong tasks, including empty strings, `null`, and quoted key names.
+- Fixed dashboard **No tags** groups miscounting tasks with emoji or other non-ASCII tags, and tag searches in embedded lists and saved searches coming back empty after a note's tasks had been displayed.
+- Completed and archived tasks now have a more consistent fade into theme-native muted text and keywords, including in blockquotes, with muted priority badges; embedded task-list keywords stay uncolored.
+
 ## 0.22.1
 
 - Fixed completing an unrelated plain task incrementing a preceding task's subtask count; optimistic progress now follows the checkbox children the parser actually counted and stays in agreement with a rescan.

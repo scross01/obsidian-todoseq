@@ -1,5 +1,6 @@
 import { DateUtils } from './date-utils';
 import type { PropertyQueryDescriptor } from '../search/search-types';
+import { foldSearchText } from '../search/search-text';
 
 /**
  * Utility class for evaluating property values in search queries.
@@ -13,14 +14,14 @@ export class PropertyEvaluator {
     descriptor: PropertyQueryDescriptor,
     caseSensitive: boolean,
   ): string[] {
-    if (descriptor.keyExact || caseSensitive) {
+    if (descriptor.keyExact || descriptor.exact || caseSensitive) {
       return Object.prototype.hasOwnProperty.call(frontmatter, descriptor.key)
         ? [descriptor.key]
         : [];
     }
-    const lowerKey = descriptor.key.toLowerCase();
+    const foldedKey = foldSearchText(descriptor.key);
     return Object.keys(frontmatter).filter(
-      (key) => key.toLowerCase() === lowerKey,
+      (key) => foldSearchText(key) === foldedKey,
     );
   }
 
@@ -56,7 +57,7 @@ export class PropertyEvaluator {
     if (typeof value === 'string') {
       return caseSensitive
         ? value.includes(search)
-        : value.toLowerCase().includes(search.toLowerCase());
+        : foldSearchText(value).includes(foldSearchText(search));
     }
     if (typeof value === 'number') {
       const numeric = Number(search);
@@ -73,7 +74,7 @@ export class PropertyEvaluator {
         : String(Object.prototype.toString.call(value));
     return caseSensitive
       ? text.includes(search)
-      : text.toLowerCase().includes(search.toLowerCase());
+      : foldSearchText(text).includes(foldSearchText(search));
   }
 
   /**

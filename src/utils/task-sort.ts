@@ -2,6 +2,7 @@ import { Task } from '../types/task';
 import { DateUtils } from './date-utils';
 import { KeywordManager } from './keyword-manager';
 import { warningPeriodToDays } from './date-utils';
+import type { UrgencyScoreAccessor } from './task-urgency';
 
 /**
  * Task Classification Types
@@ -311,19 +312,10 @@ export interface WarningPeriodSettings {
 }
 
 /**
- * Get the effective visibility date for a task, accounting for warning periods.
- * For deadlines: effective date = deadline - warning period (appears earlier)
- * For scheduled: effective date = scheduled + delay (appears later)
- *
- * Both -Nd (all occurrences) and --Nd (first-only) affect visibility the same way.
- * The difference is only in recurrence: --Nd is stripped after first occurrence,
- * while -Nd persists across repeats. This function uses whichever is set.
- *
- * @param task The task to analyze
- * @param settings Warning period settings
- * @returns The effective visibility date or null if no dates
+ * Internal zero-allocation resolver for classification. The returned Date may
+ * be one of the task's own Date objects; callers must treat it as read-only.
  */
-export function getEffectiveVisibilityDate(
+function resolveEffectiveVisibilityDate(
   task: Task,
   settings: WarningPeriodSettings,
 ): Date | null {
@@ -335,14 +327,14 @@ export function getEffectiveVisibilityDate(
     const scheduledDelay = scheduledWarningInfo
       ? warningPeriodToDays(scheduledWarningInfo)
       : settings.defaultScheduledWarningPeriod;
-    if (settings.skipScheduledWarningPeriodIfDeadline && task.deadlineDate) {
-      effectiveScheduled = task.scheduledDate;
-    } else {
-      effectiveScheduled = DateUtils.addDays(
-        task.scheduledDate,
-        scheduledDelay,
-      );
-    }
+    // Task dates are Date objects at runtime. Keep addDays' coercion for
+    // legacy fixtures and callers that still supply a date string.
+    effectiveScheduled =
+      task.scheduledDate instanceof Date &&
+      ((settings.skipScheduledWarningPeriodIfDeadline && task.deadlineDate) ||
+        scheduledDelay === 0)
+        ? task.scheduledDate
+        : DateUtils.addDays(task.scheduledDate, scheduledDelay);
   }
 
   if (task.deadlineDate) {
@@ -350,11 +342,12 @@ export function getEffectiveVisibilityDate(
     const warningDays = deadlineWarningInfo
       ? warningPeriodToDays(deadlineWarningInfo)
       : settings.defaultDeadlineWarningPeriod;
-    if (settings.skipDeadlinePrewarningIfScheduled && task.scheduledDate) {
-      effectiveDeadline = task.deadlineDate;
-    } else {
-      effectiveDeadline = DateUtils.addDays(task.deadlineDate, -warningDays);
-    }
+    effectiveDeadline =
+      task.deadlineDate instanceof Date &&
+      ((settings.skipDeadlinePrewarningIfScheduled && task.scheduledDate) ||
+        warningDays === 0)
+        ? task.deadlineDate
+        : DateUtils.addDays(task.deadlineDate, -warningDays);
   }
 
   if (!effectiveScheduled) return effectiveDeadline;
@@ -362,6 +355,27 @@ export function getEffectiveVisibilityDate(
   return effectiveScheduled < effectiveDeadline
     ? effectiveScheduled
     : effectiveDeadline;
+}
+
+/**
+ * Get the effective visibility date for a task, accounting for warning periods.
+ * For deadlines: effective date = deadline - warning period (appears earlier)
+ * For scheduled: effective date = scheduled + delay (appears later)
+ *
+ * Both -Nd (all occurrences) and --Nd (first-only) affect visibility the same way.
+ * The difference is only in recurrence: --Nd is stripped after first occurrence,
+ * while -Nd persists across repeats. This function uses whichever is set.
+ *
+ * @param task The task to analyze
+ * @param settings Warning period settings
+ * @returns A fresh Date with the effective visibility date, or null if no dates
+ */
+export function getEffectiveVisibilityDate(
+  task: Task,
+  settings: WarningPeriodSettings,
+): Date | null {
+  const effective = resolveEffectiveVisibilityDate(task, settings);
+  return effective ? new Date(effective) : null;
 }
 
 /**
@@ -387,7 +401,7 @@ export function classifyTask(
   }
 
   const effectiveDate = settings
-    ? getEffectiveVisibilityDate(task, settings)
+    ? resolveEffectiveVisibilityDate(task, settings)
     : getEarliestDate(task);
 
   // Tasks with no dates are current
@@ -466,6 +480,7 @@ export function classifyAll(
 function getSortFunction(
   sortMethod: SortMethod,
   keywordConfig?: KeywordSortConfig,
+  urgencyAccessor?: UrgencyScoreAccessor,
 ): (a: Task, b: Task) => number {
   switch (sortMethod) {
     case 'sortByScheduled':
@@ -583,16 +598,18 @@ function getSortFunction(
 
     case 'sortByUrgency':
       return (a, b) => {
+        const aUrgency = urgencyAccessor ? urgencyAccessor(a) : a.urgency;
+        const bUrgency = urgencyAccessor ? urgencyAccessor(b) : b.urgency;
         // Handle null urgency values - sort to end
-        if (a.urgency === null && b.urgency === null) {
+        if (aUrgency === null && bUrgency === null) {
           return taskComparator(a, b);
         }
-        if (a.urgency === null) return 1;
-        if (b.urgency === null) return -1;
+        if (aUrgency === null) return 1;
+        if (bUrgency === null) return -1;
 
         // Sort by urgency descending (higher urgency first)
-        if (a.urgency !== b.urgency) {
-          return b.urgency - a.urgency;
+        if (aUrgency !== bUrgency) {
+          return bUrgency - aUrgency;
         }
 
         // If urgencies are equal, use keyword sort as secondary
@@ -639,6 +656,7 @@ export function sortTasksInBlocks(
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
   classifications?: Map<Task, TaskClassification>,
+  urgencyAccessor?: UrgencyScoreAccessor,
 ): TaskBlock[] {
   // Classify all tasks - don't sort yet
   const classified: Record<TaskCategory, Task[]> = {
@@ -658,7 +676,11 @@ export function sortTasksInBlocks(
   }
 
   // Get the sort function once
-  const sortFunction = getSortFunction(sortMethod, keywordConfig);
+  const sortFunction = getSortFunction(
+    sortMethod,
+    keywordConfig,
+    urgencyAccessor,
+  );
 
   const blocks: TaskBlock[] = [];
 
@@ -762,6 +784,7 @@ export function sortTasksWithThreeBlockSystem(
   keywordConfig?: KeywordSortConfig,
   warningPeriodSettings?: WarningPeriodSettings,
   classifications?: Map<Task, TaskClassification>,
+  urgencyAccessor?: UrgencyScoreAccessor,
 ): Task[] {
   const blocks = sortTasksInBlocks(
     tasks,
@@ -772,6 +795,7 @@ export function sortTasksWithThreeBlockSystem(
     keywordConfig,
     warningPeriodSettings,
     classifications,
+    urgencyAccessor,
   );
   return flattenBlocks(blocks);
 }

@@ -22,6 +22,9 @@ import { KeywordManager } from '../../utils/keyword-manager';
 import type { TaskStateTransitionManager } from '../../services/task-state-transition-manager';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { BaseDialog } from '../components/base-dialog';
+import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import type { TaskUpdateOutcome } from '../../services/task-update-coordinator';
+import { resolveDependencyMarker } from '../components/dependency-marker';
 
 interface LinkPattern {
   type: 'wiki' | 'md' | 'url' | 'tag';
@@ -38,7 +41,7 @@ const LINK_PATTERNS: LinkPattern[] = [
 export type TaskStateChangeCallback = (
   task: Task,
   newState: string,
-) => Promise<void>;
+) => Promise<TaskUpdateOutcome | void>;
 
 export type TaskLocationOpenCallback = (task: Task) => void | Promise<void>;
 
@@ -70,6 +73,7 @@ export class TaskItemRenderer {
   private onStateChange: TaskStateChangeCallback;
   private onLocationOpen: TaskLocationOpenCallback;
   private onContextMenu: TaskContextMenuCallback | null;
+  private getDependencyManager: () => TaskDependencyManager | null;
 
   constructor(
     getKeywordManager: () => KeywordManager,
@@ -85,8 +89,10 @@ export class TaskItemRenderer {
         cellIndex?: number,
       ) => Task | null;
     } | null = () => null,
+    getDependencyManager: () => TaskDependencyManager | null = () => null,
   ) {
     this.getKeywordManager = getKeywordManager;
+    this.getDependencyManager = getDependencyManager;
     this.getStateManager = getStateManager;
     this.getMenuBuilder = getMenuBuilder;
     this.getTaskStateManager = getTaskStateManager;
@@ -125,28 +131,9 @@ export class TaskItemRenderer {
 
     checkbox.addClass('task-list-item-checkbox');
 
-    const settings = this.keywordManager.getSettings();
-
-    // Determine data-task character and checked state based on settings
-    let dataTaskChar: string;
-    if (settings.useExtendedCheckboxStyles) {
-      // Theme handles styling via :checked + data-task selectors
-      dataTaskChar = this.keywordManager.getCheckboxState(task.state, settings);
-      checkbox.checked = dataTaskChar !== ' ';
-    } else {
-      // Default behavior: use standard checkbox states
-      // For active keywords, use '/' so CSS can apply active styling
-      if (this.keywordManager.isActive(task.state)) {
-        dataTaskChar = '/';
-      } else if (this.keywordManager.isCompleted(task.state)) {
-        dataTaskChar = 'x';
-      } else {
-        dataTaskChar = ' ';
-      }
-      checkbox.checked = task.completed;
-    }
-
-    checkbox.setAttribute('data-task', dataTaskChar);
+    const presentation = this.getCheckboxPresentation(task);
+    checkbox.checked = presentation.checked;
+    checkbox.setAttribute('data-task', presentation.char);
 
     checkbox.addEventListener('change', () => {
       void (async () => {
@@ -178,11 +165,35 @@ export class TaskItemRenderer {
           return;
         }
 
-        await this.onStateChange(currentTask, targetState);
+        const outcome = await this.onStateChange(currentTask, targetState);
+        if (outcome?.status === 'refused') {
+          // The gate wrote nothing; the browser already toggled the control.
+          const presentation = this.getCheckboxPresentation(currentTask);
+          checkbox.checked = presentation.checked;
+          checkbox.setAttribute('data-task', presentation.char);
+        }
       })();
     });
 
     return checkbox;
+  }
+
+  /** Checkbox character and checked state for a task, used for render and rollback. */
+  private getCheckboxPresentation(task: Task): {
+    char: string;
+    checked: boolean;
+  } {
+    const settings = this.keywordManager.getSettings();
+    if (settings.useExtendedCheckboxStyles) {
+      const char = this.keywordManager.getCheckboxState(task.state, settings);
+      return { char, checked: char !== ' ' };
+    }
+    const char = this.keywordManager.isActive(task.state)
+      ? '/'
+      : this.keywordManager.isCompleted(task.state)
+        ? 'x'
+        : ' ';
+    return { char, checked: task.completed };
   }
 
   /**
@@ -581,6 +592,7 @@ export class TaskItemRenderer {
       fileInfo.appendText(`${displayName}:${task.line + 1}`);
     }
     setTooltip(fileInfo, task.path);
+    this.applyDependencyMarker(li, task);
 
     // Click to open source (avoid checkbox and keyword)
     li.addEventListener('click', (evt) => {
@@ -846,6 +858,81 @@ export class TaskItemRenderer {
 
     // 6. Update LI classes for task state
     this.applyStateClasses(element, task);
+    this.applyDependencyMarker(element, task);
+  }
+
+  /**
+   * One status glyph per row, placed after the checkbox and before the keyword
+   * on every surface. The row class stays even though it no longer dims, so
+   * themes and tests keep a stable semantic hook.
+   */
+  private applyDependencyMarker(element: HTMLElement, task: Task): void {
+    const manager = this.getDependencyManager();
+    const key = `${task.path}:${task.line}${
+      task.isTableTask && task.tableCell ? `:${task.tableCell.cellIndex}` : ''
+    }`;
+    const marker = task.completed
+      ? null
+      : resolveDependencyMarker(manager, key);
+    element.classList.toggle('todoseq-task-blocked', marker !== null);
+
+    const existing = element.querySelector<HTMLElement>(
+      '.todoseq-task-blocked-icon, .todoseq-dependency-issue-icon',
+    );
+    if (!marker) {
+      existing?.remove();
+      return;
+    }
+
+    const markerClass =
+      marker.kind === 'blocked'
+        ? 'todoseq-task-blocked-icon'
+        : 'todoseq-dependency-issue-icon';
+    // A diagnostic outranks the lock, so a kind change replaces the node
+    // rather than leaving two glyphs or stale button handlers behind.
+    let icon = existing?.classList.contains(markerClass) ? existing : null;
+    if (existing && !icon) existing.remove();
+    if (!icon) icon = createSpan({ cls: markerClass });
+
+    const wrapper = element.querySelector<HTMLElement>(
+      '.todoseq-task-text-wrapper',
+    );
+    const anchor =
+      wrapper?.querySelector<HTMLElement>('.todoseq-task-text') ?? null;
+    if (wrapper) {
+      if (icon.parentElement !== wrapper) wrapper.insertBefore(icon, anchor);
+    } else if (icon.parentElement !== element) {
+      (element.querySelector('.todo-main-content') ?? element).appendChild(
+        icon,
+      );
+    }
+
+    icon.onclick = null;
+    icon.onkeydown = null;
+
+    if (marker.kind === 'issue') {
+      setIcon(icon, 'alert-triangle');
+      icon.removeAttribute('tabindex');
+      icon.setAttribute('role', 'img');
+      icon.setAttribute('aria-label', marker.label);
+      setTooltip(icon, marker.label);
+      return;
+    }
+
+    setIcon(icon, 'lock');
+    setTooltip(icon, marker.label);
+    icon.setAttribute('aria-label', marker.label);
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('tabindex', '0');
+    const showDetails = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      new Notice(marker.details || marker.label, 8000);
+    };
+    icon.onclick = showDetails;
+    icon.onkeydown = (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+    };
   }
 
   /**

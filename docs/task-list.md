@@ -1,6 +1,6 @@
 # Task List
 
-The Task List is the central interface for managing all your tasks across your Obsidian vault. It provides a comprehensive overview of your tasks and powerful tools for task management.
+The Task List collects every task TODOseq finds in your vault, with filters, sorting and quick actions.
 
 ![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu.png){.ts-img-full .ts-img-dark}
 ![TODOseq with task list side panel](./assets/todoseq-editor-sidepanel-with-context-menu-light.png){.ts-img-full .ts-img-light}
@@ -12,6 +12,10 @@ The Task List is the central interface for managing all your tasks across your O
 The Task List automatically opens in the right sidebar when the TODOseq plugin is first enabled. You can drag and drop the panel to reposition it within the Obsidian interface, such as moving to different panel locations or making it a floating window.
 
 The list follows the vault. Edits, renames and deletions made in Obsidian — or outside it — update the list, and a task's current state is kept even when a background vault scan and a live edit land at the same time. Configured non-Markdown formats (Org notes, code comments) refresh live too; renaming one to an unsupported extension removes its tasks from the list.
+
+### Ribbon
+
+On mobile, TODOseq adds an `Open TODOseq` ribbon icon for opening the Task List. If the ribbon is hidden, turn on **Settings → Interface → Show ribbon**. The [Command Palette](#command-palette) command works whether or not the ribbon is visible.
 
 ### Command Palette
 
@@ -95,7 +99,7 @@ Right-click any **task keyword** to see all available state options in a popup m
 
 ### Task Context Menu
 
-Right-click anywhere on a task row in the Task List to open a comprehensive context menu with quick actions for task management. This menu provides fast access to common operations without needing to navigate to the source file.
+Right-click a task row to open its context menu without navigating to the source file.
 
 ![TODOseq task row context menu](./assets/todoseq-task-context-menu.png){.ts-img-detail .ts-img-dark}
 ![TODOseq task row context menu](./assets/todoseq-task-context-menu-light.png){.ts-img-detail .ts-img-light}
@@ -115,17 +119,19 @@ The context menu includes several sections:
 - Clear scheduled date
 - Pick date...
 
-These shortcuts help you quickly reschedule tasks without manually editing dates. The new Date Picker provides a calendar view, time picker, and repeat options for more precise scheduling.
+The date picker adds a calendar view, a time picker and repeat options.
 
 - **Deadline** - Access deadline options using the new Date Picker. The date picker provides quick date selections, calendar view, time picker, and repeat options.
 
 - **Copy** - Copy the task text to your clipboard. This includes the task keyword, priority, and task text, making it easy to paste the task elsewhere.
 
-- **Copy to today** - Copy the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is appended to the end of today's daily note while keeping the original task in place.
+- **Copy ID** / **Copy anchor** - Copy a stable reference to the task for links, embeds or a dependency. See [Task IDs and Anchors](task-ids.md).
 
-- **Move to today** - Move the task to today's daily note. This option appears only when the Daily Notes plugin is enabled. The task is removed from its original location and appended to today's daily note. This is useful when you want to consolidate tasks for the current day.
+- **Copy to today** - Copy the task to the end of today's daily note, keeping the original in place. Requires the Daily Notes plugin.
 
-- **Migrate to today** - Copy the task to today's daily note and update the original with a custom state keyword. This option appears only when both the Daily Notes plugin is enabled and a migrated state keyword is configured in settings. The original task's keyword is replaced with the configured state (see [Migrated state keyword](settings.md#migrated-state-keyword)). This is useful for marking tasks as moved or archived while preserving them in today's note.
+- **Move to today** - Remove the task from its note and append it to today's daily note. Requires the Daily Notes plugin.
+
+- **Migrate to today** - Copy the task to today's daily note and replace the original's keyword with the configured [migrated state keyword](settings.md#migrated-state-keyword). Requires the Daily Notes plugin and a configured keyword.
 
 The context menu supports keyboard navigation with arrow keys and Enter to select options, and can be dismissed with Escape. On mobile devices, long-press on a task row opens the context menu.
 
@@ -146,15 +152,15 @@ The Date Picker can be accessed from the task context menu by selecting "Pick da
 
 ### Opening Source Location
 
-Clicking on a task row opens the source file in a smart, intuitive way that adapts to your workflow. The behavior varies based on how you click:
+Clicking a task row opens its note. Where it opens depends on the modifier:
 
-**Simple click** opens the file by reusing existing tabs whenever possible. If you already have markdown tabs open, TODOseq will use those to display the new page, keeping your workspace clean and organized. If no tabs are available, it opens in the current active pane or creates a new tab.
+**Simple click** reuses an existing Markdown tab when there is one; otherwise it opens in the active pane or a new tab.
 
-**Shift-click** creates a new split pane and opens the file there. This is perfect for when you want to reference the task while working on something else in your main workspace.
+**Shift-click** opens a new split pane.
 
-**Ctrl/Cmd-click** always opens the file in a brand new tab, ensuring you have a fresh workspace for the task without disrupting your current view.
+**Ctrl/Cmd-click** opens a new tab.
 
-In all cases, TODOseq navigates to the exact line containing the task and focuses the editor for immediate editing.
+In every case the cursor lands on the task's line.
 
 ### Drag and Drop
 
@@ -173,13 +179,11 @@ A notice appears confirming the action: "Task copied", "Task moved", or "Task mi
 
 ## Sort Methods
 
-Sort the task list
-
-See [Sort Methods](sort-methods.md) for detials.
+Choose how tasks are ordered with the dropdown in the toolbar. See [Sort Methods](sort-methods.md) for details.
 
 ## Search Functionality
 
-The search field provides powerful live filtering of tasks.
+The search field filters tasks as you type.
 
 See [Search Functionality](search.md) for details.
 
@@ -187,7 +191,7 @@ See [Search Functionality](search.md) for details.
 
 ### Completed Task Indicators
 
-Tasks with DONE, CANCELED, or CANCELLED states are visually marked as completed. Completed tasks appear with strikethrough formatting, and state badges show completed states in distinct colors.
+Tasks with DONE, CANCELED, or CANCELLED states are visually marked as completed. Their state badge keeps only a faint blend of the theme accent, while the title fades into heavily muted text with strikethrough. Completed rows also mute their priority badge to a neutral chip. Archived tasks fade further still in the editor and Reader view. Embedded task-list keywords remain uncolored.
 
 ### Priority Badges
 

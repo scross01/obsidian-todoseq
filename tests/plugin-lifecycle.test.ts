@@ -42,6 +42,9 @@ jest.mock('../src/main', () => ({
     keywordManager = {};
     taskStateManager = {
       getTasks: jest.fn().mockReturnValue([]),
+      getCommittedTasks: jest.fn().mockReturnValue([]),
+      getRevision: jest.fn().mockReturnValue(0),
+      getCommittedRevision: jest.fn().mockReturnValue(0),
       subscribe: jest.fn().mockReturnValue(jest.fn()),
     };
     changeTracker = {};
@@ -229,6 +232,9 @@ describe('PluginLifecycleManager', () => {
       keywordManager: {},
       taskStateManager: {
         getTasks: jest.fn().mockReturnValue([]),
+        getCommittedTasks: jest.fn().mockReturnValue([]),
+        getRevision: jest.fn().mockReturnValue(0),
+        getCommittedRevision: jest.fn().mockReturnValue(0),
         subscribe: jest.fn().mockReturnValue(jest.fn()),
       },
       changeTracker: {},
@@ -304,6 +310,102 @@ describe('PluginLifecycleManager', () => {
       expect(pluginMock.taskUpdateCoordinator).not.toBeNull();
     });
 
+    it('schedules a dependency refresh when the task state publishes', async () => {
+      await lifecycleManager.onload();
+      const schedule = jest.spyOn(
+        lifecycleManager as unknown as {
+          scheduleDependencySurfaceRefresh: () => void;
+        },
+        'scheduleDependencySurfaceRefresh',
+      );
+      schedule.mockImplementation(() => undefined);
+
+      try {
+        const subscribe = pluginMock.taskStateManager as {
+          subscribe: jest.Mock;
+        };
+        subscribe.subscribe.mock.calls.forEach((call) => {
+          (call[0] as () => void)();
+        });
+
+        expect(schedule).toHaveBeenCalledTimes(1);
+      } finally {
+        schedule.mockRestore();
+      }
+    });
+
+    it('pumps the dependency snapshot before refreshing surfaces', () => {
+      const manager = { getSnapshot: jest.fn() };
+      pluginMock.taskDependencyManager = manager;
+      const refreshEditor = pluginMock.refreshVisibleEditorDecorations as {
+        mockClear: () => void;
+        mock: {
+          calls: unknown[][];
+          invocationCallOrder: number[];
+        };
+      };
+      refreshEditor.mockClear();
+      const pendingTimers: Array<{ callback: () => void; delay?: number }> = [];
+      const setTimeoutSpy = jest
+        .spyOn(window, 'setTimeout')
+        .mockImplementation(((
+          ...args: Parameters<typeof window.setTimeout>
+        ) => {
+          const [callback, delay] = args;
+          if (typeof callback === 'function') {
+            pendingTimers.push({ callback, delay });
+          }
+          return pendingTimers.length;
+        }) as typeof window.setTimeout);
+
+      try {
+        (
+          lifecycleManager as unknown as {
+            scheduleDependencySurfaceRefresh: () => void;
+          }
+        ).scheduleDependencySurfaceRefresh();
+        const refresh = pendingTimers.find((timer) => timer.delay === 25);
+        expect(refresh).toBeDefined();
+        refresh!.callback();
+      } finally {
+        setTimeoutSpy.mockRestore();
+      }
+
+      expect(manager.getSnapshot).toHaveBeenCalledTimes(1);
+      expect(refreshEditor.mock.calls).toHaveLength(1);
+      expect(manager.getSnapshot.mock.invocationCallOrder[0]).toBeLessThan(
+        refreshEditor.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('restores readiness and refreshes surfaces after a scan error', async () => {
+      await lifecycleManager.onload();
+      const scanner = pluginMock.vaultScanner as { on: jest.Mock };
+      const errorHandler = scanner.on.mock.calls.find(
+        ([event]) => event === 'scan-error',
+      )?.[1] as ((error: Error) => void) | undefined;
+      expect(errorHandler).toBeDefined();
+
+      const manager = pluginMock.taskDependencyManager as {
+        setValidationReady: (ready: boolean) => void;
+      };
+      const setReady = jest.spyOn(manager, 'setValidationReady');
+      const schedule = jest.spyOn(
+        lifecycleManager,
+        'scheduleDependencySurfaceRefresh',
+      );
+      schedule.mockImplementation(() => undefined);
+
+      try {
+        errorHandler!(new Error('scan failed'));
+        expect(setReady).toHaveBeenCalledWith(true);
+        expect(schedule).toHaveBeenCalledTimes(1);
+      } finally {
+        setReady.mockRestore();
+        schedule.mockRestore();
+      }
+    });
+
     it('should initialize embedded task list processor', async () => {
       await lifecycleManager.onload();
       expect(pluginMock.embeddedTaskListProcessor).not.toBeNull();
@@ -339,6 +441,42 @@ describe('PluginLifecycleManager', () => {
       expect(
         (pluginMock.uiManager as any).setupTaskKeywordContextMenu,
       ).toHaveBeenCalled();
+    });
+  });
+
+  describe('archive reference retry', () => {
+    it('retries only the failed dependent and clears the queue', async () => {
+      const updateTaskDependency = jest
+        .fn()
+        .mockResolvedValueOnce({ status: 'failed', reason: 'locked' })
+        .mockResolvedValueOnce({ status: 'applied' });
+      const plugin = (lifecycleManager as unknown as { plugin: any }).plugin;
+      plugin.taskDependencyManager = {
+        getIncomingActiveReferences: jest.fn().mockReturnValue([]),
+      };
+      plugin.taskUpdateCoordinator = { updateTaskDependency };
+      const dependent = { path: 'dependent.md', line: 0 };
+
+      const first = await (
+        lifecycleManager as unknown as {
+          migrateArchivedDependents: (
+            task: unknown,
+            incoming: unknown,
+          ) => Promise<{ failures: unknown[] }>;
+        }
+      ).migrateArchivedDependents({} as never, [
+        { dependent, references: ['blocker'] },
+      ]);
+      expect(first.failures).toHaveLength(1);
+
+      await lifecycleManager.retryArchiveReferenceRepairs();
+      expect(updateTaskDependency).toHaveBeenNthCalledWith(
+        2,
+        dependent,
+        'archive',
+        ['blocker'],
+      );
+      expect(updateTaskDependency).toHaveBeenCalledTimes(2);
     });
   });
 

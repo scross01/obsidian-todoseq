@@ -21,16 +21,12 @@ async function openEmbeddedDemoFile(page: Page): Promise<void> {
       .find((f: any) => f.basename === 'embedded-demo');
     if (!file) throw new Error('embedded-demo.md not found');
     const leaf = app.workspace.getLeaf(false);
-    await leaf.openFile(file);
+    await leaf.setViewState({
+      type: 'markdown',
+      state: { file: file.path, mode: 'preview' },
+      active: true,
+    });
   });
-
-  // Toggle to reading mode if currently in editing mode.
-  const editButton = page.locator(
-    '.workspace-leaf.mod-active button[aria-label*="read"]',
-  );
-  if (await editButton.isVisible({ timeout: 2_000 }).catch(() => false)) {
-    await editButton.click();
-  }
 
   // Wait for the embedded task list to be rendered in the view.
   // The plugin processes code blocks asynchronously after the view renders.
@@ -38,7 +34,10 @@ async function openEmbeddedDemoFile(page: Page): Promise<void> {
   // only check for element existence and that it has child content.
   await page.waitForFunction(
     () => {
-      const list = document.querySelector('.todoseq-embedded-task-list');
+      // Scope to the reading view: the leaf can also hold hidden source DOM.
+      const list = document.querySelector(
+        '.workspace-leaf.mod-active .markdown-reading-view .todoseq-embedded-task-list',
+      );
       return list && list.children.length > 0;
     },
     { timeout: 15_000 },
@@ -53,7 +52,11 @@ test.describe('Embedded task list', () => {
   test('renders tasks from path in reading mode', async () => {
     await openEmbeddedDemoFile(page);
 
-    const embeddedList = page.locator('.todoseq-embedded-task-list').first();
+    const embeddedList = page
+      .locator(
+        '.workspace-leaf.mod-active .markdown-reading-view .todoseq-embedded-task-list',
+      )
+      .first();
     const taskItems = embeddedList.locator('.todoseq-embedded-task-item');
     const count = await taskItems.count();
     // All tasks from projects/ should appear (2 TODO + 1 DONE from alpha.md).
@@ -70,7 +73,11 @@ test.describe('Embedded task list', () => {
   test('embedded checkbox toggles task state', async () => {
     await openEmbeddedDemoFile(page);
 
-    const embeddedList = page.locator('.todoseq-embedded-task-list').first();
+    const embeddedList = page
+      .locator(
+        '.workspace-leaf.mod-active .markdown-reading-view .todoseq-embedded-task-list',
+      )
+      .first();
     const taskItem = embeddedList.locator('.todoseq-embedded-task-item', {
       hasText: 'Implement feature A',
     });

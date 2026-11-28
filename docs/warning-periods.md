@@ -1,18 +1,18 @@
 # Warning Periods
 
-Warning periods control **when** a task becomes visible in the task list relative to its SCHEDULED or DEADLINE date. Instead of appearing exactly on the scheduled date or the deadline, a warning period shifts the task's visibility forward or backward in time — giving you advance notice for deadlines or delaying the appearance of scheduled tasks.
+A warning period changes when a task becomes visible in the Task List relative to its SCHEDULED or DEADLINE date. A deadline can appear early; a scheduled task can appear late.
 
-This feature is inspired by [Org Mode's warning period mechanism](https://orgmode.org/manual/Deadlines-and-Scheduling.html) for DEADLINE and SCHEDULED timestamps. In Org Mode, a deadline with `-5d` triggers agenda warnings starting 5 days before the due date, and a scheduled item with `-2d` delays its display by 2 days. TODOseq implements the same syntax and semantics, with extensions for per-task overrides and first-only warning periods.
+The syntax comes from [Org Mode's warning periods](https://orgmode.org/manual/Deadlines-and-Scheduling.html): `-5d` on a deadline starts warnings five days early, and `-2d` on a scheduled item delays it two days. TODOseq follows the same semantics and adds per-task overrides and first-only periods.
 
 ## Why Use Warning Periods?
 
-Without warning periods, a task with `DEADLINE: <2026-06-20>` only appears on June 20. With a 5-day advance notice, the task appears from June 15 — giving you a window to prepare.
+Without one, a task with `DEADLINE: <2026-06-20>` appears only on June 20; with `-5d` it appears from June 15.
 
 Common use cases:
 
-- **Deadline advance notice**: A report due Friday should start appearing on Monday so you have time to work on it
-- **Scheduled delay**: A follow-up task scheduled for next week shouldn't clutter today's list — delay its appearance until closer to the date
-- **Recurring tasks with initial grace period**: A weekly review task should give you 2 extra days for the first occurrence, but not for subsequent weeks
+- **Deadline advance notice**: a report due Friday appears from Monday, leaving time to work on it
+- **Scheduled delay**: a follow-up task for next week stays out of today's list until closer to the date
+- **Recurring tasks with initial grace period**: a weekly review gets 2 extra days on the first occurrence only
 
 ## Syntax
 
@@ -104,7 +104,7 @@ When a task has a warning period set, the task list displays small arrow indicat
 - **`→` (right arrow)** on a scheduled date indicates delayed notice — the task appears _after_ the scheduled date
 - **`←` (left arrow)** on a deadline date indicates advance notice — the task appears _before_ the deadline
 
-These arrows provide an immediate visual cue that a warning period is active, without needing to hover over the date. The arrows also appear in embedded task lists when date badges are enabled.
+The arrows show at a glance that a warning period is active. They also appear in embedded task lists when date badges are enabled.
 
 ![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows.png){.ts-img-detail .ts-img-dark}
 ![A task scheduled for yesterday with a delay, and a task with a deadline one week out](./assets/todoseq-warning-period-arrows-light.png){.ts-img-detail .ts-img-light}

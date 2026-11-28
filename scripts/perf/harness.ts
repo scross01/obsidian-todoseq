@@ -158,15 +158,16 @@ export function gitSha(): string {
 export function writeArtifact(
   size: PerfSize,
   payload: Record<string, unknown>,
+  suite = 'node',
 ): string {
   const dir = path.join(process.cwd(), 'output', 'perf');
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, `node-${size}.json`);
+  const file = path.join(dir, `${suite}-${size}.json`);
   fs.writeFileSync(
     file,
     JSON.stringify(
       {
-        kind: 'node-bench',
+        kind: `${suite}-bench`,
         size,
         gitSha: gitSha(),
         node: process.version,

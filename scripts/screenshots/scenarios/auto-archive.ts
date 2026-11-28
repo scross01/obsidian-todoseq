@@ -1,5 +1,6 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import { ARCHIVE_SEEDS, waitForPlugin } from './helpers';
+import { waitForPlugin } from './helpers';
+import { ARCHIVE_SEEDS } from './seeds/archive.ts';
 
 /**
  * Docs scenarios for the Auto-Archive page (docs/auto-archive.md).

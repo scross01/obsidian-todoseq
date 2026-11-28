@@ -1,6 +1,6 @@
 # Task Entry Structure
 
-This guide covers how TODOseq recognizes, parses, and manages tasks in your Obsidian vault.
+This page covers how TODOseq recognizes tasks and how each part of a task line is read.
 
 ## Task Recognition Patterns
 
@@ -49,7 +49,8 @@ SCHEDULED: <2026-01-20>
 
 - Description is a single line (multi-line descriptions are not supported)
 - The `DESCRIPTION:` keyword is case-sensitive
-- DESCRIPTION: is always inserted immediately after the task line
+- A `DESCRIPTION:` line belongs to the task when it is unquoted at any indentation, or quoted with `>` in the first column at any blockquote depth. Leading whitespace before `>` makes it ordinary quoted text, not a description.
+- DESCRIPTION: is always inserted immediately after the task line, and an existing description is reused instead of adding a second line
 - Date lines (SCHEDULED, DEADLINE, CLOSED) appear after DESCRIPTION:
 
 **Example with checkbox:**
@@ -108,11 +109,23 @@ TODOseq automatically syncs checkbox state with task keywords when updated from 
 
 \*Note: If you modify the checkbox directly in the Obsidian editor, the task state keyword will not be automatically updated.
 
-## Task Keywords
+## Tasks in Other Contexts
 
-### Additional Formats
+TODOseq recognizes tasks in lists, tables, headings, quotes, callouts, code blocks, comments and footnotes. Table tasks follow the same keyword syntax as regular tasks; for programming language files, enable "Scan code files for comments" in experimental features.
 
-TODOseq supports tasks in Markdown tables, headings, quotes, callouts, code blocks, and comments. Tasks in tables follow the same keyword syntax as regular tasks. For tasks in programming language files, enable "Scan code files for comments" in experimental features.
+### Tasks in Lists
+
+TODOseq preserves list structure and markers:
+
+```markdown
+- TODO Task in bullet list
+  - DOING Subtask with indentation
+    - DONE Deeply nested subtask
+
+1. TODO First numbered task
+2. DOING Second numbered task
+3. DONE Third numbered task
+```
 
 ### Tasks in Tables
 
@@ -140,7 +153,7 @@ See [Editor Integration](editor.md#tasks-in-tables) for full details on table ce
 
 ### Tasks in Headings
 
-TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you structure your notes hierarchically with projects as headings and tasks as sub-headings, similar to Org-mode and Logseq.
+Task keywords also work in Markdown headings (H1–H6), so projects can be headings and tasks sub-headings, as in Org-mode and Logseq.
 
 ```markdown
 # TODO Project Alpha
@@ -149,7 +162,7 @@ TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you s
 ## TODO Implementation
 ```
 
-Heading tasks support all the same features as regular tasks — priority tokens, SCHEDULED/DEADLINE dates, and DESCRIPTION lines. Date and description lines go on the next line without indentation.
+Heading tasks support priorities, SCHEDULED/DEADLINE dates and DESCRIPTION lines like any other task; date and description lines go on the next line, unindented.
 
 ```markdown
 # TODO Launch new feature
@@ -369,7 +382,7 @@ DONE [#C] Documentation update
 
 TODOseq supports Logseq-style SCHEDULED and DEADLINE dates for task organization.
 
-TODOseq treats all dates and times as timezone-independent values that assume local time. When you schedule a task for "2026-01-31 22:00", TODOseq interprets this in your local timezone rather than UTC. If your device changes timezone, "2026-01-31 22:00" represents Jan 31st 10pm in your new timezone. TODOseq does not make timezone adjustments and does not currently support timezone-aware date handling.
+Dates and times are local: `2026-01-31 22:00` means 10pm wherever your device is, not a fixed UTC instant. TODOseq makes no timezone adjustments and does not support timezone-aware dates.
 
 ### Date Formats
 
@@ -399,7 +412,7 @@ DEADLINE: <2025-01-20 Mon 17:00>
 
 ### Smart Date Entry
 
-When Smart Date Recognition is enabled, you can type dates in plain language at the end of a task line. When you finish typing or move the cursor away, TODOseq automatically converts the phrase to a structured `SCHEDULED:` or `DEADLINE:` date line. The table below lists every pattern that is recognised on a task line.
+With Smart Date Recognition enabled, a plain-language date at the end of a task line becomes a `SCHEDULED:` or `DEADLINE:` line when you finish typing or move the cursor away. The table below lists every pattern that is recognised on a task line.
 
 #### One-shot dates
 
@@ -601,6 +614,8 @@ When you mark a task with a repeating date as completed (default completed state
 2. The new date is written back to the file
 3. The task is reset to an inactive state (default inactive state, i.e. TODO)
 
+Each date type advances independently. In an Org entry whose SCHEDULED and DEADLINE timestamps share one planning line, only the repeating timestamp changes; a fixed timestamp, its position and the rest of the line are kept. Date and `DESCRIPTION:` metadata belong outside an Org properties drawer; a `SCHEDULED:`, `DEADLINE:`, `CLOSED:`, `STARTED:` or `DESCRIPTION:` line inside it is not interpreted, is never changed, and is reported as a property problem. The same applies to property-style versions such as `:SCHEDULED:`. TODOseq's completed timestamp is `CLOSED:`; `COMPLETED:` is not a metadata keyword. Org reads `CLOSED:` and `STARTED:` only at the start of a line, so the same text inside prose is not history metadata. Indented tasks keep their indentation when they roll over. If you edit the occurrence's date, repeater interval, repeater mode or warning period while its rollover is waiting to be written, the rollover stops instead of overwriting your edit.
+
 Tasks with repeating dates display a repeat icon in the task list to indicate they will advance when completed.
 
 ### Inserting dates from the editor
@@ -627,7 +642,7 @@ For first-only warning periods (only affects the first occurrence of a recurring
 SCHEDULED: <2026-06-10 Wed +1w --2d>  # First occurrence delayed 2 days, subsequent weeks on time
 ```
 
-When a recurring task is completed, only the repeating date advances. A one-off date on the same task (for example a repeating `SCHEDULED` with a fixed `DEADLINE`) is left exactly as written. A first-only `--Nd` warning period is removed from the date line when the task rolls to its next occurrence.
+When a recurring task is completed, only the repeating date advances. A one-off date on the same task (for example a repeating `SCHEDULED` with a fixed `DEADLINE`) is left exactly as written. A first-only `--Nd` warning period is removed from the date line when the task rolls to its next occurrence. Rollover resolves the target against the current note, so it follows the task if an edit moved its row. That check is repeated after any earlier same-note write finishes, so a queued rollover cannot advance a task that took the old line, and it stops if the occurrence's date, repeat interval, repeat mode or warning period changed. An anonymous task is only followed to a unique anonymous row; a same-title row with its own [ID or block anchor](task-ids.md) is never adopted as its replacement. A task with an ID or block anchor is only changed when that identity still belongs to the target block; a replacement block that gains an ID or anchor is not treated as the same task. A drawer belongs to a task only when its quote and indentation match, so a drawer quoted separately from the task never supplies its ID. Placed above the task's own drawer it also ends the block, exactly as the parser does, so a rollover with a captured ID stops there; placed after the owned drawer it has no effect. Blank lines and date or metadata lines do not end the task block, so an owned drawer can sit further down the block; prose, a heading or the next task ends ownership. A `DESCRIPTION:` line keeps the block open when the parser owns it — quoted in the first column, or unquoted at any indentation. A date line whose `>` sits in the first column belongs to the task above it when it is quoted once or at the task's own quote depth, so a rollover updates that line in place and keeps the full quote prefix. A date line quoted more deeply than the task remains body text and is never updated or removed as the task's date. An unquoted date line belongs to the task only when it is indented at least as far as the task. Whitespace around a drawer ID does not prevent rollover. Markdown and nested Org headings are read with their registered parser; Org planning lookup skips property drawers. In an Org entry, a property drawer that follows body text is body content rather than the entry's identity. If the target was removed or cannot be identified uniquely, the note is left unchanged rather than advancing a neighboring task.
 
 #### Behavior by Date Type
 
@@ -680,126 +695,6 @@ DEADLINE: <2026-01-01 Wed +1m -3d>
 TODO Weekly review
 SCHEDULED: <2026-06-10 Wed +1w --2d>
 # First occurrence delayed 2 days, subsequent weeks on time
-```
-
-## Tasks in Different Contexts
-
-### Tasks in Lists
-
-TODOseq preserves list structure and markers:
-
-```markdown
-- TODO Task in bullet list
-  - DOING Subtask with indentation
-    - DONE Deeply nested subtask
-
-1. TODO First numbered task
-2. DOING Second numbered task
-3. DONE Third numbered task
-```
-
-### Tasks in Headings
-
-TODOseq recognizes task keywords in Markdown headings (H1–H6). This lets you structure your notes hierarchically with projects as headings and tasks as sub-headings, similar to Org-mode and Logseq.
-
-```markdown
-# TODO Project Alpha
-## DOING Design phase
-### DONE Research completed
-## TODO Implementation
-```
-
-Heading tasks support all the same features as regular tasks — priority tokens, SCHEDULED/DEADLINE dates, and DESCRIPTION lines. Date and description lines go on the next line without indentation.
-
-```markdown
-# TODO Launch new feature
-SCHEDULED: <2026-07-20>
-DEADLINE: <2026-08-01>
-```
-
-### Tasks in Quotes and Callouts
-
-When "Include tasks inside quote and callout blocks" is enabled:
-
-```markdown
-> TODO Task in a quote block
-
-> > TODO Task in a nested quote block
-
-> > > TODO Task in three level nested quote block
-
-> [!info]
-> TODO Task in an info callout
-
-> [!todo]-
->
-> - [ ] TODO Checkbox task in collapsible todo block
-```
-
-### Tasks in Comment Blocks
-
-When "Include tasks inside comment blocks" is enabled:
-
-```markdown
-%% TODO Task in single-line comment block %%
-
-%%
-TODO Task in multi-line comment block
-DEADLINE: <2025-11-01>
-%%
-```
-
-### Tasks in Code Blocks
-
-When "Include tasks inside code blocks" is enabled:
-
-<pre>
-```txt
-TODO task in code block
-TODO another task in code block
-```
-</pre>
-
-### Tasks in Footnotes
-
-TODOseq can detect tasks in footnote definitions:
-
-```markdown
-This text has a footnote[^1]
-
-[^1]: TODO task in the footnote
-```
-
-### Language-Aware Comment Tasks
-
-TODOseq supports extracting tasks from comments in 20+ programming languages:
-
-**Python, Ruby, Shell, YAML, TOML, Dockerfile:**
-
-```python
-# TODO Write documentation
-# FIXME Handle edge cases
-```
-
-**JavaScript, Java, C++, C#, Go, Swift, Kotlin, Rust, PowerShell:**
-
-```javascript
-// TODO Implement feature
-// HACK Temporary fix
-```
-
-**SQL:**
-
-```sql
--- TODO Optimize query
--- DOING Add indexes
-```
-
-**INI:**
-
-```ini
-; TODO Configure settings
-; FIXME Broken config
 ```
 
 ## Subtasks
@@ -899,7 +794,7 @@ Numeric footnote definitions follow the same inclusion settings as other tasks: 
 
 ## Escaped pipes in tables
 
-A backslash-escaped pipe (`\|`) inside a table cell is not a cell delimiter. Tasks in a row that contains one keep their displayed cell index, and state or date changes rewrite only that cell — every other byte of the row is left as it was.
+A backslash-escaped pipe (`\|`) inside a table cell is not a cell delimiter. Tasks in a row that contains one keep their displayed cell index, and a state or date change rewrites only that cell, leaving the rest of the row untouched.
 
 ## Optimistic subtask progress
 

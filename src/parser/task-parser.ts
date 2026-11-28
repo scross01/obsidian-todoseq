@@ -1,4 +1,9 @@
-import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
+import {
+  Task,
+  DateRepeatInfo,
+  WarningPeriodInfo,
+  type TaskPropertyIssue,
+} from '../types/task';
 import { LanguageRegistry, LanguageDefinition } from './language-registry';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
@@ -11,12 +16,23 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import { DateUtils } from '../utils/date-utils';
 import {
-  getIndentLength,
   parseTableCells,
   isSeparatorCell,
   getCellTaskLine,
+  parseDescriptionLine,
+  getOwnedDateLineType,
 } from '../utils/task-line-utils';
+import {
+  extractTaskProperties,
+  findPropertiesDrawerEnd,
+  isPropertiesDrawerStart,
+  readTaskPropertiesDrawer,
+  type ParsedTaskProperties,
+} from '../utils/task-properties';
+import { splitTrailingBlockAnchor } from '../utils/block-anchor';
+import { findTaskBlockAnchor } from '../utils/task-block-anchor';
 import {
   BULLET_LIST_PATTERN_SOURCE,
   NUMBERED_LIST_PATTERN_SOURCE,
@@ -36,6 +52,7 @@ import {
   CHECKBOX_REGEX,
   CHECKBOX_DETECTION_REGEX,
   PRIORITY_TOKEN_REGEX,
+  extractTagsFromText,
   SINGLE_LINE_COMMENT_REGEX,
   stripMarkdownPrefixes,
   HEADING_PREFIX_SOURCE,
@@ -86,6 +103,9 @@ export class TaskParser implements ITaskParser {
 
   // Urgency coefficients (loaded on startup)
   private urgencyCoefficients: UrgencyCoefficients;
+
+  /** Normalized start of day for the current parseFile pass, if any. */
+  private parseTodayStart: Date | null = null;
 
   // App instance for daily note detection (optional for decoration-only use)
   private readonly app: App;
@@ -463,17 +483,27 @@ export class TaskParser implements ITaskParser {
     embedReference?: string;
     cleanedText: string;
   } {
-    let cleanedText = taskText;
-    let embedReference: string | undefined;
+    // Use the shared block-anchor grammar so a task-line anchor and a
+    // block-end anchor accept exactly the same suffixes.
+    const { text, anchor } = splitTrailingBlockAnchor(taskText);
+    return {
+      embedReference: anchor ? `^${anchor}` : undefined,
+      cleanedText: anchor ? text.trim() : taskText,
+    };
+  }
 
-    // Extract Obsidian embed references like ^abc123 (only at end of text)
-    const embedMatch = taskText.match(/(\s*\^[^\s]+)$/);
-    if (embedMatch) {
-      embedReference = embedMatch[1].trim();
-      cleanedText = taskText.slice(0, embedMatch.index).trim();
-    }
-
-    return { embedReference, cleanedText };
+  /**
+   * Adopt a block-end anchor when the task line carries none. Markdown only:
+   * table and Org tasks keep their existing identity behaviour.
+   */
+  private applyBlockEndAnchor(
+    task: Task,
+    lines: string[],
+    index: number,
+  ): void {
+    if (task.embedReference || task.isTableTask) return;
+    const found = findTaskBlockAnchor(lines, index, task.indent ?? '');
+    if (found) task.embedReference = `^${found.anchor}`;
   }
 
   /**
@@ -611,6 +641,14 @@ export class TaskParser implements ITaskParser {
     }
   }
 
+  private urgencyContext(): UrgencyContext {
+    return {
+      activeKeywordsSet: this.keywordManager.getActiveSet(),
+      waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      todayStart: this.parseTodayStart ?? undefined,
+    };
+  }
+
   /**
    * Parse a single line as a task.
    * Implements ITaskParser interface.
@@ -689,58 +727,7 @@ export class TaskParser implements ITaskParser {
     line: string,
     taskIndent: string,
   ): 'scheduled' | 'deadline' | 'closed' | 'started' | null {
-    const trimmedLine = line.trim();
-
-    // For quoted lines, check if the line starts with > and the rest starts with SCHEDULED:, DEADLINE:, CLOSED:, or STARTED:
-    if (line.startsWith('>')) {
-      const contentAfterArrow = trimmedLine.substring(1).trim();
-      if (
-        contentAfterArrow.startsWith('SCHEDULED:') ||
-        contentAfterArrow.startsWith('DEADLINE:') ||
-        contentAfterArrow.startsWith('CLOSED:') ||
-        contentAfterArrow.startsWith('STARTED:')
-      ) {
-        return contentAfterArrow.startsWith('SCHEDULED:')
-          ? 'scheduled'
-          : contentAfterArrow.startsWith('DEADLINE:')
-            ? 'deadline'
-            : contentAfterArrow.startsWith('STARTED:')
-              ? 'started'
-              : 'closed';
-      }
-    }
-
-    // For regular tasks, check if the trimmed line starts with SCHEDULED:, DEADLINE:, CLOSED:, or STARTED:
-    if (
-      !trimmedLine.startsWith('SCHEDULED:') &&
-      !trimmedLine.startsWith('DEADLINE:') &&
-      !trimmedLine.startsWith('CLOSED:') &&
-      !trimmedLine.startsWith('STARTED:')
-    ) {
-      return null;
-    }
-
-    // For regular tasks, check indent matching
-    const lineIndent = line.substring(0, line.length - trimmedLine.length);
-    const lineIndentLength = getIndentLength(lineIndent);
-
-    // For heading tasks, the task indent is "# " but date lines have no indent
-    // Accept date lines at indent level 0 (no indent) for heading tasks
-    const isHeadingIndent = /^#{1,6}\s+$/.test(taskIndent);
-    const taskIndentLength = isHeadingIndent ? 0 : getIndentLength(taskIndent);
-
-    // Date line must be at same or deeper indent level
-    if (lineIndentLength < taskIndentLength) {
-      return null;
-    }
-
-    return trimmedLine.startsWith('SCHEDULED:')
-      ? 'scheduled'
-      : trimmedLine.startsWith('DEADLINE:')
-        ? 'deadline'
-        : trimmedLine.startsWith('STARTED:')
-          ? 'started'
-          : 'closed';
+    return getOwnedDateLineType(line, taskIndent);
   }
 
   /**
@@ -752,9 +739,12 @@ export class TaskParser implements ITaskParser {
     // Remove the SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
     let content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
+      .replace(/^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
+
+    // A trailing block anchor is identity, not date content. Strip it before
+    // normalising CLOSED brackets so `CLOSED: [date] ^anchor` still parses.
+    content = splitTrailingBlockAnchor(content).text;
 
     // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
     // (org-mode uses <...> for active dates and [...] for inactive/closed dates)
@@ -779,9 +769,12 @@ export class TaskParser implements ITaskParser {
     // Remove the SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: prefix and trim
     // The regex needs to account for leading whitespace and callout blocks (>)
     let content = line
-      .replace(/^\s*>\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
-      .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
+      .replace(/^\s*(?:>\s*)*(SCHEDULED|DEADLINE|CLOSED|STARTED):\s*/, '')
       .trim();
+
+    // A trailing block anchor is identity, not date content. Strip it before
+    // normalising CLOSED brackets so `CLOSED: [date] ^anchor` still parses.
+    content = splitTrailingBlockAnchor(content).text;
 
     // CLOSED dates use [...] format, convert to <...> for DateParser compatibility
     // (org-mode uses <...> for active dates and [...] for inactive/closed dates)
@@ -814,6 +807,7 @@ export class TaskParser implements ITaskParser {
     scheduledWarningPeriod: WarningPeriodInfo | null;
     deadlineWarningPeriod: WarningPeriodInfo | null;
     description: string | null;
+    propertyInfo: ParsedTaskProperties | null;
   } {
     let scheduledDate: Date | null = null;
     let scheduledDateRepeat: DateRepeatInfo | null = null;
@@ -824,6 +818,7 @@ export class TaskParser implements ITaskParser {
     let scheduledWarningPeriod: WarningPeriodInfo | null = null;
     let deadlineWarningPeriod: WarningPeriodInfo | null = null;
     let description: string | null = null;
+    let propertyInfo: ParsedTaskProperties | null = null;
 
     let scheduledFound = false;
     let deadlineFound = false;
@@ -837,6 +832,43 @@ export class TaskParser implements ITaskParser {
       const nextLineTrimmed = nextLine.trim();
       if (nextLineTrimmed === '') {
         continue; // Skip empty lines
+      }
+
+      if (isPropertiesDrawerStart(nextLine, 'markdown', indent)) {
+        const drawer = readTaskPropertiesDrawer(lines, i, 'markdown', {
+          taskIndent: indent,
+          isBoundary: (line) =>
+            this.testRegex.test(line) ||
+            this.headingRegex.test(line) ||
+            CHECKBOX_DETECTION_REGEX.test(line),
+        });
+        if (drawer) {
+          if (propertyInfo) {
+            const existingProperties: ParsedTaskProperties = propertyInfo;
+            const issues: TaskPropertyIssue[] = [
+              ...(existingProperties.propertyIssues ?? []),
+              {
+                code: 'duplicate-drawer',
+                line: i,
+                message: 'A second properties drawer is ignored.',
+              },
+            ];
+            propertyInfo = { ...existingProperties, propertyIssues: issues };
+            console.debug(
+              `Duplicate properties drawer at line ${i + 1}; first drawer wins.`,
+            );
+          } else {
+            propertyInfo = extractTaskProperties(drawer, 'markdown');
+            if (!drawer.closed) {
+              console.debug(
+                `Unclosed properties drawer at line ${drawer.startLine + 1}.`,
+              );
+            }
+          }
+          i = drawer.endLine;
+          if (!drawer.closed) break;
+          continue;
+        }
       }
 
       const dateLineType = this.getDateLineType(nextLine, indent);
@@ -918,6 +950,7 @@ export class TaskParser implements ITaskParser {
       scheduledWarningPeriod,
       deadlineWarningPeriod,
       description,
+      propertyInfo,
     };
   }
 
@@ -925,16 +958,7 @@ export class TaskParser implements ITaskParser {
    * Extract description text from a DESCRIPTION: line, or null if not a description line.
    */
   private getDescriptionText(line: string): string | null {
-    let contentLine = line;
-    if (line.startsWith('>')) {
-      const quoteMatch = line.match(/^(>\s*)+/);
-      if (quoteMatch) {
-        contentLine = line.substring(quoteMatch[0].length);
-      }
-    }
-    const trimmed = contentLine.trimStart();
-    if (!trimmed.startsWith('DESCRIPTION:')) return null;
-    return trimmed.substring('DESCRIPTION:'.length).trim();
+    return parseDescriptionLine(line);
   }
 
   /**
@@ -1064,6 +1088,18 @@ export class TaskParser implements ITaskParser {
         break;
       }
 
+      const drawer = findPropertiesDrawerEnd(lines, i, 'markdown', {
+        taskIndent: indent,
+        isBoundary: (line) =>
+          this.testRegex.test(line) ||
+          this.headingRegex.test(line) ||
+          CHECKBOX_DETECTION_REGEX.test(line),
+      });
+      if (drawer) {
+        i = drawer.endLine;
+        continue;
+      }
+
       // Check if this line contains a task keyword but is still a valid subtask
       // A line with a task keyword can still be a subtask if it's a checkbox line indented properly
       if (this.testRegex.test(nextLine)) {
@@ -1162,173 +1198,180 @@ export class TaskParser implements ITaskParser {
     };
   }
 
-  // Parse a single file content into Task[], pure and stateless w.r.t. external app
+  // Parse a single file content into Task[]. parseTodayStart is pass-local and
+  // restored before this method returns.
   parseFile(content: string, path: string, file?: TFile): Task[] {
-    const lines = content.split('\n');
+    const previousTodayStart = this.parseTodayStart;
+    this.parseTodayStart = DateUtils.getStartOfDay(new Date());
+    try {
+      const lines = content.split('\n');
 
-    // Initialize state machine
-    let inBlock = false;
-    let blockMarker: 'code' | 'math' | 'comment' | null = null;
-    let codeDelimiter: string | null = null;
-    let codeRegex: RegExp | null = null;
+      // Initialize state machine
+      let inBlock = false;
+      let blockMarker: 'code' | 'math' | 'comment' | null = null;
+      let codeDelimiter: string | null = null;
+      let codeRegex: RegExp | null = null;
 
-    const tasks: Task[] = [];
-    const processedLines = new Set<number>();
-    // Nearest enclosing markdown heading, tracked for Task.parentHeading
-    // (search `heading:` prefix; heading-grouping plans consume it too).
-    let currentHeading: string | undefined;
+      const tasks: Task[] = [];
+      const processedLines = new Set<number>();
+      // Nearest enclosing markdown heading, tracked for Task.parentHeading
+      // (search `heading:` prefix; heading-grouping plans consume it too).
+      let currentHeading: string | undefined;
 
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
 
-      // Skip blank lines
-      if (line.trim() === '') {
-        continue;
-      }
+        // Skip blank lines
+        if (line.trim() === '') {
+          continue;
+        }
 
-      // Check for block transitions
-      const blockTransition = this.detectBlockTransition(
-        line,
-        inBlock,
-        blockMarker,
-        codeDelimiter,
-      );
-      if (blockTransition) {
-        const result = this.handleBlockTransition(
-          blockTransition,
-          index,
-          lines,
+        // Check for block transitions
+        const blockTransition = this.detectBlockTransition(
+          line,
           inBlock,
-          codeRegex,
-          path,
+          blockMarker,
+          codeDelimiter,
         );
-        if (result) {
-          inBlock = result.inBlock;
-          blockMarker = result.blockMarker;
-          codeDelimiter = result.blockDelimiter ?? null;
-          codeRegex = result.codeRegex;
+        if (blockTransition) {
+          const result = this.handleBlockTransition(
+            blockTransition,
+            index,
+            lines,
+            inBlock,
+            codeRegex,
+            path,
+          );
+          if (result) {
+            inBlock = result.inBlock;
+            blockMarker = result.blockMarker;
+            codeDelimiter = result.blockDelimiter ?? null;
+            codeRegex = result.codeRegex;
+          }
+          continue;
         }
-        continue;
-      }
 
-      // Section-heading tracking for Task.parentHeading. Cheap leading-'#'
-      // gate first; block-transition handling above guarantees in-block
-      // lines (e.g. `# comment` inside a code fence) never reach the regex.
-      // Heading-task lines (`# TODO x`) are captured here too — their own
-      // text becomes their parentHeading (they *are* that section).
-      if (!inBlock && line.charCodeAt(0) === 35 /* '#' */) {
-        const headingText = SECTION_HEADING_TEXT_REGEX.exec(line);
-        if (headingText) {
-          currentHeading = headingText[1];
+        // Section-heading tracking for Task.parentHeading. Cheap leading-'#'
+        // gate first; block-transition handling above guarantees in-block
+        // lines (e.g. `# comment` inside a code fence) never reach the regex.
+        // Heading-task lines (`# TODO x`) are captured here too — their own
+        // text becomes their parentHeading (they *are* that section).
+        if (!inBlock && line.charCodeAt(0) === 35 /* '#' */) {
+          const headingText = SECTION_HEADING_TEXT_REGEX.exec(line);
+          if (headingText) {
+            currentHeading = headingText[1];
+          }
         }
-      }
 
-      // Check for single-line comment blocks (%% ... %%)
-      const isSingleLineComment = SINGLE_LINE_COMMENT_REGEX.test(line);
-      if (isSingleLineComment) {
-        if (this.includeCommentBlocks) {
-          const commentTask = this.tryParseCommentBlockTask(
+        // Check for single-line comment blocks (%% ... %%)
+        const isSingleLineComment = SINGLE_LINE_COMMENT_REGEX.test(line);
+        if (isSingleLineComment) {
+          if (this.includeCommentBlocks) {
+            const commentTask = this.tryParseCommentBlockTask(
+              line,
+              path,
+              index,
+              lines,
+              processedLines,
+            );
+            if (commentTask) {
+              commentTask.parentHeading = currentHeading;
+              tasks.push(commentTask);
+            }
+          }
+          continue;
+        }
+
+        // Check if line should be skipped
+        if (this.shouldSkipLine(line, inBlock, blockMarker)) {
+          continue;
+        }
+
+        // Numeric footnote definitions obey the same block-inclusion rules as
+        // other tasks; the block transition above has already run.
+        if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
+          const footnoteTask = this.tryParseFootnoteTask(
             line,
             path,
             index,
             lines,
             processedLines,
           );
-          if (commentTask) {
-            commentTask.parentHeading = currentHeading;
-            tasks.push(commentTask);
+          if (footnoteTask) {
+            footnoteTask.parentHeading = currentHeading;
+            tasks.push(footnoteTask);
           }
+          continue;
         }
-        continue;
-      }
 
-      // Check if line should be skipped
-      if (this.shouldSkipLine(line, inBlock, blockMarker)) {
-        continue;
-      }
+        // Table cell task detection
+        if (/^\s*\|/.test(line) && !this.testRegex.test(line)) {
+          const cellTasks = this.parseTasksFromTableCells(line, index, path);
+          for (const cellTask of cellTasks) {
+            cellTask.parentHeading = currentHeading;
+          }
+          tasks.push(...cellTasks);
+          continue;
+        }
 
-      // Numeric footnote definitions obey the same block-inclusion rules as
-      // other tasks; the block transition above has already run.
-      if (FOOTNOTE_DEFINITION_REGEX.test(line)) {
-        const footnoteTask = this.tryParseFootnoteTask(
+        // Heading task detection (e.g., "# TODO task", "## DONE")
+        if (!inBlock && this.headingRegex.test(line)) {
+          const headingTask = this.tryParseHeadingTask(
+            line,
+            path,
+            index,
+            lines,
+            processedLines,
+            file,
+          );
+          if (headingTask) {
+            headingTask.parentHeading = currentHeading;
+            tasks.push(headingTask);
+          }
+          continue;
+        }
+
+        // Determine which regex to use
+        const useCodeRegex =
+          inBlock &&
+          this.includeCodeBlocks &&
+          blockMarker === 'code' &&
+          this.languageCommentSupport &&
+          this.currentLanguage &&
+          codeRegex;
+        if (
+          !this.shouldParseLine(
+            line,
+            useCodeRegex && codeRegex ? codeRegex : undefined,
+            inBlock,
+          )
+        ) {
+          continue;
+        }
+
+        // Extract task details and create task
+        const regex = useCodeRegex && codeRegex ? codeRegex : this.captureRegex;
+        const taskDetails = this.extractTaskDetails(line, regex);
+        const task = this.createTaskFromDetails(
           line,
           path,
           index,
-          lines,
-          processedLines,
-        );
-        if (footnoteTask) {
-          footnoteTask.parentHeading = currentHeading;
-          tasks.push(footnoteTask);
-        }
-        continue;
-      }
-
-      // Table cell task detection
-      if (/^\s*\|/.test(line) && !this.testRegex.test(line)) {
-        const cellTasks = this.parseTasksFromTableCells(line, index, path);
-        for (const cellTask of cellTasks) {
-          cellTask.parentHeading = currentHeading;
-        }
-        tasks.push(...cellTasks);
-        continue;
-      }
-
-      // Heading task detection (e.g., "# TODO task", "## DONE")
-      if (!inBlock && this.headingRegex.test(line)) {
-        const headingTask = this.tryParseHeadingTask(
-          line,
-          path,
-          index,
+          taskDetails,
           lines,
           processedLines,
           file,
         );
-        if (headingTask) {
-          headingTask.parentHeading = currentHeading;
-          tasks.push(headingTask);
+
+        if (task) {
+          task.parentHeading = currentHeading;
+          tasks.push(task);
         }
-        continue;
       }
 
-      // Determine which regex to use
-      const useCodeRegex =
-        inBlock &&
-        this.includeCodeBlocks &&
-        blockMarker === 'code' &&
-        this.languageCommentSupport &&
-        this.currentLanguage &&
-        codeRegex;
-      if (
-        !this.shouldParseLine(
-          line,
-          useCodeRegex && codeRegex ? codeRegex : undefined,
-          inBlock,
-        )
-      ) {
-        continue;
-      }
-
-      // Extract task details and create task
-      const regex = useCodeRegex && codeRegex ? codeRegex : this.captureRegex;
-      const taskDetails = this.extractTaskDetails(line, regex);
-      const task = this.createTaskFromDetails(
-        line,
-        path,
-        index,
-        taskDetails,
-        lines,
-        processedLines,
-        file,
-      );
-
-      if (task) {
-        task.parentHeading = currentHeading;
-        tasks.push(task);
-      }
+      return tasks;
+    } finally {
+      this.parseTodayStart = previousTodayStart;
     }
-
-    return tasks;
   }
 
   /**
@@ -1345,92 +1388,114 @@ export class TaskParser implements ITaskParser {
     const tasks: Task[] = [];
 
     for (let i = 0; i < cells.length; i++) {
-      const { content } = cells[i];
-      if (!content || isSeparatorCell(content)) continue;
-
-      const taskLine = getCellTaskLine(content);
-      if (!taskLine || !this.testRegex.test(taskLine)) continue;
-
-      const match = this.captureRegex.exec(taskLine);
-      if (!match) continue;
-
-      const { priority, cleanedText, embedReference, footnoteReference } =
-        this.extractPriority(match[5] || '');
-
-      const task: Task = {
-        path: filePath,
-        line: rowIndex,
-        rawText: taskLine,
-        sourceFormat: 'markdown',
-        indent: match[1] || '',
-        listMarker: (match[2] || '') + (match[3] || ''),
-        text: cleanedText,
-        state: match[4],
-        completed: this.keywordManager.isCompleted(match[4]),
-        priority,
-        scheduledDate: null,
-        scheduledDateRepeat: null,
-        deadlineDate: null,
-        deadlineDateRepeat: null,
-        closedDate: null,
-        startedDate: null,
-        scheduledWarningPeriod: null,
-        deadlineWarningPeriod: null,
-        urgency: null,
-        isDailyNote: false,
-        dailyNoteDate: null,
-        embedReference,
-        footnoteReference,
-        quoteNestingLevel: 0,
-        subtaskCount: 0,
-        subtaskCompletedCount: 0,
-        isTableTask: true,
-        tableCell: { cellIndex: i },
-      };
-
-      // Parse inline dates and description from <br>-separated parts
-      const parts = content.split(/<br\s*\/?>/i);
-      for (let j = 1; j < parts.length; j++) {
-        const part = parts[j].trim();
-        const dateContent = part
-          .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/i, '')
-          .trim();
-        if (/^SCHEDULED:/i.test(part)) {
-          const p = DateParser.parseDateWithRepeater(dateContent);
-          if (p.date) {
-            task.scheduledDate = p.date;
-            task.scheduledDateRepeat = p.repeat;
-            task.scheduledWarningPeriod = p.warningPeriod;
-          }
-        } else if (/^DEADLINE:/i.test(part)) {
-          const p = DateParser.parseDateWithRepeater(dateContent);
-          if (p.date) {
-            task.deadlineDate = p.date;
-            task.deadlineDateRepeat = p.repeat;
-            task.deadlineWarningPeriod = p.warningPeriod;
-          }
-        } else if (/^CLOSED:/i.test(part)) {
-          // CLOSED dates use [date] brackets (inactive-date convention, same
-          // as non-cell CLOSED lines). DateParser only matches <date>, so
-          // normalize — tolerating historic bracket depths ([date], [[date]],
-          // [[[date]]] from an earlier double-wrapping writer bug) by
-          // stripping ALL leading/trailing brackets first.
-          const content = dateContent.replace(/^\[+/, '').replace(/\]+$/, '');
-          const p = DateParser.parseDateWithRepeater(`<${content}>`);
-          if (p.date) {
-            task.closedDate = p.date;
-          }
-        } else if (task.description === undefined) {
-          const descText = this.getDescriptionText(part);
-          if (descText !== null) {
-            task.description = descText || undefined;
-          }
-        }
-      }
-
-      tasks.push(task);
+      const task = this.parseTableTaskFromCell(
+        cells[i].content,
+        rowIndex,
+        filePath,
+        i,
+      );
+      if (task) tasks.push(task);
     }
     return tasks;
+  }
+
+  /**
+   * Parse one table cell as a task, including its inline dates and description.
+   *
+   * The cell's first `<br>` segment is the task line; later segments carry
+   * `SCHEDULED`/`DEADLINE`/`CLOSED` and `DESCRIPTION:`. Editor commands must
+   * use this rather than parsing only the first segment, otherwise recurrence
+   * and warning metadata are lost before the update reaches the coordinator.
+   */
+  public parseTableTaskFromCell(
+    content: string,
+    rowIndex: number,
+    filePath: string,
+    cellIndex: number,
+  ): Task | null {
+    if (!content || isSeparatorCell(content)) return null;
+
+    const taskLine = getCellTaskLine(content);
+    if (!taskLine || !this.testRegex.test(taskLine)) return null;
+
+    const match = this.captureRegex.exec(taskLine);
+    if (!match) return null;
+
+    const { priority, cleanedText, embedReference, footnoteReference } =
+      this.extractPriority(match[5] || '');
+
+    const task: Task = {
+      path: filePath,
+      line: rowIndex,
+      rawText: taskLine,
+      sourceFormat: 'markdown',
+      indent: match[1] || '',
+      listMarker: (match[2] || '') + (match[3] || ''),
+      text: cleanedText,
+      state: match[4],
+      completed: this.keywordManager.isCompleted(match[4]),
+      priority,
+      scheduledDate: null,
+      scheduledDateRepeat: null,
+      deadlineDate: null,
+      deadlineDateRepeat: null,
+      closedDate: null,
+      startedDate: null,
+      scheduledWarningPeriod: null,
+      deadlineWarningPeriod: null,
+      urgency: null,
+      isDailyNote: false,
+      dailyNoteDate: null,
+      embedReference,
+      footnoteReference,
+      quoteNestingLevel: 0,
+      subtaskCount: 0,
+      subtaskCompletedCount: 0,
+      isTableTask: true,
+      tableCell: { cellIndex },
+    };
+
+    // Parse inline dates and description from <br>-separated parts
+    const parts = content.split(/<br\s*\/?>/i);
+    for (let j = 1; j < parts.length; j++) {
+      const part = parts[j].trim();
+      const dateContent = part
+        .replace(/^\s*(SCHEDULED|DEADLINE|CLOSED):\s*/i, '')
+        .trim();
+      if (/^SCHEDULED:/i.test(part)) {
+        const p = DateParser.parseDateWithRepeater(dateContent);
+        if (p.date) {
+          task.scheduledDate = p.date;
+          task.scheduledDateRepeat = p.repeat;
+          task.scheduledWarningPeriod = p.warningPeriod;
+        }
+      } else if (/^DEADLINE:/i.test(part)) {
+        const p = DateParser.parseDateWithRepeater(dateContent);
+        if (p.date) {
+          task.deadlineDate = p.date;
+          task.deadlineDateRepeat = p.repeat;
+          task.deadlineWarningPeriod = p.warningPeriod;
+        }
+      } else if (/^CLOSED:/i.test(part)) {
+        // CLOSED dates use [date] brackets (inactive-date convention, same
+        // as non-cell CLOSED lines). DateParser only matches <date>, so
+        // normalize — tolerating historic bracket depths ([date], [[date]],
+        // [[[date]]] from an earlier double-wrapping writer bug) by
+        // stripping ALL leading/trailing brackets first.
+        const content = dateContent.replace(/^\[+/, '').replace(/\]+$/, '');
+        const p = DateParser.parseDateWithRepeater(`<${content}>`);
+        if (p.date) {
+          task.closedDate = p.date;
+        }
+      } else if (task.description === undefined) {
+        const descText = this.getDescriptionText(part);
+        if (descText !== null) {
+          task.description = descText || undefined;
+        }
+      }
+    }
+
+    return task;
   }
 
   /**
@@ -1725,6 +1790,7 @@ export class TaskParser implements ITaskParser {
       deadlineDateRepeat,
       scheduledWarningPeriod,
       deadlineWarningPeriod,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1735,6 +1801,8 @@ export class TaskParser implements ITaskParser {
     task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
+    this.applyParsedProperties(task, propertyInfo);
+    this.applyBlockEndAnchor(task, lines, index);
 
     // Extract subtasks from lines following date lines
     // Footnote tasks don't have checkboxes
@@ -1752,14 +1820,10 @@ export class TaskParser implements ITaskParser {
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -1862,6 +1926,7 @@ export class TaskParser implements ITaskParser {
       deadlineDateRepeat,
       scheduledWarningPeriod,
       deadlineWarningPeriod,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -1872,6 +1937,7 @@ export class TaskParser implements ITaskParser {
     task.startedDate = startedDate;
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
+    this.applyParsedProperties(task, propertyInfo);
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
@@ -1890,14 +1956,10 @@ export class TaskParser implements ITaskParser {
     task.subtaskSpan = subtaskSpan;
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -1990,6 +2052,7 @@ export class TaskParser implements ITaskParser {
       scheduledWarningPeriod,
       deadlineWarningPeriod,
       description,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, indent);
 
     task.scheduledDate = scheduledDate;
@@ -2001,17 +2064,15 @@ export class TaskParser implements ITaskParser {
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
+    this.applyParsedProperties(task, propertyInfo);
+    this.applyBlockEndAnchor(task, lines, index);
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -2024,13 +2085,7 @@ export class TaskParser implements ITaskParser {
    * @returns Array of tag strings (without #)
    */
   private extractTags(taskText: string): string[] {
-    // Match #tag patterns, but not #A, #B, #C (priorities)
-    const tagRegex = /#(?!A|B|C)(\w+)/g;
-    const matches = taskText.match(tagRegex);
-    if (!matches) return [];
-
-    // Remove the # prefix from each tag
-    return matches.map((tag) => tag.substring(1));
+    return extractTagsFromText(taskText);
   }
 
   /**
@@ -2141,6 +2196,7 @@ export class TaskParser implements ITaskParser {
       scheduledWarningPeriod,
       deadlineWarningPeriod,
       description,
+      propertyInfo,
     } = this.extractTaskDates(lines, index + 1, taskDetails.indent);
 
     task.scheduledDate = scheduledDate;
@@ -2152,6 +2208,8 @@ export class TaskParser implements ITaskParser {
     task.scheduledWarningPeriod = scheduledWarningPeriod;
     task.deadlineWarningPeriod = deadlineWarningPeriod;
     task.description = description ?? undefined;
+    this.applyParsedProperties(task, propertyInfo);
+    this.applyBlockEndAnchor(task, lines, index);
 
     // Extract subtasks from lines following date lines
     // Check if parent task has a checkbox (use CHECKBOX_DETECTION_REGEX to detect
@@ -2170,18 +2228,32 @@ export class TaskParser implements ITaskParser {
     task.subtaskSpan = subtaskSpan;
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
     return task;
+  }
+
+  private applyParsedProperties(
+    task: Task,
+    parsed: ParsedTaskProperties | null,
+  ): void {
+    if (!parsed) return;
+    if (parsed.properties) task.properties = parsed.properties;
+    if (parsed.id !== undefined) task.id = parsed.id;
+    if (parsed.blockedBy !== undefined) task.blockedBy = parsed.blockedBy;
+    if (parsed.archivedBlockers !== undefined) {
+      task.archivedBlockers = parsed.archivedBlockers;
+    }
+    if (parsed.ordered !== undefined) task.ordered = parsed.ordered;
+    if (parsed.noblocking !== undefined) task.noblocking = parsed.noblocking;
+    if (parsed.propertyIssues?.length) {
+      task.propertyIssues = parsed.propertyIssues;
+    }
   }
 
   private detectLanguage(lang: string): void {

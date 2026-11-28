@@ -1,10 +1,7 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import {
-  DEMO_SEEDS,
-  EDITOR_SEEDS,
-  waitForPlugin,
-  waitForTaskListView,
-} from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { DEMO_SEEDS } from './seeds/demo.ts';
+import { EDITOR_SEEDS } from './seeds/editor.ts';
 
 /**
  * Docs scenarios for the Editor Integration page (docs/editor.md).
@@ -19,8 +16,10 @@ export default defineScript({
   id: 'docs-editor',
   title: 'docs editor scenarios',
   format: 'mp4',
-  width: 1400,
-  height: 900,
+  // The docs' committed captures use this window size: a larger one only adds
+  // empty canvas to the full-window shots and widens the clipped editor crops.
+  width: 1024,
+  height: 640,
   stills: { mode: 'only', scale: 1 },
   setup: {
     // The recorder hides Obsidian's ribbon and status bar by default

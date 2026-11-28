@@ -8,6 +8,7 @@ import { Task } from '../src/types/task';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { PropertySearchEngine } from '../src/services/property-search-engine';
 import { TFile } from 'obsidian';
+import { TAG_PATTERN } from '../src/utils/patterns';
 import { createBaseTask, createBaseSettings } from './helpers/test-helper';
 
 // Helper to parse search query into AST node
@@ -964,6 +965,23 @@ describe('SearchEvaluator - Comprehensive', () => {
       const task = createBaseTask({ rawText: '', text: 'task' });
       const result = await SearchEvaluator.evaluate(node, task, false);
       expect(result).toBe(false);
+    });
+
+    it('matches tags when the shared pattern was left mid-scan', async () => {
+      // Rendering a task whose text ends with a tag leaves TAG_PATTERN's
+      // lastIndex at the end of that string, and matchAll copies the offset it
+      // is given. A tag filter must not depend on what has been rendered.
+      const node = parseQuery('tag:#urgent');
+      const task = createBaseTask({
+        rawText: 'TODO task #urgent',
+        text: 'task',
+      });
+      TAG_PATTERN.lastIndex = 'TODO task #urgent'.length;
+      try {
+        expect(await SearchEvaluator.evaluate(node, task, false)).toBe(true);
+      } finally {
+        TAG_PATTERN.lastIndex = 0;
+      }
     });
   });
 

@@ -24,6 +24,8 @@ import {
   createDate,
 } from './helpers/test-helper';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
+import { TFile } from 'obsidian';
+import { PropertySearchEngine } from '../src/services/property-search-engine';
 
 /** Local-midnight date `offset` days from today (timezone-independent). */
 function dayOffset(offset: number): Date {
@@ -283,16 +285,60 @@ describe('DashboardAggregator', () => {
       expect(result.total).toBe(5);
       expect(result.overlapsTotal).toBe(true);
       // count-desc, ties broken by label; #A excluded
-      expect(result.groups.map((g) => g.label)).toEqual(['#home', '#project']);
-      expect(result.groups.map((g) => g.count)).toEqual([2, 2]);
+      expect(result.groups.map((g) => g.label)).toEqual([
+        '#home',
+        '#project',
+        'No tags',
+      ]);
+      expect(result.groups.map((g) => g.count)).toEqual([2, 2, 1]);
       expect(result.groups.map((g) => g.filter)).toEqual([
         'tag:home',
         'tag:project',
+        'tag:none',
       ]);
       // Column sums may exceed the card total for tags (overlap is expected)
       const sum = result.groups.reduce((acc, g) => acc + g.count, 0);
-      expect(sum).toBe(4);
-      expect(sum).not.toBe(result.total);
+      expect(sum).toBe(5);
+    });
+
+    it('emits a No tags group only when matched tasks have no tags', async () => {
+      const aggregator = makeAggregator();
+      const tagged = [
+        makeTask({ path: 'a.md', line: 0, tags: ['alpha'] }),
+        makeTask({ path: 'a.md', line: 1, tags: ['beta'] }),
+      ];
+
+      const noUntagged = await aggregator.aggregate(tagged, {
+        groupBy: 'tag',
+      });
+      expect(noUntagged.groups.some((g) => g.key === 'tag:none')).toBe(false);
+
+      const withUntagged = await aggregator.aggregate(
+        [...tagged, makeTask({ path: 'a.md', line: 2, tags: [] })],
+        { groupBy: 'tag' },
+      );
+      const group = withUntagged.groups.find((g) => g.key === 'tag:none');
+      expect(group).toEqual({
+        key: 'tag:none',
+        label: 'No tags',
+        count: 1,
+        filter: 'tag:none',
+      });
+    });
+
+    it('keeps the No tags filter consistent with its count through the evaluator', async () => {
+      const aggregator = makeAggregator();
+      const tasks = [
+        makeTask({ path: 'a.md', line: 0, tags: ['alpha'] }),
+        makeTask({ path: 'a.md', line: 1, tags: [] }),
+        makeTask({ path: 'a.md', line: 2, tags: [] }),
+      ];
+      const result = await aggregator.aggregate(tasks, { groupBy: 'tag' });
+      const group = result.groups.find((g) => g.key === 'tag:none');
+      const matched = await Promise.all(
+        tasks.map((task) => Search.evaluate('tag:none', task, false)),
+      );
+      expect(matched.filter(Boolean)).toHaveLength(group?.count ?? -1);
     });
 
     it('truncates tags to max-groups with an N-more tail', async () => {
@@ -384,6 +430,87 @@ describe('DashboardAggregator', () => {
         );
         const evalCount = matched.filter(Boolean).length;
         expect(evalCount).toBe(group.count);
+      }
+    });
+
+    it('passes a parsed exact-empty descriptor through the window adapter', async () => {
+      // The window vocabulary is date-only today, so inject a property filter
+      // for the first window and assert its real descriptor reaches the engine
+      // (a reconstructed query string would lose the quoted empty intent).
+      const frontmatters: Record<string, Record<string, unknown>> = {
+        'a.md': { place: '' },
+        'b.md': { place: 'Café' },
+        'c.md': { place: null },
+      };
+      const files = Object.fromEntries(
+        Object.keys(frontmatters).map((path) => [
+          path,
+          new TFile(path, path.replace('.md', ''), 'md'),
+        ]),
+      );
+      const app = {
+        vault: {
+          getAbstractFileByPath: (path: string) => files[path] ?? null,
+          getMarkdownFiles: () => Object.values(files),
+        },
+        metadataCache: {
+          getFileCache: (file: TFile) => ({
+            frontmatter: frontmatters[file.path] ?? {},
+          }),
+        },
+      };
+      const engine = new PropertySearchEngine(app as never, {
+        taskStateManager: {
+          getTasks: () =>
+            Object.keys(frontmatters).map((path) => ({ path, line: 0 })),
+        } as never,
+        refreshAllTaskListViews: jest.fn(),
+        vaultScanner: {
+          isScanning: () => false,
+          isObsidianInitializing: () => false,
+        } as never,
+      });
+      await engine.initialize();
+      const searchProperty = jest.spyOn(engine, 'searchProperty');
+      const aggregator = new DashboardAggregator(
+        createBaseSettings(),
+        createTestKeywordManager(),
+        engine,
+      );
+      const tasks = Object.keys(frontmatters).map((path) =>
+        makeTask({ path, line: 0, scheduledDate: dayOffset(-2) }),
+      );
+      const injected = Search.parse('[place:""]');
+      const originalParse = Search.parse;
+      const parseSpy = jest
+        .spyOn(Search, 'parse')
+        .mockImplementation((query: string) =>
+          query === 'scheduled:overdue' ? injected : originalParse(query),
+        );
+
+      try {
+        const result = await aggregator.aggregate(tasks, {
+          groupBy: 'scheduled',
+        });
+
+        expect(searchProperty).toHaveBeenCalledWith(
+          {
+            key: 'place',
+            kind: 'string',
+            value: '',
+            exact: true,
+            keyExact: false,
+          },
+          true,
+        );
+        // Only the empty-string file is in the first window; the other two
+        // dated tasks fall through to Later.
+        expect(result.groups.find((g) => g.label === 'Overdue')?.count).toBe(1);
+        expect(result.groups.find((g) => g.label === 'Later')?.count).toBe(2);
+      } finally {
+        parseSpy.mockRestore();
+        searchProperty.mockRestore();
+        engine.destroy();
       }
     });
 

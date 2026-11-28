@@ -10,7 +10,10 @@ import { RangeSetBuilder } from '@codemirror/state';
 import { TodoTrackerSettings } from '../../settings/settings-types';
 import { TaskParser } from '../../parser/task-parser';
 import { getPriorityLevelName } from '../../utils/task-format';
-import { setTooltip } from 'obsidian';
+import { editorInfoField, setIcon, setTooltip } from 'obsidian';
+import type { DependencyIssue } from '../../types/task-dependency';
+import type { TaskDependencyManager } from '../../services/task-dependency-manager';
+import { getIssueKindLabel } from '../components/task-issues';
 import {
   CODE_BLOCK_REGEX,
   COMMENT_BLOCK_REGEX,
@@ -33,7 +36,13 @@ import {
   isTableRow,
   isSeparatorCell,
   getCellTaskLine,
+  getOwnedDateLineType,
+  parseDescriptionLineInfo,
 } from '../../utils/task-line-utils';
+import {
+  isDrawerEndLine,
+  splitTrailingBlockAnchor,
+} from '../../utils/block-anchor';
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -91,6 +100,78 @@ export class PriorityWidget extends WidgetType {
   }
 }
 
+export class DependencyIssueWidget extends WidgetType {
+  constructor(
+    readonly issues: readonly DependencyIssue[],
+    readonly taskKey: string,
+  ) {
+    super();
+  }
+
+  eq(other: DependencyIssueWidget): boolean {
+    return (
+      this.taskKey === other.taskKey &&
+      this.issues.map((issue) => issue.fingerprint).join('|') ===
+        other.issues.map((issue) => issue.fingerprint).join('|')
+    );
+  }
+
+  toDOM(): HTMLElement {
+    const firstIssue = this.issues[0];
+    const first = firstIssue?.message ?? 'Dependency problem';
+    const label =
+      this.issues.length > 1
+        ? `${first} (+${this.issues.length - 1} more)`
+        : first;
+    const el = createSpan({
+      cls: 'todoseq-dependency-issue-icon todoseq-editor-issue-badge',
+      attr: {
+        'data-task-key': this.taskKey,
+        'aria-label': `${getIssueKindLabel(firstIssue ?? {})}: ${label}`,
+        role: 'img',
+      },
+    });
+    setIcon(el, 'alert-triangle');
+    setTooltip(el, label);
+    return el;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
+export class BlockedLockWidget extends WidgetType {
+  constructor(
+    readonly label: string,
+    readonly taskKey: string,
+  ) {
+    super();
+  }
+
+  eq(other: BlockedLockWidget): boolean {
+    return this.taskKey === other.taskKey && this.label === other.label;
+  }
+
+  toDOM(): HTMLElement {
+    const el = createSpan({
+      cls: 'todoseq-task-blocked-icon todoseq-editor-blocked-badge',
+      attr: {
+        'data-task-key': this.taskKey,
+        'aria-label': this.label,
+        role: 'img',
+      },
+    });
+    setIcon(el, 'lock');
+    setTooltip(el, this.label);
+    return el;
+  }
+
+  ignoreEvent(): boolean {
+    return true;
+  }
+}
+
 export class TaskKeywordDecorator {
   private decorations: DecorationSet;
   private parser: TaskParser;
@@ -110,6 +191,10 @@ export class TaskKeywordDecorator {
   // Track task lines to detect SCHEDULED/DEADLINE lines that follow them
   private previousTaskLine: number | null = null;
   private previousTaskIndent = '';
+  /** Task prefix used for date-line ownership (whitespace plus quote depth). */
+  private previousTaskDateIndent = '';
+  /** True between a task's `:PROPERTIES:` line and its `:END:` line. */
+  private inPropertiesDrawer = false;
 
   // Proximity buffer for cursor detection (in characters)
   // Set to 0 for exact token overlap detection (no buffer)
@@ -123,10 +208,46 @@ export class TaskKeywordDecorator {
     private view: EditorView,
     settings: TodoTrackerSettings,
     parser: TaskParser,
+    private getDependencyManager: () => TaskDependencyManager | null = () =>
+      null,
   ) {
     this.settings = settings;
     this.parser = parser;
     this.decorations = this.createDecorations();
+  }
+
+  private getEditorPath(): string | null {
+    try {
+      const info = this.view.state.field?.(editorInfoField, false);
+      return info?.file?.path ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Source diagnostics for this file, grouped by zero-based line. Ordinary
+   * blocked state is deliberately excluded: it is not an error.
+   */
+  private getIssuesByLine(): Map<number, DependencyIssue[]> {
+    const result = new Map<number, DependencyIssue[]>();
+    const manager = this.getDependencyManager();
+    if (!manager) return result;
+
+    const path = this.getEditorPath();
+    if (!path) return result;
+
+    const prefix = `${path}:`;
+    for (const issue of manager.getIssues()) {
+      if (!issue.sourceKey?.startsWith(prefix)) continue;
+      const line = issue.sourceKey.slice(prefix.length);
+      if (!/^\d+$/.test(line)) continue;
+      const key = Number(line);
+      const list = result.get(key) ?? [];
+      list.push(issue);
+      result.set(key, list);
+    }
+    return result;
   }
 
   /**
@@ -187,6 +308,9 @@ export class TaskKeywordDecorator {
   private createDecorations(): DecorationSet {
     const builder = new RangeSetBuilder<Decoration>();
     const doc = this.view.state.doc;
+    const issuesByLine = this.getIssuesByLine();
+    const path = this.getEditorPath();
+    const manager = this.getDependencyManager();
 
     try {
       // Reset state tracking
@@ -200,6 +324,8 @@ export class TaskKeywordDecorator {
       this.inFootnote = false;
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.previousTaskDateIndent = '';
+      this.inPropertiesDrawer = false;
 
       // Iterate through all lines in the document
       for (let lineNumber = 1; lineNumber <= doc.lines; lineNumber++) {
@@ -385,6 +511,11 @@ export class TaskKeywordDecorator {
             0,
             lineText.length - lineText.trimStart().length,
           );
+          this.previousTaskDateIndent =
+            lineText.match(/^[ \t]*(?:>[ \t]*)+/)?.[0] ??
+            lineText.match(/^[ \t]*/)?.[0] ??
+            '';
+          this.inPropertiesDrawer = false;
 
           // For code blocks with language comment support, we need to find the actual keyword position
           // considering comment prefixes
@@ -419,6 +550,44 @@ export class TaskKeywordDecorator {
 
           const startPos = line.from + keywordStart;
           const endPos = line.from + keywordEnd;
+
+          // A status glyph belongs to the keyword, so it is drawn immediately
+          // before the keyword mark. A point decoration must also be added
+          // before a mark that starts at the same offset, or RangeSetBuilder
+          // rejects the range as unsorted; that is why this sits here rather
+          // than at the end of the line (which would also land after a drawer).
+          const sourceLine = lineNumber - 1;
+          const lineIssues = issuesByLine.get(sourceLine);
+          const taskKey = path ? `${path}:${sourceLine}` : null;
+          if (lineIssues?.length) {
+            builder.add(
+              startPos,
+              startPos,
+              Decoration.widget({
+                widget: new DependencyIssueWidget(
+                  lineIssues,
+                  lineIssues[0].sourceKey ?? `line:${lineNumber}`,
+                ),
+                side: -1,
+              }),
+            );
+          } else if (manager && taskKey && manager.isBlocked(taskKey)) {
+            const details = manager
+              .getBlockingReasons(taskKey)
+              .map((reason) => reason.message)
+              .join(' ');
+            builder.add(
+              startPos,
+              startPos,
+              Decoration.widget({
+                widget: new BlockedLockWidget(
+                  details || 'Blocked by an incomplete dependency',
+                  taskKey,
+                ),
+                side: -1,
+              }),
+            );
+          }
 
           // All keywords use the same styling - no group-based CSS classes
           let cssClasses = 'todoseq-keyword-formatted';
@@ -687,6 +856,59 @@ export class TaskKeywordDecorator {
   }
 
   /**
+   * End offset for a metadata line's TODOseq span. A trailing Obsidian block
+   * anchor is excluded so Obsidian's native `.cm-blockid` styling applies to
+   * `^anchor` alone instead of the whole-line metadata class.
+   */
+  private metadataLineEnd(
+    line: { from: number; to: number },
+    lineText: string,
+  ): number {
+    const { text } = splitTrailingBlockAnchor(lineText);
+    return Math.min(line.to, line.from + text.length);
+  }
+
+  /**
+   * Style one line of a properties drawer as quiet metadata. Entry lines also
+   * get a faint key mark; the `:PROPERTIES:` / `:END:` boundaries do not.
+   */
+  private decoratePropertiesLine(
+    line: { from: number; to: number },
+    lineText: string,
+    builder: RangeSetBuilder<Decoration>,
+    entry: boolean,
+  ): void {
+    builder.add(
+      line.from,
+      this.metadataLineEnd(line, lineText),
+      Decoration.mark({
+        class: 'todoseq-properties-line',
+        attributes: {
+          'data-properties-line': entry ? 'entry' : 'boundary',
+          'aria-label': 'task properties',
+          role: 'note',
+        },
+      }),
+    );
+    if (!entry) return;
+
+    const content = lineText.trimStart();
+    const quote = /^(?:>\s*)+/.exec(content);
+    const contentStart =
+      line.from +
+      (lineText.length - content.length) +
+      (quote ? quote[0].length : 0);
+    const propertyText = quote ? content.slice(quote[0].length) : content;
+    const keyEnd = propertyText.indexOf(':', 1);
+    if (!propertyText.startsWith(':') || keyEnd < 0) return;
+    builder.add(
+      contentStart,
+      contentStart + keyEnd + 1,
+      Decoration.mark({ class: 'todoseq-properties-key' }),
+    );
+  }
+
+  /**
    * Check if a line contains SCHEDULED:, DEADLINE:, CLOSED:, or STARTED: and apply appropriate decorations
    * if it follows a task line at the same indent level
    */
@@ -704,45 +926,61 @@ export class TaskKeywordDecorator {
     // Check if this line is immediately after the task line (with possible empty lines in between)
     const linesSinceTask = lineNumber - this.previousTaskLine;
 
-    // Only consider lines that are close to the task line (within 5 lines)
-    if (linesSinceTask > 5) {
+    // Only consider lines that are close to the task line. Drawers can add
+    // several metadata lines, so keep the window bounded but large enough.
+    if (linesSinceTask > 60) {
       // Too far from task line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.previousTaskDateIndent = '';
+      this.inPropertiesDrawer = false;
       return;
     }
 
-    // Check if this line contains SCHEDULED:, DEADLINE:, CLOSED:, STARTED:, or DESCRIPTION:
+    // Check if this line belongs to a bounded `:PROPERTIES:` drawer under the
+    // task. The drawer stays within the task's metadata span, a blank line
+    // inside it does not end tracking, and a naked `:KEY:` line outside it
+    // stays prose — matching the parser. Empty task indents (top-level tasks)
+    // are valid owners.
     const trimmedLine = lineText.trim();
-    let dateLineType: 'scheduled' | 'deadline' | 'closed' | 'started' | null =
-      null;
-    let isDescriptionLine = false;
+    const lineIndent = lineText.substring(
+      0,
+      lineText.length - trimmedLine.length,
+    );
+    const indentMatches =
+      lineIndent === this.previousTaskIndent ||
+      lineIndent.startsWith(this.previousTaskIndent);
 
-    // Handle callout blocks (lines starting with >)
-    if (lineText.startsWith('>')) {
-      const contentAfterArrow = trimmedLine.substring(1).trim();
-      if (contentAfterArrow.startsWith('SCHEDULED:')) {
-        dateLineType = 'scheduled';
-      } else if (contentAfterArrow.startsWith('DEADLINE:')) {
-        dateLineType = 'deadline';
-      } else if (contentAfterArrow.startsWith('CLOSED:')) {
-        dateLineType = 'closed';
-      } else if (contentAfterArrow.startsWith('STARTED:')) {
-        dateLineType = 'started';
-      } else if (contentAfterArrow.startsWith('DESCRIPTION:')) {
-        isDescriptionLine = true;
-      }
-    } else if (trimmedLine.startsWith('SCHEDULED:')) {
-      dateLineType = 'scheduled';
-    } else if (trimmedLine.startsWith('DEADLINE:')) {
-      dateLineType = 'deadline';
-    } else if (trimmedLine.startsWith('CLOSED:')) {
-      dateLineType = 'closed';
-    } else if (trimmedLine.startsWith('STARTED:')) {
-      dateLineType = 'started';
-    } else if (trimmedLine.startsWith('DESCRIPTION:')) {
-      isDescriptionLine = true;
+    const quoteStripped = trimmedLine.replace(/^(?:>\s*)+/, '');
+    if (quoteStripped === ':PROPERTIES:' && indentMatches) {
+      this.inPropertiesDrawer = true;
+      this.decoratePropertiesLine(line, lineText, builder, false);
+      return;
     }
+
+    if (this.inPropertiesDrawer) {
+      if (!trimmedLine) {
+        return;
+      }
+      if (isDrawerEndLine(quoteStripped, 'markdown') && indentMatches) {
+        this.inPropertiesDrawer = false;
+        this.decoratePropertiesLine(line, lineText, builder, false);
+        return;
+      }
+      if (indentMatches && /^:[^:\s]+:/.test(quoteStripped)) {
+        this.decoratePropertiesLine(line, lineText, builder, true);
+        return;
+      }
+      // Unclosed drawer: stop styling it and let the line follow normal rules.
+      this.inPropertiesDrawer = false;
+    }
+
+    const dateLineType = getOwnedDateLineType(
+      lineText,
+      this.previousTaskDateIndent,
+    );
+    const isDescriptionLine =
+      dateLineType === null && parseDescriptionLineInfo(lineText) !== null;
 
     // If this is a date line, check if it matches the indent level of the previous task
     if (dateLineType !== null) {
@@ -758,7 +996,7 @@ export class TaskKeywordDecorator {
       ) {
         // Apply full-line decoration
         const lineStartPos = line.from;
-        const lineEndPos = line.to;
+        const lineEndPos = this.metadataLineEnd(line, lineText);
 
         // Determine CSS classes based on line type
         const lineClass =
@@ -836,7 +1074,7 @@ export class TaskKeywordDecorator {
       ) {
         // Apply full-line decoration for DESCRIPTION: line
         const lineStartPos = line.from;
-        const lineEndPos = line.to;
+        const lineEndPos = this.metadataLineEnd(line, lineText);
 
         builder.add(
           lineStartPos,
@@ -877,6 +1115,8 @@ export class TaskKeywordDecorator {
       // Non-empty line that's not a date line, reset tracking
       this.previousTaskLine = null;
       this.previousTaskIndent = '';
+      this.previousTaskDateIndent = '';
+      this.inPropertiesDrawer = false;
     }
   }
 
@@ -1050,12 +1290,14 @@ export class TaskKeywordDecorator {
 export const taskKeywordPlugin = (
   settings: TodoTrackerSettings,
   getParser: () => TaskParser | null,
+  getDependencyManager: () => TaskDependencyManager | null = () => null,
 ) => {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet;
       private settings: TodoTrackerSettings;
       private getParser: () => TaskParser | null;
+      private getDependencyManager: () => TaskDependencyManager | null;
       private settingsDetector: SettingsChangeDetector;
       private wasLivePreviewMode: boolean | null = null;
       private tableCellStylingTimer: number | null = null;
@@ -1064,6 +1306,7 @@ export const taskKeywordPlugin = (
       constructor(view: EditorView) {
         this.settings = settings;
         this.getParser = getParser;
+        this.getDependencyManager = getDependencyManager;
         this.settingsDetector = createSettingsChangeDetector(settings);
         // Initialize the mode state
         this.wasLivePreviewMode = this.isLivePreviewMode(view);
@@ -1110,6 +1353,7 @@ export const taskKeywordPlugin = (
             view,
             this.settings,
             parser,
+            this.getDependencyManager,
           );
           this.decorations = decorator.getDecorations();
         }
@@ -1348,6 +1592,33 @@ export const taskKeywordPlugin = (
       }
 
       /**
+       * Split text into the styled body and a trailing ` ^anchor` suffix.
+       */
+      private splitTrailingAnchor(text: string): {
+        body: string;
+        suffix: string;
+      } {
+        const { text: body } = splitTrailingBlockAnchor(text);
+        return body === text
+          ? { body: text, suffix: '' }
+          : { body, suffix: text.slice(body.length) };
+      }
+
+      /**
+       * Move a trailing block anchor at the end of a span's last text node out
+       * of the span; returns the removed suffix.
+       */
+      private detachTrailingAnchorText(span: HTMLElement): string {
+        const last = span.lastChild;
+        if (!last || last.nodeType !== Node.TEXT_NODE) return '';
+        const text = last.textContent ?? '';
+        const { body, suffix } = this.splitTrailingAnchor(text);
+        if (!suffix) return '';
+        (last as Text).textContent = body;
+        return suffix;
+      }
+
+      /**
        * Wrap date lines in table cells to match reader view structure.
        * Creates: <span class="todoseq-{type}-line"><span class="todoseq-{type}-keyword">KEYWORD:</span> date text</span>
        * The outer span styles the entire line (muted, smaller font).
@@ -1417,8 +1688,16 @@ export const taskKeywordPlugin = (
               nextSibling = next;
             }
 
+            const anchorSuffix = this.detachTrailingAnchorText(lineSpan);
+
             // Replace the original keyword text node with the assembled line span
             parent.replaceChild(lineSpan, node);
+            if (anchorSuffix) {
+              parent.insertBefore(
+                window.activeDocument.createTextNode(anchorSuffix),
+                lineSpan.nextSibling,
+              );
+            }
             break; // restart walker for next keyword since DOM changed
           }
         }
@@ -1522,15 +1801,24 @@ export const taskKeywordPlugin = (
             text: 'DESCRIPTION:',
           });
 
-          // Add text after DESCRIPTION:
-          if (afterText) {
+          // Keep a trailing block anchor outside the description span so it
+          // keeps Obsidian's native anchor styling.
+          const { body: afterBody, suffix: anchorSuffix } =
+            this.splitTrailingAnchor(afterText);
+          if (afterBody) {
             descContainer.appendChild(
-              window.activeDocument.createTextNode(afterText),
+              window.activeDocument.createTextNode(afterBody),
             );
           }
 
           parent.insertBefore(descContainer, node);
           parent.removeChild(node);
+          if (anchorSuffix) {
+            parent.insertBefore(
+              window.activeDocument.createTextNode(anchorSuffix),
+              descContainer.nextSibling,
+            );
+          }
           break;
         }
       }

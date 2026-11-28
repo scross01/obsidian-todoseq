@@ -349,5 +349,74 @@ describe('Tag Search with Subtags and Exact Matching', () => {
         ).toBe(false);
       });
     });
+
+    describe('tag:none', () => {
+      const untagged = createBaseTask({
+        path: 'notes/untagged.md',
+        line: 1,
+        rawText: 'TODO task with no tags',
+        text: 'task with no tags',
+        tags: [],
+      });
+      const tagged = createBaseTask({
+        path: 'notes/tagged.md',
+        line: 1,
+        rawText: 'TODO task with a tag #work',
+        text: 'task with a tag',
+        tags: ['work'],
+      });
+      const literalNone = createBaseTask({
+        path: 'notes/literal-none.md',
+        line: 1,
+        rawText: 'TODO task literally tagged #none',
+        text: 'task literally tagged',
+        tags: ['none'],
+      });
+
+      it('matches only tasks with no tags', async () => {
+        expect(await Search.evaluate('tag:none', untagged, false)).toBe(true);
+        expect(await Search.evaluate('tag:none', tagged, false)).toBe(false);
+        expect(await Search.evaluate('tag:none', literalNone, false)).toBe(
+          false,
+        );
+      });
+
+      it('composes with negation and the quoted exact form', async () => {
+        expect(await Search.evaluate('-tag:none', tagged, false)).toBe(true);
+        expect(await Search.evaluate('-tag:none', untagged, false)).toBe(false);
+        expect(await Search.evaluate('tag:"none"', untagged, false)).toBe(true);
+        expect(await Search.evaluate('tag:"none"', literalNone, false)).toBe(
+          false,
+        );
+      });
+
+      it('does not treat emoji tags as untagged', async () => {
+        const emojiTagged = createBaseTask({
+          path: 'notes/emoji-tag.md',
+          line: 1,
+          rawText: 'TODO [#B] #🏠 Check the hot tub',
+          text: 'Check the hot tub',
+          tags: ['🏠'],
+        });
+
+        expect(await Search.evaluate('tag:none', emojiTagged, false)).toBe(
+          false,
+        );
+        expect(await Search.evaluate('-tag:none', emojiTagged, false)).toBe(
+          true,
+        );
+      });
+
+      it('does not crash on a task with no raw text', async () => {
+        const blank = createBaseTask({
+          path: 'notes/blank.md',
+          line: 1,
+          rawText: '',
+          text: '',
+          tags: [],
+        });
+        expect(await Search.evaluate('tag:none', blank, false)).toBe(true);
+      });
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { TaskWriter } from '../src/services/task-writer';
+import { TaskParser } from '../src/parser/task-parser';
 import {
   createBaseTask,
   createCheckboxTask,
@@ -85,6 +86,74 @@ describe('TaskWriter Instance Methods', () => {
       additionalInactiveKeywords: ['CUSTOM'],
     });
     taskWriter = new TaskWriter(mockPlugin, keywordManager);
+  });
+
+  describe('findPropertiesDrawer date ownership', () => {
+    const makeNestedTask = (): Task =>
+      createBaseTask({
+        rawText: '> > TODO Task text',
+        line: 0,
+        indent: '> > ',
+      });
+
+    it('skips a same-depth nested date and finds the drawer', () => {
+      const lines = [
+        '> > TODO Task text',
+        '> > SCHEDULED: <2026-03-05 Thu>',
+        '> > :PROPERTIES:',
+        '> > :ID: nested-1',
+        '> > :END:',
+      ];
+
+      expect(
+        (taskWriter as any).findPropertiesDrawer(lines, makeNestedTask()),
+      ).not.toBeNull();
+    });
+
+    it('stops at a date quoted deeper than the task', () => {
+      const lines = [
+        '> > TODO Task text',
+        '> > > SCHEDULED: <2026-03-05 Thu>',
+        '> > :PROPERTIES:',
+        '> > :ID: nested-1',
+        '> > :END:',
+      ];
+
+      expect(
+        (taskWriter as any).findPropertiesDrawer(lines, makeNestedTask()),
+      ).toBeNull();
+    });
+  });
+
+  describe('migrateBlockerHistory', () => {
+    it('does not recreate a reference the live drawer no longer contains', async () => {
+      mockApp.vault.read = jest
+        .fn()
+        .mockResolvedValue(
+          ['TODO Task text', ':PROPERTIES:', ':BLOCKER: present', ':END:'].join(
+            '\n',
+          ),
+        );
+      mockApp.vault.process = jest.fn();
+      const task = createBaseTask({
+        path: 'test.md',
+        line: 0,
+        rawText: 'TODO Task text',
+        text: 'Task text',
+        blockedBy: ['present'],
+      });
+
+      const result = await taskWriter.migrateBlockerHistory(
+        task,
+        'to-history',
+        ['removed'],
+      );
+
+      expect(result.status).toBe('success');
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+      expect(result.task?.blockedBy).toEqual(['present']);
+      expect(result.task?.archivedBlockers).toBeUndefined();
+    });
   });
 
   describe('applyLineUpdate', () => {
@@ -750,9 +819,11 @@ describe('TaskWriter Instance Methods', () => {
     it.each([true, false])(
       'keeps CLOSED on TODO → LATER (tracking %p)',
       async (tracking) => {
+        const TODO_CELL_WITH_CLOSED =
+          '| TODO Task text <br>CLOSED: [[2026-03-14 Sat 10:00]] |';
         mockPlugin.settings.trackClosedDate = tracking;
         useRealKeywords();
-        useVaultCell(CELL_WITH_CLOSED);
+        useVaultCell(TODO_CELL_WITH_CLOSED);
 
         const result = await taskWriter.applyLineUpdate(
           makeCellTask({
@@ -763,7 +834,7 @@ describe('TaskWriter Instance Methods', () => {
           'LATER',
         );
 
-        expect(processedCell(CELL_WITH_CLOSED)).toContain(
+        expect(processedCell(TODO_CELL_WITH_CLOSED)).toContain(
           'CLOSED: [[2026-03-14 Sat 10:00]]',
         );
         expect(result.closedDate).not.toBeNull();
@@ -1210,6 +1281,45 @@ describe('TaskWriter Instance Methods', () => {
       expect(result.rawText).toContain('[#C]');
       expect(result.rawText).toContain('^123');
       expect(result.rawText).toContain('[^1]');
+    });
+
+    it('should keep a legacy task-line anchor after the text when setting priority', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO Task text ^123',
+        text: 'Task text',
+        embedReference: '^123',
+        priority: null,
+      });
+
+      const result = await taskWriter.updateTaskPriority(task, 'high');
+
+      expect(result.rawText).toBe('TODO [#A] Task text ^123');
+    });
+
+    it('should keep a legacy task-line anchor after the text when removing priority', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO [#B] Task text ^123',
+        text: 'Task text',
+        embedReference: '^123',
+        priority: 'med',
+      });
+
+      const result = await taskWriter.removeTaskPriority(task);
+
+      expect(result.rawText).toBe('TODO Task text ^123');
+    });
+
+    it('should not move a block-end anchor onto the task line when setting priority', async () => {
+      const task: Task = createBaseTask({
+        rawText: 'TODO Task text',
+        text: 'Task text',
+        embedReference: '^block',
+        priority: null,
+      });
+
+      const result = await taskWriter.updateTaskPriority(task, 'high');
+
+      expect(result.rawText).toBe('TODO [#A] Task text');
     });
 
     it('should handle tasks with leading whitespace and priority', async () => {
@@ -1960,6 +2070,11 @@ describe('TaskWriter Instance Methods', () => {
       expect(result).toBe(
         '> > TODO Task text\n> > SCHEDULED: <2026-03-10 Tue>',
       );
+      const reparsed = TaskParser.create(
+        createTestKeywordManager(),
+        null,
+      ).parseFile(result, 'test.md');
+      expect(reparsed[0].scheduledDate).toEqual(newDate);
     });
 
     it('should update existing SCHEDULED for quote block task', async () => {
@@ -2060,7 +2175,7 @@ describe('TaskWriter Instance Methods', () => {
       expect(resultContent).toBe('> TODO Task text');
     });
 
-    it('should remove SCHEDULED line for nested quote block task', async () => {
+    it('removes a same-depth nested-quoted date line', async () => {
       const task: Task = createBaseTask({
         rawText: '> > TODO Task text',
         line: 0,
@@ -2083,12 +2198,40 @@ describe('TaskWriter Instance Methods', () => {
       const result = await taskWriter.removeTaskScheduledDate(task);
 
       expect(result.scheduledDate).toBeNull();
-      expect(mockApp.vault.process).toHaveBeenCalled();
-      const processCall = mockApp.vault.process.mock.calls[0];
-      const updateFn = processCall[1];
       const content = '> > TODO Task text\n> > SCHEDULED: <2026-03-05 Thu>';
-      const resultContent = updateFn(content);
-      expect(resultContent).toBe('> > TODO Task text');
+      const updateFn = mockApp.vault.process.mock.calls[0][1];
+      expect(updateFn(content)).toBe('> > TODO Task text');
+    });
+
+    it('leaves a date line quoted deeper than the task', async () => {
+      const task: Task = createBaseTask({
+        rawText: '> > TODO Task text',
+        line: 0,
+        indent: '> > ',
+        scheduledDate: new Date(2026, 2, 5),
+      });
+      mockApp.workspace.getActiveViewOfType = jest.fn().mockReturnValue(null);
+      const mockTFile = new MockTFile();
+      mockApp.vault.getAbstractFileByPath = jest
+        .fn()
+        .mockReturnValue(mockTFile);
+      mockApp.vault.process.mockImplementation(
+        (_file: any, updateFn: (content: string) => string) => {
+          return Promise.resolve(
+            updateFn(
+              '> > TODO Task text\n> > > SCHEDULED: <2026-03-05 Thu>',
+            ),
+          );
+        },
+      );
+
+      const result = await taskWriter.removeTaskScheduledDate(task);
+
+      expect(result.scheduledDate).toBeNull();
+      const content =
+        '> > TODO Task text\n> > > SCHEDULED: <2026-03-05 Thu>';
+      const updateFn = mockApp.vault.process.mock.calls[0][1];
+      expect(updateFn(content)).toBe(content);
     });
 
     it('should remove SCHEDULED line for checkbox task', async () => {
@@ -3021,6 +3164,35 @@ describe('TaskWriter Instance Methods', () => {
       expect(mockApp.vault.process).toHaveBeenCalledTimes(1);
     });
 
+    it('refuses to mutate a line that no longer holds the task', async () => {
+      const original = 'DONE Someone else\n  SCHEDULED: <2026-06-24 Wed +1d>';
+      let content = original;
+      mockApp.vault.process = jest
+        .fn()
+        .mockImplementation(
+          (_file: unknown, updateFn: (data: string) => string) => {
+            content = updateFn(content);
+            return Promise.resolve(content);
+          },
+        );
+      const task = createBaseTask({
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        text: 'Task text',
+        scheduledDate: new Date(2026, 5, 24),
+        scheduledDateRepeat: { type: '+', unit: 'd', value: 1, raw: '+1d' },
+      });
+
+      await expect(
+        taskWriter.applyRecurrenceUpdate(task, {
+          newScheduledDate: new Date(2026, 5, 25),
+          newState: 'TODO',
+        }),
+      ).rejects.toThrow('Task row changed before recurrence update');
+      expect(content).toBe(original);
+    });
+
     it('should update task state, scheduled date, and deadline in a single write', async () => {
       const task = createBaseTask({
         rawText: 'DONE Task text',
@@ -3253,24 +3425,43 @@ describe('TaskWriter Instance Methods', () => {
       expect(mockApp.vault.process).toHaveBeenCalledTimes(1);
     });
 
-    it('should handle null file gracefully', async () => {
+    it('refuses a rollover whose Markdown note has disappeared', async () => {
       mockApp.vault.getAbstractFileByPath = jest.fn().mockReturnValue(null);
 
       const task = createBaseTask({
+        path: 'note.md',
         rawText: 'DONE Task text',
         state: 'DONE',
         completed: true,
         deadlineDate: new Date(2026, 5, 24),
       });
 
-      const result = await taskWriter.applyRecurrenceUpdate(task, {
-        newDeadlineDate: new Date(2026, 5, 25),
-        newState: 'TODO',
+      await expect(
+        taskWriter.applyRecurrenceUpdate(task, {
+          newDeadlineDate: new Date(2026, 5, 25),
+          newState: 'TODO',
+        }),
+      ).rejects.toThrow('Task row changed before recurrence update');
+      expect(mockApp.vault.process).not.toHaveBeenCalled();
+    });
+
+    it('refuses a rollover whose Org note has disappeared', async () => {
+      mockApp.vault.getAbstractFileByPath = jest.fn().mockReturnValue(null);
+
+      const task = createBaseTask({
+        path: 'note.org',
+        rawText: 'DONE Task text',
+        state: 'DONE',
+        completed: true,
+        deadlineDate: new Date(2026, 5, 24),
       });
 
-      // Should still return correct snapshot even without file write
-      expect(result.state).toBe('TODO');
-      expect(result.deadlineDate).toEqual(new Date(2026, 5, 25));
+      await expect(
+        taskWriter.applyRecurrenceUpdate(task, {
+          newDeadlineDate: new Date(2026, 5, 25),
+          newState: 'TODO',
+        }),
+      ).rejects.toThrow('Task row changed before recurrence update');
       expect(mockApp.vault.process).not.toHaveBeenCalled();
     });
 

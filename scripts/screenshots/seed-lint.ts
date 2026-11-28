@@ -71,6 +71,14 @@ const H1_LINE = /^#(?:[ \t]|[^#\s])/;
 const CHECKBOX_LINE = /^\s*[-*+]\s*\[[ xX]\]/;
 
 /**
+ * An Org property-drawer line: a delimiter or a `:KEY:` entry.
+ *
+ * Drawers are metadata attached to the task above them, so consecutive lines
+ * are the expected shape and must not read as a hard-wrapped paragraph.
+ */
+const PROPERTY_LINE = /^:(?:PROPERTIES|END):$|^:[A-Za-z][A-Za-z0-9_-]*(?:\+)?:/;
+
+/**
  * Emoji that signal state or dates in other plugins' conventions. TODOseq
  * carries both in the keyword and the date lines, so an emoji here is at best
  * decoration and at worst a second, contradictory claim about state.
@@ -82,7 +90,11 @@ const FOREIGN_EMOJI = /[✅❌☑✔✖🗹⭕📅⏳🛫🛑➕🆔🔁🔺⏲�
  */
 function isProse(line: string, isTask: boolean, isDateLine: boolean): boolean {
   return (
-    !isTask && !isDateLine && !/^[#>\-*+\d]/.test(line) && !/^\s/.test(line)
+    !isTask &&
+    !isDateLine &&
+    !PROPERTY_LINE.test(line) &&
+    !/^[#>\-*+\d]/.test(line) &&
+    !/^\s/.test(line)
   );
 }
 

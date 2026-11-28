@@ -2,6 +2,11 @@ import { TaskParser } from '../src/parser/task-parser';
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import { Task } from '../src/types/task';
 import {
+  calculateTaskUrgency,
+  getDefaultCoefficients,
+} from '../src/utils/task-urgency';
+import { DateUtils } from '../src/utils/date-utils';
+import {
   createBaseSettings,
   createTestKeywordManager,
 } from './helpers/test-helper';
@@ -322,6 +327,26 @@ TODO task text
       expect(tasks[0].text).toBe('#tag my first task');
       expect(tasks[1].state).toBe('TODO');
       expect(tasks[1].text).toBe('my second task #tag');
+      expect(tasks[0].tags).toEqual(['tag']);
+      expect(tasks[1].tags).toEqual(['tag']);
+    });
+
+    test('should extract emoji and multibyte tags', () => {
+      const lines = `
+      TODO [#B] #🏠 Check the hot tub
+      TODO #中文标签 task with multibyte tag
+      `;
+      const tasks = parser.parseFile(lines, 'test.md');
+
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].tags).toEqual(['🏠']);
+      expect(tasks[1].tags).toEqual(['中文标签']);
+    });
+
+    test('should not drop tags that begin with a priority letter', () => {
+      const tasks = parser.parseFile('TODO #Apple buy fruit', 'test.md');
+
+      expect(tasks[0].tags).toEqual(['Apple']);
     });
   });
 
@@ -1316,8 +1341,11 @@ TODO 🇨🇦 Canadian flag
         'scheduled',
       );
       // Nested quotes (>>) not supported - returns null
+      expect(parser.getDateLineType('>> SCHEDULED: <2026-03-10>', '>> ')).toBe(
+        'scheduled',
+      );
       expect(
-        parser.getDateLineType('>> SCHEDULED: <2026-03-10>', '>> '),
+        parser.getDateLineType('> > > SCHEDULED: <2026-03-10>', '>> '),
       ).toBeNull();
     });
 
@@ -1435,6 +1463,78 @@ TODO 🇨🇦 Canadian flag
         'deadline',
       );
     });
+  });
+});
+
+describe('nested-quoted date lines', () => {
+  const nestedParser = TaskParser.create(createTestKeywordManager(), null);
+
+  test('parses a scheduled date at the task quote depth', () => {
+    const tasks = nestedParser.parseFile(
+      [
+        '> > - [ ] TODO Nested task',
+        '> > SCHEDULED: <2026-03-10 Tue +1d --2d>',
+      ].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].scheduledDate).toEqual(new Date(2026, 2, 10));
+    expect(tasks[0].scheduledDateRepeat).toEqual({
+      type: '+',
+      unit: 'd',
+      value: 1,
+      raw: '+1d',
+    });
+    expect(tasks[0].scheduledWarningPeriod).toEqual({
+      value: 2,
+      unit: 'd',
+      isFirstOnly: true,
+    });
+  });
+
+  test('parses a deadline at a compact two-marker depth', () => {
+    const tasks = nestedParser.parseFile(
+      ['>> - [ ] TODO Nested task', '>> DEADLINE: <2026-03-12 Thu>'].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].deadlineDate).toEqual(new Date(2026, 2, 12));
+  });
+
+  test('parses a date at three quote levels', () => {
+    const tasks = nestedParser.parseFile(
+      [
+        '> > > - [ ] TODO Nested task',
+        '> > > SCHEDULED: <2026-03-10 Tue>',
+      ].join('\n'),
+      'test.md',
+    );
+
+    expect(tasks[0].scheduledDate).toEqual(new Date(2026, 2, 10));
+  });
+
+  test('does not parse a date quoted deeper than the task', () => {
+    const tasks = nestedParser.parseFile(
+      ['> > - [ ] TODO Nested task', '> > > SCHEDULED: <2026-03-10 Tue>'].join(
+        '\n',
+      ),
+      'test.md',
+    );
+
+    expect(tasks[0].scheduledDate).toBeNull();
+  });
+
+  test('still parses a depth-one date under a nested task', () => {
+    const tasks = nestedParser.parseFile(
+      ['> > - [ ] TODO Nested task', '> SCHEDULED: <2026-03-10 Tue>'].join(
+        '\n',
+      ),
+      'test.md',
+    );
+
+    expect(tasks[0].scheduledDate).toEqual(new Date(2026, 2, 10));
   });
 });
 
@@ -1576,6 +1676,252 @@ describe('table task parsing', () => {
     });
   });
 
+  describe('properties drawers', () => {
+    const drawerParser = TaskParser.create(
+      createTestKeywordManager(createBaseSettings()),
+      null,
+      undefined,
+    );
+
+    const parse = (content: string): Task[] =>
+      drawerParser.parseFile(content, 'test.md');
+
+    it('attaches ID, BLOCKER, append and archived history to plain tasks', () => {
+      const tasks = parse(`TODO Write paper
+:PROPERTIES:
+:ID: paper-01
+:BLOCKER: data-02 literature-03
+:BLOCKER+: approval-04
+:ARCHIVED_BLOCKER: old-01
+:Unknown: preserved
+:END:`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'paper-01',
+        blockedBy: ['data-02', 'literature-03', 'approval-04'],
+        archivedBlockers: ['old-01'],
+        properties: {
+          ID: 'paper-01',
+          BLOCKER: 'data-02 literature-03 approval-04',
+          ARCHIVED_BLOCKER: 'old-01',
+        },
+      });
+      expect(tasks[0].propertyIssues).toBeUndefined();
+    });
+
+    it('supports heading, bullet, checkbox and quoted task drawers', () => {
+      const tasks = parse(`# TODO Heading
+:PROPERTIES:
+:ID: heading-1
+:END:
+- TODO Bullet
+  :PROPERTIES:
+  :ID: bullet-1
+  :END:
+- [ ] TODO Checkbox
+  :PROPERTIES:
+  :ID: check-1
+  :END:
+> TODO Quoted
+> :PROPERTIES:
+> :ID: quote-1
+> :END:`);
+      expect(tasks.map((task) => task.id)).toEqual([
+        'heading-1',
+        'bullet-1',
+        'check-1',
+        'quote-1',
+      ]);
+    });
+
+    it('keeps the drawer out of subtask counts and child parentage', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: parent-1
+:END:
+  - [ ] Child
+`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'parent-1',
+        subtaskCount: 1,
+        subtaskCompletedCount: 0,
+      });
+    });
+
+    it('does not let an unclosed drawer consume a following task', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: parent-1
+TODO Child`);
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].id).toBe('parent-1');
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'malformed-drawer' }),
+      ]);
+      expect(tasks[1].text).toBe('Child');
+      expect(tasks[1].id).toBeUndefined();
+    });
+
+    it('still counts an indented child after an unclosed drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: parent-1
+  - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0].subtaskCount).toBe(1);
+    });
+
+    it('counts children after an indented drawer', () => {
+      const tasks = parse(`  - TODO Parent
+    :PROPERTIES:
+    :ID: parent-1
+    :END:
+    - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'parent-1',
+        subtaskCount: 1,
+      });
+    });
+
+    it('counts children after a quoted drawer', () => {
+      const tasks = parse(`> TODO Parent
+> :PROPERTIES:
+> :ID: parent-1
+> :END:
+>   - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'parent-1',
+        subtaskCount: 1,
+      });
+    });
+
+    it('ignores a second drawer but reports it', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: first
+:END:
+:PROPERTIES:
+:ID: second
+:END:`);
+      expect(tasks[0].id).toBe('first');
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'duplicate-drawer', line: 4 }),
+      ]);
+    });
+
+    it('still counts children after a second drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:ID: first
+:END:
+:PROPERTIES:
+:ID: second
+:END:
+  - [ ] Child`);
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        id: 'first',
+        subtaskCount: 1,
+      });
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({ code: 'duplicate-drawer' }),
+      ]);
+    });
+
+    it('reports malformed Markdown dependency links without splitting them', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:BLOCKER: good [[Broken link
+:END:`);
+      expect(tasks[0].blockedBy).toEqual(['good']);
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({
+          code: 'invalid-reference',
+          reference: '[[Broken link',
+        }),
+      ]);
+    });
+
+    it('parses dates and DESCRIPTION around a drawer', () => {
+      const tasks = parse(`TODO Parent
+SCHEDULED: <2026-05-10 Sun>
+:PROPERTIES:
+:ID: parent-1
+:END:
+DESCRIPTION: After the drawer
+CLOSED: [2026-05-09 Sat]`);
+      expect(tasks[0].scheduledDate).not.toBeNull();
+      expect(tasks[0].closedDate).not.toBeNull();
+      expect(tasks[0].description).toBe('After the drawer');
+    });
+
+    it('reports malformed and misplaced metadata inside a drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+SCHEDULED: <2026-03-05 Thu>
+DEADLINE: <2026-03-10 Tue>
+CLOSED: [2026-03-05 Thu]
+STARTED: [2026-03-05 Thu]
+DESCRIPTION: hidden description
+:BOGUS
+:BLOCKER: blocker-1
+:END:
+SCHEDULED: <2026-03-10 Tue>`);
+      expect(tasks[0].scheduledDate?.getDate()).toBe(10);
+      expect(tasks[0].deadlineDate).toBeNull();
+      expect(tasks[0].closedDate).toBeNull();
+      expect(tasks[0].startedDate).toBeNull();
+      expect(tasks[0].description).toBeUndefined();
+      expect(tasks[0].blockedBy).toEqual(['blocker-1']);
+      expect(tasks[0].properties?.BLOCKER).toBe('blocker-1');
+      expect(tasks[0].propertyIssues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ code: 'misplaced-metadata', line: 2 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 3 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 4 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 5 }),
+          expect.objectContaining({ code: 'misplaced-metadata', line: 6 }),
+          expect.objectContaining({
+            code: 'invalid-property',
+            line: 7,
+            reference: ':BOGUS',
+          }),
+        ]),
+      );
+    });
+
+    it('reports property-style metadata inside a drawer', () => {
+      const tasks = parse(`TODO Parent
+:PROPERTIES:
+:SCHEDULED: <2026-03-05 Thu>
+:BLOCKER: blocker-1
+:END:`);
+      expect(tasks[0].scheduledDate).toBeNull();
+      expect(tasks[0].blockedBy).toEqual(['blocker-1']);
+      expect(tasks[0].propertyIssues).toEqual([
+        expect.objectContaining({
+          code: 'misplaced-metadata',
+          line: 2,
+          reference: ':SCHEDULED: <2026-03-05 Thu>',
+        }),
+      ]);
+    });
+
+    it('does not leak drawer lines from table cells into a following task', () => {
+      const tasks = parse(`| TODO Cell |
+:PROPERTIES:
+:ID: table-trap
+:END:
+TODO Next`);
+      expect(tasks).toHaveLength(2);
+      expect(tasks[0].id).toBeUndefined();
+      expect(tasks[1].id).toBeUndefined();
+    });
+  });
+
   describe('configured active keyword segments (keyword-groups example)', () => {
     // STARTED configured as an ACTIVE keyword (the documented keyword-
     // groups example) must never make a <br>STARTED: date segment parse
@@ -1611,5 +1957,138 @@ describe('table task parsing', () => {
       expect(tasks[0].text).toBe('a');
       expect(tasks[1].text).toBe('b');
     });
+  });
+});
+
+describe('Block-end anchors', () => {
+  const parser = TaskParser.create(
+    createTestKeywordManager(createBaseSettings()),
+    null,
+    undefined,
+    createBaseSettings(),
+  );
+  const parse = (content: string): Task[] =>
+    parser.parseFile(content, 'test.md');
+
+  it('reads an anchor at the end of a SCHEDULED line and cleans the date', () => {
+    const tasks = parse(
+      'TODO test\nSCHEDULED: <2026-11-23 Mon> ^todoseq-abc123',
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].text).toBe('test');
+    expect(tasks[0].scheduledDate).not.toBeNull();
+    expect(tasks[0].embedReference).toBe('^todoseq-abc123');
+  });
+
+  it('reads an anchor after :END: and still attaches properties', () => {
+    const tasks = parse(
+      'TODO test another\nSCHEDULED: <2026-11-23 Mon>\n:PROPERTIES:\n:ID: probe-1\n:END: ^todoseq-abc123',
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].scheduledDate).not.toBeNull();
+    expect(tasks[0].id).toBe('probe-1');
+    expect(tasks[0].propertyIssues).toBeUndefined();
+    expect(tasks[0].embedReference).toBe('^todoseq-abc123');
+  });
+
+  it('reads an anchor at the end of DESCRIPTION and cleans the description', () => {
+    const tasks = parse('TODO test\nDESCRIPTION: some text ^descrend');
+    expect(tasks[0].description).toBe('some text');
+    expect(tasks[0].embedReference).toBe('^descrend');
+  });
+
+  it('treats an anchor-only DESCRIPTION as empty', () => {
+    const tasks = parse('TODO test\nDESCRIPTION: ^descanchor');
+    expect(tasks[0].description).toBeUndefined();
+    expect(tasks[0].embedReference).toBe('^descanchor');
+  });
+
+  it('parses CLOSED brackets with a trailing anchor', () => {
+    const tasks = parse('TODO test\nCLOSED: [2026-11-23 Mon] ^closedend');
+    expect(tasks[0].closedDate).not.toBeNull();
+    expect(tasks[0].closedDate?.getMonth()).toBe(10);
+    expect(tasks[0].closedDate?.getDate()).toBe(23);
+    expect(tasks[0].embedReference).toBe('^closedend');
+  });
+
+  it('prefers a task-line anchor over a block-end anchor', () => {
+    const tasks = parse(
+      'TODO test ^taskline\nSCHEDULED: <2026-11-23 Mon> ^blockend',
+    );
+    expect(tasks[0].text).toBe('test');
+    expect(tasks[0].embedReference).toBe('^taskline');
+  });
+
+  it('uses the shared anchor grammar on the task line', () => {
+    expect(parse('TODO task foo^bar')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task ^anchor]')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task ^')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task [^1]')[0].embedReference).toBeUndefined();
+    expect(parse('TODO task [^1]')[0].footnoteReference).toBe('[^1]');
+  });
+
+  it('keeps metadata after a blank line associated but anchors the task line', () => {
+    const tasks = parse(
+      'TODO test ^taskline\n\nSCHEDULED: <2026-11-23 Mon> ^blockend',
+    );
+    expect(tasks[0].scheduledDate).not.toBeNull();
+    expect(tasks[0].embedReference).toBe('^taskline');
+  });
+
+  it('does not swallow the following task after an anchored drawer', () => {
+    const tasks = parse(
+      'TODO first\n:PROPERTIES:\n:ID: first-1\n:END: ^firstend\nTODO second',
+    );
+    expect(tasks).toHaveLength(2);
+    expect(tasks[0].id).toBe('first-1');
+    expect(tasks[0].embedReference).toBe('^firstend');
+    expect(tasks[1].text).toBe('second');
+    expect(tasks[1].embedReference).toBeUndefined();
+  });
+});
+
+describe('Task parsing uses one parse-wide today', () => {
+  const referenceDate = new Date(2026, 3, 15, 23, 30);
+  const settings = createBaseSettings();
+  const parser = TaskParser.create(
+    createTestKeywordManager(settings),
+    null,
+    undefined,
+    settings,
+  );
+
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(referenceDate);
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('matches a direct calculation with the same explicit day', () => {
+    const tasks = parser.parseFile(
+      'TODO task\nDEADLINE: <2026-04-20>',
+      'test.md',
+    );
+    const expected = calculateTaskUrgency(tasks[0], getDefaultCoefficients(), {
+      todayStart: new Date(2026, 3, 15),
+    });
+
+    expect(tasks[0].urgency).toBe(expected);
+  });
+
+  it('normalizes one today for the whole file', () => {
+    const startOfDay = jest.spyOn(DateUtils, 'getStartOfDay');
+
+    try {
+      parser.parseFile(
+        'TODO one\nDEADLINE: <2026-04-20>\n\nTODO two\nDEADLINE: <2026-04-21>',
+        'test.md',
+      );
+      // One parse-wide today plus one normalization per deadline date.
+      expect(startOfDay).toHaveBeenCalledTimes(3);
+    } finally {
+      startOfDay.mockRestore();
+    }
   });
 });

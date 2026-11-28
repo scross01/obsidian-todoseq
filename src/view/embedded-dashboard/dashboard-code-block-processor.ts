@@ -101,6 +101,7 @@ export class DashboardCodeBlockProcessor {
       this.plugin.settings,
       keywordManager ?? this.plugin.keywordManager,
       this.plugin.propertySearchEngine,
+      this.plugin.taskDependencyManager,
     );
   }
 

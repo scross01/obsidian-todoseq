@@ -110,6 +110,25 @@ export const SCENARIO_PLUGIN_SOURCES: Record<string, readonly string[]> = {
   'docs-embedded-collapse': ['src/view/embedded-task-list/**'],
   // The warning arrows: the task list rows and the date badges they hang off.
   'docs-warning-periods': ['src/view/task-list/**'],
+  // Blocked rows and the Issues panel: the row renderer, the marker decision
+  // shared by every surface, the panel's own labels, and the graph that
+  // resolves a reference to a reason.
+  'docs-task-dependencies': [
+    'src/view/task-list/**',
+    'src/view/components/dependency-marker.ts',
+    'src/view/components/task-issues.ts',
+    'src/services/task-dependency-manager.ts',
+  ],
+  // The generated-properties workflow: the row menu that writes, the writer
+  // that generates the ID, the editor rendering the drawers, and the resolved
+  // lock the dependent gains once the blocker lands.
+  'docs-org-properties': [
+    'src/view/task-list/**',
+    'src/view/components/task-context-menu.ts',
+    'src/view/components/dependency-marker.ts',
+    'src/view/editor-extensions/**',
+    'src/services/task-writer.ts',
+  ],
   // The hero GIF: typing in the editor, so the editor extensions again, plus
   // the natural-language date rewriting that the demo visibly depends on.
   'docs-task-entry': [

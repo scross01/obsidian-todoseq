@@ -1,8 +1,6 @@
 # Moving Tasks
 
-TODOseq provides several ways to move tasks between locations in your vault. Whether you want to copy a task to today's note, move it entirely, or migrate it with a custom state marker, these actions help you manage task flow without losing context.
-
-You can perform these actions through the [task context menu](task-list.md#task-context-menu) or by [drag and drop](task-list.md#drag-and-drop) directly from the Task List into an open file in your vault.
+Tasks can be copied, moved or migrated from the [task context menu](task-list.md#task-context-menu), or by [drag and drop](task-list.md#drag-and-drop) from the Task List into an open file.
 
 Some copy/move actions require a daily-note provider: the Daily Notes core plugin, or Periodic Notes with its daily note enabled. When neither provides a daily note, those commands are unavailable in the command palette and nothing is created.
 
@@ -12,25 +10,25 @@ Copy, move and drag-and-drop take the whole task block: the task line, its conse
 
 Migrate to Today is the exception: the copy keeps the full block, while the source line keeps `STARTED:`, `CLOSED:` and `DESCRIPTION:` and loses only the `SCHEDULED:` and `DEADLINE:` dates it is moving to the new copy.
 
+A task with an `ID` or block anchor keeps it, and the references TODOseq can find are updated to follow the task. See [Task IDs and Anchors](task-ids.md) for how identities work and what [Task Dependencies](task-dependencies.md#moving-and-copying-tasks) does with them.
+
 ## Copy
 
-Copy the task content to the clipboard. This is useful when you want to duplicate a task without changing its original location.
+Copy puts the task text on the clipboard and leaves the note unchanged.
 
 ## Copy to today
 
-Copy to Today duplicates a task into today's daily note while keeping the original in place. This is useful when you want to review a task in today's context without removing it from its original location.
+Copy to Today adds a copy to today's daily note and leaves the original where it is.
 
 ## Move to today
 
-Move to Today transfers a task to today's daily note and removes it from its original location. This is useful when you want to consolidate tasks into your daily workflow and remove them from their original context. When you move a task, it appears at the end of today's daily note and is deleted from its original file.
+Move to Today appends the task to today's daily note and deletes it from its original file.
 
 ## Migrate to today
 
-Migrate to Today combines copying with state transformation. It copies the task to today's daily note and replaces the original task's keyword with a custom state. This is particularly useful for marking tasks as moved, archived, or otherwise completed in the original location when moving the task to today's note.
+Migrate to Today copies the task to today's daily note and replaces the original's keyword with a custom state, marking it as moved or archived in place.
 
-The replacement keyword is configurable in settings under [Migrated state keyword](settings.md#migrated-state-keyword). Here are several approaches to using this feature:
-
-Using a standard keyword like `ARCHIVED` or a custom keyword like `MOVED` to clearly indicates the task's new status while maintaining compatibility with TODOseq's state system:
+The replacement keyword is configured under [Migrated state keyword](settings.md#migrated-state-keyword). A standard keyword such as `ARCHIVED`, or a custom one such as `MOVED`, shows the task's new status and still counts as a known keyword:
 
 ```markdown
 # source page
@@ -52,9 +50,9 @@ ARCHIVED Review project timeline
 TODO Review project timeline
 ```
 
-The replacement text does not need to be a valid task keyword. You can use any text to indicate the task's new status
+The replacement does not have to be a task keyword. Any text works, including a marker that stops TODOseq tracking the line:
 
-Using a non-keyword marker such as `(migrated)` or `(moved)` can be used to retain to original task content while removing from being tracked by TODOseq:
+A non-keyword marker such as `(migrated)` keeps the task text but removes the line from TODOseq:
 
 ```markdown
 # source page
@@ -62,7 +60,7 @@ Using a non-keyword marker such as `(migrated)` or `(moved)` can be used to reta
 (migrated) Review project timeline
 ```
 
-Combining a keyword with custom text e.g. `ARCHIVED (moved)` helps to provide additional context about the task's new status:
+A keyword plus text, such as `ARCHIVED (moved)`, adds context:
 
 ```markdown
 # source page
@@ -70,6 +68,10 @@ Combining a keyword with custom text e.g. `ARCHIVED (moved)` helps to provide ad
 ARCHIVED (moved) Review project timeline
 ```
 
-## What copy, move and migrate guarantee
+## If something goes wrong
 
-Transfers are written by the task writer, not by the view. The destination append is atomic, so two transfers into the same note can never overwrite one another, and an open unsaved editor buffer is the source of truth for both files. The source is revalidated immediately before it changes: if the task moved or changed since the list was rendered, the transfer stops with a notice instead of copying the wrong line. A table cell task transfers as a normal task line; moving one clears only that cell, leaving the rest of the row byte-for-byte intact, and removes the row only when nothing else is in it. A failed destination write never removes the source; if the destination succeeds and the source cannot be updated, the notice says the task was copied but not updated.
+A transfer writes the editor's current content, including unsaved changes, and checks the task again just before writing. If the task has moved since the list was drawn, the transfer stops with a notice rather than copying the wrong line.
+
+A failed write to the destination leaves the original untouched. If the destination succeeds but the original cannot be updated, the notice says the task was copied but not updated. A table cell is changed in place: only that cell is cleared, and the row is removed only when it is empty.
+
+Links to the task are updated during the transfer. If any could not be updated, the notice names the notes that could not be read and the links that could not be written, and Retry repeats the link updates only.

@@ -2,10 +2,10 @@
  * Bundle-size budget guard (report-only baseline with a generous ceiling).
  *
  * Obsidian loads the whole plugin bundle on every app start, so bundle size
- * is a startup-cost input. The ceiling is deliberately generous (~+24%
- * headroom over the recorded baseline) so this stays silent unless something
- * genuinely large lands — the same "quiet unless actually wrong" principle
- * the repo's screenshot staleness check uses.
+ * is a startup-cost input. The ceiling is deliberately generous (a few
+ * kilobytes of headroom over the 2026-11-24 recorded build) so this stays
+ * silent unless something genuinely large lands — the same "quiet unless
+ * actually wrong" principle the repo's screenshot staleness check uses.
  *
  * Skips quietly when no build artifact exists (fresh checkout without
  * `npm run build`); CI builds before running unit tests, so the guard is
@@ -20,8 +20,8 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const MAIN_JS = path.join(REPO_ROOT, 'main.js');
 const STYLES_CSS = path.join(REPO_ROOT, 'styles.css');
 
-/** ~+24% headroom over the recorded baseline gzip (see failure message). */
-const GZIP_CEILING_BYTES = 175 * 1024;
+/** Re-baselined 2026-11-24 after the target-ownership and recurrence work. */
+const GZIP_CEILING_BYTES = 180 * 1024;
 
 function gzipBytes(file: string): number {
   return zlib.gzipSync(fs.readFileSync(file)).length;

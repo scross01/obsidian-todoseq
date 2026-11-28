@@ -68,6 +68,21 @@ test.describe('Settings tab', () => {
     expect(currentValue).toBe('IN-PROGRESS');
   });
 
+  test('hide task properties in Reading view is off by default and can be enabled', async () => {
+    const settingsPage = await openSettings(page);
+    await navigateToPluginTab(settingsPage, 'TODOseq');
+
+    const toggle = settingsPage
+      .locator('.setting-item', {
+        hasText: 'Hide task properties in Reading view',
+      })
+      .locator('.checkbox-container');
+
+    await expect(toggle).not.toHaveClass(/is-enabled/);
+    await toggle.click();
+    await expect(toggle).toHaveClass(/is-enabled/);
+  });
+
   test('toggling off code block inclusion forces language comment support off', async () => {
     const settingsPage = await openSettings(page);
     await navigateToPluginTab(settingsPage, 'TODOseq');

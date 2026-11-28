@@ -3,7 +3,12 @@
  * Parses tasks from org-mode files using org-mode syntax.
  */
 
-import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
+import {
+  Task,
+  DateRepeatInfo,
+  WarningPeriodInfo,
+  type TaskPropertyIssue,
+} from '../types/task';
 import { ITaskParser, ParserConfig } from './types';
 import { DateParser } from './date-parser';
 import { KeywordManager } from '../utils/keyword-manager';
@@ -14,16 +19,19 @@ import {
   UrgencyContext,
 } from '../utils/task-urgency';
 import { getDailyNoteInfo } from '../utils/daily-note-utils';
+import { DateUtils } from '../utils/date-utils';
 import { RegexCache } from '../utils/regex-cache';
 import {
   buildOrgHeadlineRegex,
-  ORG_SCHEDULED_LINE_PATTERN,
-  ORG_DEADLINE_LINE_PATTERN,
-  ORG_PROPERTIES_START,
-  ORG_PROPERTIES_END,
   extractOrgPriority,
   getNestingLevel,
 } from '../utils/org-patterns';
+import {
+  extractTaskProperties,
+  isPropertiesDrawerStart,
+  readTaskPropertiesDrawer,
+  type ParsedTaskProperties,
+} from '../utils/task-properties';
 import { TFile, App } from 'obsidian';
 
 /**
@@ -50,6 +58,8 @@ export class OrgModeTaskParser implements ITaskParser {
   private keywords: string[];
   private keywordManager: KeywordManager;
   private urgencyCoefficients: UrgencyCoefficients;
+  /** Normalized start of day for the current parseFile pass, if any. */
+  private parseTodayStart: Date | null = null;
   private regexCache: RegexCache;
   private headlineRegex: RegExp;
   private readonly app: App;
@@ -116,25 +126,31 @@ export class OrgModeTaskParser implements ITaskParser {
    * Parse file content and extract tasks.
    */
   parseFile(content: string, path: string, file?: TFile): Task[] {
-    const lines = content.split('\n');
-    const tasks: Task[] = [];
+    const previousTodayStart = this.parseTodayStart;
+    this.parseTodayStart = DateUtils.getStartOfDay(new Date());
+    try {
+      const lines = content.split('\n');
+      const tasks: Task[] = [];
 
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
+      for (let index = 0; index < lines.length; index++) {
+        const line = lines[index];
 
-      // Skip empty lines
-      if (line.trim() === '') {
-        continue;
+        // Skip empty lines
+        if (line.trim() === '') {
+          continue;
+        }
+
+        // Try to parse as org-mode headline task
+        const task = this.tryParseHeadlineTask(line, index, path, lines, file);
+        if (task) {
+          tasks.push(task);
+        }
       }
 
-      // Try to parse as org-mode headline task
-      const task = this.tryParseHeadlineTask(line, index, path, lines, file);
-      if (task) {
-        tasks.push(task);
-      }
+      return tasks;
+    } finally {
+      this.parseTodayStart = previousTodayStart;
     }
-
-    return tasks;
   }
 
   /**
@@ -143,6 +159,18 @@ export class OrgModeTaskParser implements ITaskParser {
    */
   parseLine(line: string, lineNumber: number, filePath: string): Task | null {
     return this.tryParseHeadlineTask(line, lineNumber, filePath, [], undefined);
+  }
+
+  /** Classify an Org planning line without changing the task parser contract. */
+  getDateLineType(
+    line: string,
+    _taskIndent: string,
+  ): 'scheduled' | 'deadline' | 'closed' | null {
+    const match = line
+      .trimStart()
+      .match(/^(SCHEDULED|DEADLINE|CLOSED):\s*(?:<|\[)/i);
+    if (!match) return null;
+    return match[1].toLowerCase() as 'scheduled' | 'deadline' | 'closed';
   }
 
   /**
@@ -163,6 +191,14 @@ export class OrgModeTaskParser implements ITaskParser {
       }
     }
     return false;
+  }
+
+  private urgencyContext(): UrgencyContext {
+    return {
+      activeKeywordsSet: this.keywordManager.getActiveSet(),
+      waitingKeywordsSet: this.keywordManager.getWaitingSet(),
+      todayStart: this.parseTodayStart ?? undefined,
+    };
   }
 
   /**
@@ -250,6 +286,7 @@ export class OrgModeTaskParser implements ITaskParser {
         deadlineWarningPeriod,
         closedDate,
         startedDate,
+        propertyInfo,
       } = this.extractTaskDates(lines, index + 1);
       task.scheduledDate = scheduledDate;
       task.scheduledDateRepeat = scheduledDateRepeat;
@@ -259,18 +296,17 @@ export class OrgModeTaskParser implements ITaskParser {
       task.deadlineWarningPeriod = deadlineWarningPeriod;
       task.closedDate = closedDate;
       task.startedDate = startedDate;
+      if (propertyInfo) {
+        this.applyParsedProperties(task, propertyInfo);
+      }
     }
 
     // Calculate urgency for non-completed tasks
     if (!task.completed) {
-      const urgencyContext: UrgencyContext = {
-        activeKeywordsSet: this.keywordManager.getActiveSet(),
-        waitingKeywordsSet: this.keywordManager.getWaitingSet(),
-      };
       task.urgency = calculateTaskUrgency(
         task,
         this.urgencyCoefficients,
-        urgencyContext,
+        this.urgencyContext(),
       );
     }
 
@@ -292,6 +328,7 @@ export class OrgModeTaskParser implements ITaskParser {
     deadlineWarningPeriod: WarningPeriodInfo | null;
     closedDate: Date | null;
     startedDate: Date | null;
+    propertyInfo: ParsedTaskProperties | null;
   } {
     let scheduledDate: Date | null = null;
     let scheduledDateRepeat: DateRepeatInfo | null = null;
@@ -301,8 +338,8 @@ export class OrgModeTaskParser implements ITaskParser {
     let deadlineWarningPeriod: WarningPeriodInfo | null = null;
     let closedDate: Date | null = null;
     let startedDate: Date | null = null;
-
-    let inPropertiesDrawer = false;
+    let propertyInfo: ParsedTaskProperties | null = null;
+    let seenBody = false;
 
     for (let i = startIndex; i < lines.length; i++) {
       const line = lines[i];
@@ -312,54 +349,86 @@ export class OrgModeTaskParser implements ITaskParser {
         continue;
       }
 
-      // Check for properties drawer
-      if (ORG_PROPERTIES_START.test(line)) {
-        inPropertiesDrawer = true;
-        continue;
-      }
-
-      if (ORG_PROPERTIES_END.test(line)) {
-        inPropertiesDrawer = false;
-        continue;
-      }
-
-      // Skip lines inside properties drawer (except for date lines which are outside)
-      if (inPropertiesDrawer) {
-        continue;
-      }
-
-      // Check for next headline (starts with *), stop searching
+      // Check for next headline (starts with *), stop searching. This must
+      // happen before drawer handling so an unclosed drawer cannot absorb the
+      // next entry.
       if (/^\*/.test(line)) {
         break;
       }
 
-      // Check for scheduled date
-      const scheduledMatch = ORG_SCHEDULED_LINE_PATTERN.exec(line);
-      if (scheduledMatch && !scheduledDate) {
-        const dateContent = scheduledMatch[1];
-        const { date, repeat, warningPeriod } =
-          this.parseOrgDateWithRepeater(dateContent);
+      if (isPropertiesDrawerStart(line, 'org')) {
+        const drawer = readTaskPropertiesDrawer(lines, i, 'org', {
+          isBoundary: (candidate) => /^\*/.test(candidate),
+        });
+        if (drawer) {
+          if (!seenBody && !propertyInfo) {
+            propertyInfo = extractTaskProperties(drawer, 'org');
+            if (!drawer.closed) {
+              console.debug(
+                `Unclosed properties drawer at line ${drawer.startLine + 1}.`,
+              );
+            }
+          } else if (!seenBody && propertyInfo) {
+            const existingProperties: ParsedTaskProperties = propertyInfo;
+            const issues: TaskPropertyIssue[] = [
+              ...(existingProperties.propertyIssues ?? []),
+              {
+                code: 'duplicate-drawer',
+                line: i,
+                message: 'A second properties drawer is ignored.',
+              },
+            ];
+            propertyInfo = { ...existingProperties, propertyIssues: issues };
+          }
+          i = drawer.endLine;
+          if (!drawer.closed) break;
+          continue;
+        }
+      }
+
+      // A drawer after body text is preserved but does not attach as entry
+      // properties. Skip it without consuming the following headline.
+      if (isPropertiesDrawerStart(line, 'org')) {
+        const drawer = readTaskPropertiesDrawer(lines, i, 'org', {
+          isBoundary: (candidate) => /^\*/.test(candidate),
+        });
+        if (drawer) {
+          i = drawer.endLine;
+          if (!drawer.closed) break;
+          continue;
+        }
+      }
+
+      // Planning metadata can share one line. Read both timestamps before
+      // continuing so a combined line does not hide DEADLINE.
+      const scheduledMatch = !scheduledDate
+        ? /(?:^|\s)SCHEDULED:\s*(<[^>]+>|\[[^\]]+\])/.exec(line)
+        : null;
+      if (scheduledMatch) {
+        const { date, repeat, warningPeriod } = this.parseOrgDateWithRepeater(
+          scheduledMatch[1],
+        );
         if (date) {
           scheduledDate = date;
           scheduledDateRepeat = repeat;
           scheduledWarningPeriod = warningPeriod;
         }
-        continue;
       }
 
-      // Check for deadline date
-      const deadlineMatch = ORG_DEADLINE_LINE_PATTERN.exec(line);
-      if (deadlineMatch && !deadlineDate) {
-        const dateContent = deadlineMatch[1];
-        const { date, repeat, warningPeriod } =
-          this.parseOrgDateWithRepeater(dateContent);
+      const deadlineMatch = !deadlineDate
+        ? /(?:^|\s)DEADLINE:\s*(<[^>]+>|\[[^\]]+\])/.exec(line)
+        : null;
+      if (deadlineMatch) {
+        const { date, repeat, warningPeriod } = this.parseOrgDateWithRepeater(
+          deadlineMatch[1],
+        );
         if (date) {
           deadlineDate = date;
           deadlineDateRepeat = repeat;
           deadlineWarningPeriod = warningPeriod;
         }
-        continue;
       }
+      if (scheduledMatch || deadlineMatch) continue;
 
       // History lines use inactive brackets and may sit below the planning
       // dates, so keep scanning until the next headline rather than stopping
@@ -375,6 +444,8 @@ export class OrgModeTaskParser implements ITaskParser {
         startedDate = this.parseOrgDateWithRepeater(startedMatch[1]).date;
         continue;
       }
+
+      seenBody = true;
     }
 
     return {
@@ -386,7 +457,25 @@ export class OrgModeTaskParser implements ITaskParser {
       deadlineWarningPeriod,
       closedDate,
       startedDate,
+      propertyInfo,
     };
+  }
+
+  private applyParsedProperties(
+    task: Task,
+    parsed: ParsedTaskProperties,
+  ): void {
+    if (parsed.properties) task.properties = parsed.properties;
+    if (parsed.id !== undefined) task.id = parsed.id;
+    if (parsed.blockedBy !== undefined) task.blockedBy = parsed.blockedBy;
+    if (parsed.archivedBlockers !== undefined) {
+      task.archivedBlockers = parsed.archivedBlockers;
+    }
+    if (parsed.ordered !== undefined) task.ordered = parsed.ordered;
+    if (parsed.noblocking !== undefined) task.noblocking = parsed.noblocking;
+    if (parsed.propertyIssues?.length) {
+      task.propertyIssues = parsed.propertyIssues;
+    }
   }
 
   /**

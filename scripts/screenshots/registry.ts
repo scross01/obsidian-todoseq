@@ -18,6 +18,26 @@ export type ScenarioKind = 'stills' | 'gif';
  */
 export type ThemeMode = 'dark' | 'light';
 
+/**
+ * One pure module of seed notes under scenarios/seeds/.
+ *
+ * Seed maps are split per scenario dependency set so editing the dashboard
+ * notes does not invalidate the settings capture. A scenario declares the
+ * modules it stages, and `scenario-inputs.ts` hashes exactly those.
+ */
+export type SeedModuleId =
+  | 'demo'
+  | 'search-filter'
+  | 'editor'
+  | 'embed'
+  | 'task-entry'
+  | 'dashboard'
+  | 'archive'
+  | 'warning-period'
+  | 'collapse'
+  | 'dependencies'
+  | 'org-properties';
+
 /** One entry in the scenario registry. */
 export interface ScenarioDef {
   /** ODR script file, basename within scenarios/. */
@@ -40,24 +60,80 @@ export interface ScenarioDef {
    * undershooting only fails to remove the empty frames.
    */
   trimStartSeconds?: number;
+  /**
+   * Seed modules this scenario stages, in staging order.
+   *
+   * Every module is hashed with the scenario, so declaring one here widens the
+   * scenarios a seed edit invalidates — and omitting one would let a real seed
+   * change report FRESH. tests/screenshot-seed-registry.test.ts checks the
+   * declaration against the script's actual imports and staging.
+   */
+  seeds: SeedModuleId[];
 }
 
 /** Registry: scenario id → what to run and what it produces. */
 export const SCENARIOS: Record<string, ScenarioDef> = {
-  'docs-editor': { script: 'editor.ts', kind: 'stills' },
-  'docs-task-list': { script: 'task-list.ts', kind: 'stills' },
-  'docs-embedded-reader': { script: 'embedded-reader.ts', kind: 'stills' },
-  'docs-search': { script: 'search.ts', kind: 'stills' },
-  'docs-settings': { script: 'settings.ts', kind: 'stills' },
-  'docs-dashboards': { script: 'dashboards.ts', kind: 'stills' },
-  'docs-auto-archive': { script: 'auto-archive.ts', kind: 'stills' },
-  'docs-warning-periods': { script: 'warning-periods.ts', kind: 'stills' },
-  'docs-embedded-collapse': { script: 'embedded-collapse.ts', kind: 'stills' },
+  'docs-editor': {
+    script: 'editor.ts',
+    kind: 'stills',
+    seeds: ['demo', 'editor'],
+  },
+  'docs-task-list': {
+    script: 'task-list.ts',
+    kind: 'stills',
+    seeds: ['demo'],
+  },
+  'docs-embedded-reader': {
+    script: 'embedded-reader.ts',
+    kind: 'stills',
+    seeds: ['demo', 'embed'],
+  },
+  'docs-search': {
+    script: 'search.ts',
+    kind: 'stills',
+    seeds: ['search-filter'],
+  },
+  'docs-settings': {
+    script: 'settings.ts',
+    kind: 'stills',
+    seeds: ['demo'],
+  },
+  'docs-dashboards': {
+    script: 'dashboards.ts',
+    kind: 'stills',
+    seeds: ['dashboard'],
+  },
+  'docs-auto-archive': {
+    script: 'auto-archive.ts',
+    kind: 'stills',
+    seeds: ['archive'],
+  },
+  'docs-warning-periods': {
+    script: 'warning-periods.ts',
+    kind: 'stills',
+    seeds: ['warning-period'],
+  },
+  'docs-embedded-collapse': {
+    script: 'embedded-collapse.ts',
+    kind: 'stills',
+    seeds: ['collapse'],
+  },
+  'docs-task-dependencies': {
+    script: 'task-dependencies.ts',
+    kind: 'stills',
+    seeds: ['dependencies'],
+  },
+  'docs-org-properties': {
+    script: 'org-properties.ts',
+    kind: 'stills',
+    seeds: ['org-properties'],
+  },
   'docs-task-entry': {
     script: 'task-entry.ts',
     kind: 'gif',
     asset: 'todoseq-task-entry.gif',
     trimStartSeconds: 0.6,
+    seeds: ['task-entry'],
   },
 };
 

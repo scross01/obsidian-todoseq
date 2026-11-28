@@ -14,16 +14,23 @@
  * This design ensures consistent behavior on both desktop and mobile.
  */
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../types/task';
+import type { DependencyReason } from '../types/task-dependency';
 import { KeywordManager } from '../utils/keyword-manager';
 import { getTaskKey } from '../utils/task-utils';
+import {
+  hasStableTaskIdentity,
+  selectTaskByStableIdentity,
+  taskIdentityMatches,
+} from '../utils/task-identity';
 import TodoTracker from '../main';
 import { TaskStateManager } from './task-state-manager';
 import { TaskWriter } from './task-writer';
-import { TFile, MarkdownView } from 'obsidian';
+import { TFile, MarkdownView, Notice } from 'obsidian';
 import { EditorView } from '@codemirror/view';
 import { ChangeTracker } from './change-tracker';
 import { RecurrenceCoordinator } from './recurrence-coordinator';
 import { TaskStateTransitionManager } from './task-state-transition-manager';
+import { TaskDependencyManager } from './task-dependency-manager';
 import {
   calculateTaskUrgency,
   getDefaultCoefficients,
@@ -41,7 +48,12 @@ export type UpdateType =
   | 'deadline-date'
   | 'priority'
   | 'closed-date'
-  | 'recurrence';
+  | 'recurrence'
+  | 'dependency-reference';
+
+/** Dependency-property mutation routed through the per-file write queue. */
+export type DependencyReferenceAction =
+  'add' | 'remove' | 'archive' | 'promote';
 
 /**
  * Source of the update (for debugging/tracking)
@@ -57,7 +69,30 @@ export type UpdateType =
  * forward to its next occurrence instead of restoring the journaled line.
  */
 export type UpdateSource =
-  'editor' | 'reader' | 'task-list' | 'embedded' | 'archive-undo';
+  | 'editor'
+  | 'reader'
+  | 'task-list'
+  | 'embedded'
+  | 'archive-undo'
+  | 'dependency';
+
+class DependencyReferenceWriteError extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+    this.name = 'DependencyReferenceWriteError';
+  }
+}
+
+/**
+ * Typed result of a task update. Callers must be able to distinguish a write
+ * that happened from one the blocked-completion gate refused, so a visible
+ * control never keeps a state the file does not have.
+ */
+export type TaskUpdateOutcome =
+  | { status: 'applied' }
+  | { status: 'refused'; reasons: readonly DependencyReason[] }
+  | { status: 'failed'; reason?: string }
+  | { status: 'not-found' };
 
 /**
  * Context object for a task update operation.
@@ -94,6 +129,11 @@ export interface UpdateContext {
   newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
+  /** Dependency-property mutation for 'dependency-reference' updates. */
+  dependencyAction?: DependencyReferenceAction;
+  dependencyReferences?: readonly string[];
+  /** Explicit user override for the blocked-completion gate. */
+  forceCompletion?: boolean;
 }
 
 /**
@@ -125,6 +165,11 @@ interface ProcessingContext {
   newDeadlineWarningPeriod?: WarningPeriodInfo | null;
   /** New state for recurrence (for 'recurrence' type updates) */
   newStateForRecurrence?: string;
+  /** Dependency-property mutation for 'dependency-reference' updates. */
+  dependencyAction?: DependencyReferenceAction;
+  dependencyReferences?: readonly string[];
+  /** Explicit user override for the blocked-completion gate. */
+  forceCompletion?: boolean;
   filePath: string;
   fileLine: number;
   /**
@@ -149,7 +194,7 @@ interface ProcessingContext {
  */
 interface PendingUpdate {
   /** The promise for the update operation */
-  promise: Promise<void>;
+  promise: Promise<TaskUpdateOutcome>;
   /** Timestamp when the update was queued */
   timestamp: number;
 }
@@ -163,6 +208,13 @@ interface PendingFileQueue {
   /** Timestamp when the queue was created */
   timestamp: number;
 }
+
+/**
+ * Re-resolved queued target: a task when identified, null when a parsed live
+ * file verified that it is absent, and undefined when verification was
+ * unavailable. Only the last case may fall back to an already-resolved row.
+ */
+type QueuedSourceResolution = Task | null | undefined;
 
 export class TaskUpdateCoordinator {
   private recurrenceCoordinator: RecurrenceCoordinator;
@@ -196,6 +248,7 @@ export class TaskUpdateCoordinator {
     private taskStateManager: TaskStateManager,
     private keywordManager: KeywordManager,
     private changeTracker: ChangeTracker,
+    private taskDependencyManager: TaskDependencyManager | null = null,
   ) {
     this.recurrenceCoordinator = new RecurrenceCoordinator(
       this.plugin,
@@ -227,6 +280,12 @@ export class TaskUpdateCoordinator {
   /**
    * Update the keyword manager (called when settings change).
    */
+  setTaskDependencyManager(
+    dependencyManager: TaskDependencyManager | null,
+  ): void {
+    this.taskDependencyManager = dependencyManager;
+  }
+
   setKeywordManager(keywordManager: KeywordManager): void {
     this.keywordManager = keywordManager;
     this.recurrenceCoordinator.setKeywordManager(keywordManager);
@@ -281,7 +340,9 @@ export class TaskUpdateCoordinator {
    * @param context - Update context containing task and change details
    * @returns Promise resolving when async phase is complete (for testing)
    */
-  async updateTask(context: UpdateContext): Promise<void> {
+  async updateTask(context: UpdateContext): Promise<TaskUpdateOutcome> {
+    const refusal = this.refuseBlockedCompletion(context);
+    if (refusal) return refusal;
     const procContext = this.buildProcessingContext(context);
     procContext.fileRequestGeneration = this.nextFileGeneration(
       procContext.filePath,
@@ -291,13 +352,305 @@ export class TaskUpdateCoordinator {
   }
 
   /**
+   * Resolve one persisted row without trusting an optimistic projection.
+   * The exact line/cell wins when its identity agrees; otherwise identity and
+   * content relocation must be unique. Ambiguity is not a guess.
+   */
+  private selectVerifiedTask(
+    candidates: readonly Task[],
+    task: Task,
+  ): Task | null {
+    const scoped = candidates.filter(
+      (candidate) =>
+        candidate.path === task.path &&
+        (candidate.tableCell?.cellIndex ?? null) ===
+          (task.tableCell?.cellIndex ?? null),
+    );
+
+    const atLine = scoped.filter((candidate) => candidate.line === task.line);
+    if (atLine.length === 1 && taskIdentityMatches(atLine[0], task)) {
+      return atLine[0];
+    }
+
+    const byIdentity = selectTaskByStableIdentity(scoped, task);
+    if (byIdentity) return byIdentity;
+
+    if (hasStableTaskIdentity(task)) return null;
+
+    const byContent = scoped.filter((candidate) =>
+      taskIdentityMatches(candidate, task),
+    );
+    return byContent.length === 1 ? byContent[0] : null;
+  }
+
+  /**
+   * Resolve the persisted row that a request targets. Optimistic projections
+   * change completed/rawText, so identity is matched by id, table cell and
+   * stable task text rather than trusting the projected source state.
+   */
+  private resolveCommittedTask(task: Task): Task | null {
+    return this.selectVerifiedTask(
+      this.taskStateManager.getCommittedTasks(),
+      task,
+    );
+  }
+
+  /** Read the parser's view of the live note, preferring an active editor. */
+  private async liveFileTasks(path: string): Promise<Task[] | null> {
+    const scanner = this.plugin.vaultScanner;
+    const parser = scanner?.getParserForPath
+      ? scanner.getParserForPath(path)
+      : scanner?.getParser?.();
+    const file = this.plugin.app.vault.getAbstractFileByPath?.(path);
+    if (!parser || !(file instanceof TFile)) return null;
+
+    try {
+      const markdownView =
+        this.plugin.app.workspace.getActiveViewOfType?.(MarkdownView);
+      const content =
+        markdownView?.file?.path === path && markdownView.editor
+          ? markdownView.editor.getValue()
+          : await this.plugin.app.vault.read(file);
+      return parser.parseFile(content, path, file);
+    } catch (error) {
+      console.debug(
+        '[TaskUpdateCoordinator] Could not verify the live task row:',
+        error,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Re-resolve a queued completion or recurrence against the request's
+   * identity after earlier writes. Recovery, committed state and live content
+   * are all checked with the same verified-row rules; a position alone is not
+   * identity.
+   */
+  private async resolveQueuedSourceTask(
+    context: ProcessingContext,
+    identity: Task,
+  ): Promise<QueuedSourceResolution> {
+    const recovered = this.recoveredFileTasks.get(context.filePath);
+    if (recovered) {
+      return this.selectVerifiedTask(recovered, identity);
+    }
+
+    if (context.source !== 'editor') {
+      const committed = this.selectVerifiedTask(
+        this.taskStateManager.getCommittedTasks(),
+        identity,
+      );
+      if (committed) return committed;
+    }
+
+    const live = await this.liveFileTasks(identity.path);
+    if (!live) return context.source === 'editor' ? identity : undefined;
+    return this.selectVerifiedTask(live, identity);
+  }
+
+  /**
+   * The queued recurrence payload describes one occurrence. If the live row's
+   * date or repeater changed while it waited, rolling it would overwrite the
+   * user's edit or restore an obsolete repeater.
+   */
+  private recurrencePlanningInputMatches(
+    context: ProcessingContext,
+    sourceTask: Task,
+  ): boolean {
+    if (context.type !== 'recurrence') return true;
+    if (
+      context.newScheduledDate !== undefined &&
+      (!this.sameDate(sourceTask.scheduledDate, context.task.scheduledDate) ||
+        !this.sameRepeat(
+          sourceTask.scheduledDateRepeat,
+          context.task.scheduledDateRepeat,
+        ) ||
+        !this.sameWarningPeriod(
+          sourceTask.scheduledWarningPeriod,
+          context.task.scheduledWarningPeriod,
+        ))
+    ) {
+      return false;
+    }
+    if (
+      context.newDeadlineDate !== undefined &&
+      (!this.sameDate(sourceTask.deadlineDate, context.task.deadlineDate) ||
+        !this.sameRepeat(
+          sourceTask.deadlineDateRepeat,
+          context.task.deadlineDateRepeat,
+        ) ||
+        !this.sameWarningPeriod(
+          sourceTask.deadlineWarningPeriod,
+          context.task.deadlineWarningPeriod,
+        ))
+    ) {
+      return false;
+    }
+    return true;
+  }
+
+  private sameDate(a: Date | null, b: Date | null): boolean {
+    if (a === null || b === null) return a === b;
+    return a.getTime() === b.getTime();
+  }
+
+  private sameRepeat(
+    a: DateRepeatInfo | null,
+    b: DateRepeatInfo | null,
+  ): boolean {
+    if (a === null || b === null) return a === b;
+    return a.type === b.type && a.unit === b.unit && a.value === b.value;
+  }
+
+  private sameWarningPeriod(
+    a: WarningPeriodInfo | null,
+    b: WarningPeriodInfo | null,
+  ): boolean {
+    if (a === null || b === null) return a === b;
+    return (
+      a.value === b.value &&
+      a.unit === b.unit &&
+      a.isFirstOnly === b.isFirstOnly
+    );
+  }
+
+  /** True when this request would move an incomplete task to completion. */
+  private isCompletionRequest(context: UpdateContext): boolean {
+    const sourceTask = this.resolveCommittedTask(context.task) ?? context.task;
+    return (
+      context.type === 'state' &&
+      !!context.newState &&
+      context.source !== 'archive-undo' &&
+      !sourceTask.completed &&
+      this.keywordManager.isCompleted(context.newState)
+    );
+  }
+
+  /**
+   * Refuse before any generation, journal or optimistic mutation when the
+   * current authoritative dependency snapshot blocks completion.
+   */
+  private refuseBlockedCompletion(
+    context: UpdateContext,
+  ): Extract<TaskUpdateOutcome, { status: 'refused' }> | null {
+    if (
+      !this.isCompletionRequest(context) ||
+      context.forceCompletion ||
+      context.source === 'archive-undo' ||
+      this.plugin.settings?.enforceBlockedTasks === false ||
+      !this.taskDependencyManager
+    ) {
+      return null;
+    }
+
+    const sourceTask = this.resolveCommittedTask(context.task) ?? context.task;
+    const key = getTaskKey(sourceTask);
+    if (!this.taskDependencyManager.isBlocked(key)) return null;
+
+    const reasons = this.taskDependencyManager.getBlockingReasons(key);
+    this.announceRefusal(reasons);
+    console.debug(
+      `[TaskUpdateCoordinator] Refused completion for ${key}: ${reasons
+        .map((reason) => reason.message)
+        .join(' ')}`,
+    );
+    return { status: 'refused', reasons };
+  }
+
+  /** Shared refusal notice so the entry check and the pre-write recheck agree. */
+  private announceRefusal(reasons: readonly DependencyReason[]): void {
+    const detail = reasons.length
+      ? reasons.map((reason) => reason.message).join(' ')
+      : 'Resolve its BLOCKER references first.';
+    new Notice(
+      `Can't complete this task yet. ${detail} To override, use Complete anyway in the task menu or run the Complete blocked task command.`,
+      8000,
+    );
+  }
+
+  /**
+   * Completion requests that must still be blocked before persistence. The
+   * optimistic update marks the task complete in the state manager, so this
+   * asks for its blocking reasons rather than the derived blocked set.
+   */
+  private recheckBlockedCompletion(
+    context: ProcessingContext,
+    task: Task,
+  ): Extract<TaskUpdateOutcome, { status: 'refused' }> | null {
+    if (
+      context.type !== 'state' ||
+      !context.originalNewState ||
+      context.forceCompletion ||
+      context.source === 'archive-undo' ||
+      task.completed ||
+      this.plugin.settings?.enforceBlockedTasks === false ||
+      !this.taskDependencyManager ||
+      !this.keywordManager.isCompleted(context.originalNewState)
+    ) {
+      return null;
+    }
+
+    const reasons = this.taskDependencyManager.getBlockingReasons(
+      getTaskKey(task),
+    );
+    if (reasons.length === 0) return null;
+    return { status: 'refused', reasons };
+  }
+
+  /** Restore persisted truth after a refusal that followed the sync phase. */
+  private async recoverPersistedTasks(
+    context: ProcessingContext,
+    generation: number,
+    fallbackTask?: Task,
+  ): Promise<void> {
+    const vault = this.plugin.app.vault as {
+      getAbstractFileByPath?: (path: string) => unknown;
+    };
+    const file = vault.getAbstractFileByPath?.(context.filePath);
+    const scanner = this.plugin.vaultScanner;
+    if (scanner?.reconcileFileAfterFailedWrite) {
+      const recovered = await scanner.reconcileFileAfterFailedWrite(
+        context.filePath,
+        file instanceof TFile ? file : null,
+        () => this.fileWriteGenerations.get(context.filePath) === generation,
+      );
+      if (recovered) {
+        this.recoveredFileTasks.set(context.filePath, recovered);
+      }
+    } else if (file instanceof TFile) {
+      await scanner?.processIncrementalChange(file);
+    } else if (fallbackTask) {
+      const existing = this.taskStateManager.findTaskByPathAndLine(
+        fallbackTask.path,
+        fallbackTask.line,
+        fallbackTask.tableCell?.cellIndex,
+      );
+      if (existing) {
+        this.taskStateManager.updateTaskByPathAndLine(
+          fallbackTask.path,
+          fallbackTask.line,
+          {
+            rawText: fallbackTask.rawText,
+            state: fallbackTask.state,
+            completed: fallbackTask.completed,
+            closedDate: fallbackTask.closedDate,
+          },
+          fallbackTask.tableCell?.cellIndex,
+        );
+        this.taskStateManager.notifySubscribers();
+      }
+    }
+  }
+
+  /**
    * Convenience method for updating task state.
    */
   async updateTaskState(
     task: Task,
     newState: string,
     source: UpdateSource = 'editor',
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'state',
@@ -314,7 +667,7 @@ export class TaskUpdateCoordinator {
     date: Date | null,
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'scheduled-date',
@@ -333,7 +686,7 @@ export class TaskUpdateCoordinator {
     date: Date | null,
     repeat?: DateRepeatInfo | null,
     warningPeriod?: WarningPeriodInfo | null,
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'deadline-date',
@@ -351,7 +704,7 @@ export class TaskUpdateCoordinator {
     task: Task,
     newPriority: 'high' | 'med' | 'low' | null,
     source: UpdateSource = 'task-list',
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'priority',
@@ -375,12 +728,31 @@ export class TaskUpdateCoordinator {
       newDeadlineWarningPeriod?: WarningPeriodInfo | null;
       newStateForRecurrence?: string;
     },
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     return this.updateTask({
       task,
       type: 'recurrence',
       source: 'task-list',
       ...options,
+    });
+  }
+
+  /**
+   * Mutate dependency properties through the same per-file queue as state and
+   * date writes. The writer remains the only low-level content writer.
+   */
+  async updateTaskDependency(
+    task: Task,
+    action: DependencyReferenceAction,
+    references: readonly string[],
+    source: UpdateSource = 'dependency',
+  ): Promise<TaskUpdateOutcome> {
+    return this.updateTask({
+      task,
+      type: 'dependency-reference',
+      source,
+      dependencyAction: action,
+      dependencyReferences: references,
     });
   }
 
@@ -395,7 +767,7 @@ export class TaskUpdateCoordinator {
     newState: string,
     source: UpdateSource = 'editor',
     cellIndex?: number,
-  ): Promise<void> {
+  ): Promise<TaskUpdateOutcome> {
     let task = this.taskStateManager.findTaskByPathAndLine(
       taskPath,
       taskLine,
@@ -410,7 +782,7 @@ export class TaskUpdateCoordinator {
       console.debug(
         `[TaskUpdateCoordinator] Task not found at path=${taskPath}, line=${taskLine}`,
       );
-      return;
+      return { status: 'not-found' };
     }
 
     return this.updateTask({
@@ -476,6 +848,7 @@ export class TaskUpdateCoordinator {
     let newState = context.newState ?? '';
     // Preserve the original requested state for recurrence checking
     const originalNewState = context.newState ?? '';
+    const sourceTask = this.resolveCommittedTask(context.task) ?? context.task;
 
     if (
       context.type === 'state' &&
@@ -508,14 +881,15 @@ export class TaskUpdateCoordinator {
       source: context.source,
       newState,
       originalNewState,
+      forceCompletion: context.forceCompletion,
       // Capture BEFORE performSyncPhase's optimisticUpdate replaces the
       // stored task — the file write still needs the pre-transition values.
       originalSourceState:
         context.type === 'state' || context.type === 'recurrence'
           ? {
-              state: context.task.state,
-              completed: context.task.completed,
-              closedDate: context.task.closedDate,
+              state: sourceTask.state,
+              completed: sourceTask.completed,
+              closedDate: sourceTask.closedDate,
             }
           : undefined,
       newDate: context.newDate,
@@ -529,6 +903,8 @@ export class TaskUpdateCoordinator {
       newScheduledWarningPeriod: context.newScheduledWarningPeriod,
       newDeadlineWarningPeriod: context.newDeadlineWarningPeriod,
       newStateForRecurrence: context.newStateForRecurrence,
+      dependencyAction: context.dependencyAction,
+      dependencyReferences: context.dependencyReferences,
       filePath: context.task.path,
       fileLine: context.task.line,
     };
@@ -554,7 +930,9 @@ export class TaskUpdateCoordinator {
       this.taskStateManager.optimisticUpdate(context.task, newState);
 
       if (this.keywordManager.isArchived(newState)) {
-        this.removeTaskFromStateManager(context.task);
+        // The archived row is hidden immediately, but dependency truth waits
+        // for the write to succeed.
+        this.removeTaskFromStateManager(context.task, false);
       }
     }
 
@@ -568,11 +946,13 @@ export class TaskUpdateCoordinator {
   /**
    * ASYNC PHASE: Queue for background execution.
    */
-  private async queueAsyncPhase(context: ProcessingContext): Promise<void> {
+  private async queueAsyncPhase(
+    context: ProcessingContext,
+  ): Promise<TaskUpdateOutcome> {
     const taskKey = getTaskKey(context.task);
     const existingUpdate = this.pendingTaskUpdates.get(taskKey);
 
-    const asyncWork = async (): Promise<void> => {
+    const asyncWork = async (): Promise<TaskUpdateOutcome> => {
       if (existingUpdate) {
         try {
           await existingUpdate.promise;
@@ -587,7 +967,7 @@ export class TaskUpdateCoordinator {
           );
         }
       }
-      await this.performAsyncPhase(context);
+      return this.performAsyncPhase(context);
     };
 
     const promise = asyncWork();
@@ -597,7 +977,7 @@ export class TaskUpdateCoordinator {
     });
 
     try {
-      await promise;
+      return await promise;
     } finally {
       this.pendingTaskUpdates.delete(taskKey);
     }
@@ -607,16 +987,14 @@ export class TaskUpdateCoordinator {
    * Resolve the stored task from the state manager, with content-based fallback.
    * Used for non-editor sources where the line number may have shifted.
    */
-  private resolveStoredTask(context: ProcessingContext): Task {
+  private resolveStoredTask(context: ProcessingContext): Task | null {
     const recovered = this.recoveredFileTasks.get(context.filePath);
     if (recovered) {
-      const match = recovered.find(
-        (task) =>
-          task.line === context.task.line &&
-          (task.tableCell?.cellIndex ?? null) ===
-            (context.task.tableCell?.cellIndex ?? null),
-      );
+      const match = this.selectVerifiedTask(recovered, context.task);
       if (match) return match;
+      // Recovery is persisted truth. If it cannot identify the request, a
+      // position alone must not substitute whatever now occupies the line.
+      return null;
     }
 
     const cellIndex = context.task.tableCell?.cellIndex;
@@ -642,13 +1020,15 @@ export class TaskUpdateCoordinator {
   /**
    * ASYNC PHASE: Perform file write, recurrence, and state finalization.
    */
-  private async performAsyncPhase(context: ProcessingContext): Promise<void> {
+  private async performAsyncPhase(
+    context: ProcessingContext,
+  ): Promise<TaskUpdateOutcome> {
     const existingQueue = this.fileUpdateQueues.get(context.filePath);
     const generation =
       context.fileRequestGeneration ??
       this.nextFileGeneration(context.filePath);
 
-    const doAsyncWork = async (): Promise<void> => {
+    const doAsyncWork = async (): Promise<TaskUpdateOutcome> => {
       const taskEditor = this.plugin.taskEditor;
       if (!taskEditor) {
         throw new Error('TaskEditor is not initialized');
@@ -661,20 +1041,98 @@ export class TaskUpdateCoordinator {
         context.source === 'editor'
           ? context.task
           : this.resolveStoredTask(context);
+      if (!currentTask) {
+        await this.recoverPersistedTasks(context, generation);
+        return {
+          status: 'failed',
+          reason: 'Could not verify the task row before writing.',
+        };
+      }
 
       // The sync phase's optimisticUpdate already replaced the stored task
       // with target-state values (state/completed flipped for instant UI
-      // feedback). The file write must classify the transition from the
-      // PRE-transition source state — e.g. to distinguish fresh completion
-      // from completed → completed when stamping CLOSED — so restore the
-      // values buildProcessingContext captured before the optimistic rewrite.
-      if (context.originalSourceState) {
+      // feedback). A completion must resolve one verified row after queued
+      // writes; otherwise a stale closure would authorize the wrong target.
+      const completionRequest =
+        context.type === 'state' &&
+        !!context.originalNewState &&
+        context.source !== 'archive-undo' &&
+        this.keywordManager.isCompleted(context.originalNewState);
+      const recurrenceRequest = context.type === 'recurrence';
+      const queuedTargetRequest =
+        context.source !== 'archive-undo' &&
+        (context.type === 'state' ||
+          context.type === 'scheduled-date' ||
+          context.type === 'deadline-date' ||
+          context.type === 'priority');
+
+      if (completionRequest || recurrenceRequest || queuedTargetRequest) {
+        // Identity comes from the original request, never from a row that a
+        // previous write or recovery left at the captured position. A
+        // non-completion request may fall back to the already-resolved row
+        // only when that row still matches the request's identity.
+        const resolved = await this.resolveQueuedSourceTask(
+          context,
+          context.task,
+        );
+        let sourceTask = resolved ?? null;
+        if (
+          !sourceTask &&
+          resolved === undefined &&
+          !completionRequest &&
+          !recurrenceRequest &&
+          taskIdentityMatches(currentTask, context.task)
+        ) {
+          sourceTask = currentTask;
+        }
+        if (!sourceTask) {
+          await this.recoverPersistedTasks(context, generation);
+          return {
+            status: 'failed',
+            reason: 'Could not verify the task row before writing.',
+          };
+        }
+        currentTask = {
+          ...currentTask,
+          line: sourceTask.line,
+          tableCell: sourceTask.tableCell,
+          id: sourceTask.id,
+          embedReference: sourceTask.embedReference,
+          text: sourceTask.text,
+          rawText: sourceTask.rawText,
+          state: sourceTask.state,
+          completed: sourceTask.completed,
+          closedDate: sourceTask.closedDate,
+        };
+        if (
+          recurrenceRequest &&
+          !this.recurrencePlanningInputMatches(context, sourceTask)
+        ) {
+          await this.recoverPersistedTasks(context, generation, currentTask);
+          return {
+            status: 'failed',
+            reason: 'Recurrence input changed before writing.',
+          };
+        }
+      } else if (context.originalSourceState) {
+        // The file write must classify non-completion transitions from the
+        // PRE-transition values captured before the optimistic rewrite.
         currentTask = {
           ...currentTask,
           state: context.originalSourceState.state,
           completed: context.originalSourceState.completed,
           closedDate: context.originalSourceState.closedDate,
         };
+      }
+
+      const refusal = this.recheckBlockedCompletion(context, currentTask);
+      if (refusal) {
+        // The request was unblocked when it was made, so the sync phase has
+        // already flipped the visible state. Restore persisted truth and let
+        // the caller's control roll back without a note write.
+        await this.recoverPersistedTasks(context, generation, currentTask);
+        this.announceRefusal(refusal.reasons);
+        return refusal;
       }
 
       let updatedTask: Task;
@@ -690,27 +1148,12 @@ export class TaskUpdateCoordinator {
           `[TODOseq] File write failed for ${context.type} at line ${context.fileLine}:`,
           error,
         );
-        const file = this.plugin.app.vault.getAbstractFileByPath(
-          context.filePath,
-        );
-        const scanner = this.plugin.vaultScanner;
-        const isLatest =
-          this.fileWriteGenerations.get(context.filePath) === generation;
-        if (scanner?.reconcileFileAfterFailedWrite) {
-          // Recover persisted truth even though the failed write's skip marker
-          // is still live. Publish only when no newer request owns the file.
-          const recovered = await scanner.reconcileFileAfterFailedWrite(
-            context.filePath,
-            file instanceof TFile ? file : null,
-            isLatest,
-          );
-          if (recovered) {
-            this.recoveredFileTasks.set(context.filePath, recovered);
-          }
-        } else if (file instanceof TFile) {
-          await scanner?.processIncrementalChange(file);
-        }
-        return;
+        // Recover persisted truth even though the failed write's skip marker
+        // is still live. Publish only when no newer request owns the file.
+        await this.recoverPersistedTasks(context, generation);
+        return error instanceof DependencyReferenceWriteError
+          ? { status: 'failed', reason: error.message }
+          : { status: 'failed' };
       }
 
       const lineDelta = (updatedTask as Task & { lineDelta?: number })
@@ -724,17 +1167,22 @@ export class TaskUpdateCoordinator {
       }
 
       this.recoveredFileTasks.delete(context.filePath);
-      this.finalizeTaskState(updatedTask, context);
+      const publishUi =
+        this.fileWriteGenerations.get(context.filePath) === generation;
+      this.finalizeTaskState(updatedTask, context, publishUi);
 
       if (context.type === 'state') {
+        // Recurrence is tied to this successful transition, not to whether a
+        // newer request has already taken over UI publication for the file.
         this.handleRecurrence(updatedTask, context);
 
         // Update editor checkbox visual state after markdown has been updated
         // Only for editor updates to prevent Obsidian's re-render from overriding checkbox state
-        if (context.source === 'editor') {
+        if (publishUi && context.source === 'editor') {
           this.performDirectEditorCheckboxUpdate(updatedTask, context.newState);
         }
       }
+      return { status: 'applied' };
     };
 
     // Run doAsyncWork regardless of whether the previous file update
@@ -759,7 +1207,7 @@ export class TaskUpdateCoordinator {
     });
 
     try {
-      await queuePromise;
+      return await queuePromise;
     } finally {
       if (
         this.fileUpdateQueues.get(context.filePath)?.promise === queuePromise
@@ -769,6 +1217,7 @@ export class TaskUpdateCoordinator {
       if (this.fileWriteGenerations.get(context.filePath) === generation) {
         this.fileWriteGenerations.delete(context.filePath);
       }
+      this.plugin.vaultScanner?.completeFileWrite?.(context.filePath);
     }
   }
 
@@ -815,6 +1264,34 @@ export class TaskUpdateCoordinator {
       case 'closed-date':
         return task;
 
+      case 'dependency-reference': {
+        const action = context.dependencyAction;
+        const references = context.dependencyReferences ?? [];
+        if (!action || references.length === 0) {
+          throw new DependencyReferenceWriteError(
+            'A dependency action and reference are required.',
+          );
+        }
+        const result =
+          action === 'add' || action === 'remove'
+            ? await taskEditor.setTaskDependency(
+                task,
+                references[0],
+                action === 'add',
+              )
+            : await taskEditor.migrateBlockerHistory(
+                task,
+                action === 'archive' ? 'to-history' : 'to-active',
+                references,
+              );
+        if (result.status !== 'success' || !result.task) {
+          throw new DependencyReferenceWriteError(
+            result.reason ?? `Dependency ${action} failed.`,
+          );
+        }
+        return result.task;
+      }
+
       case 'recurrence': {
         // Use atomic update to apply all recurrence changes in a single
         // vault.process call. This creates one undo entry instead of 2-3
@@ -834,6 +1311,32 @@ export class TaskUpdateCoordinator {
             task.deadlineWarningPeriod,
           ),
           newState: context.newStateForRecurrence,
+          expectedRecurrence: {
+            scheduledDate:
+              context.newScheduledDate !== undefined
+                ? context.task.scheduledDate
+                : undefined,
+            scheduledDateRepeat:
+              context.newScheduledDate !== undefined
+                ? context.task.scheduledDateRepeat
+                : undefined,
+            scheduledWarningPeriod:
+              context.newScheduledDate !== undefined
+                ? context.task.scheduledWarningPeriod
+                : undefined,
+            deadlineDate:
+              context.newDeadlineDate !== undefined
+                ? context.task.deadlineDate
+                : undefined,
+            deadlineDateRepeat:
+              context.newDeadlineDate !== undefined
+                ? context.task.deadlineDateRepeat
+                : undefined,
+            deadlineWarningPeriod:
+              context.newDeadlineDate !== undefined
+                ? context.task.deadlineWarningPeriod
+                : undefined,
+          },
         });
       }
 
@@ -850,6 +1353,7 @@ export class TaskUpdateCoordinator {
   private finalizeTaskState(
     updatedTask: Task,
     context: ProcessingContext,
+    publishUi = true,
   ): void {
     const isStateUpdate =
       context.type === 'state' || context.type === 'recurrence';
@@ -857,7 +1361,11 @@ export class TaskUpdateCoordinator {
       context.type === 'state' ? context.newState : updatedTask.state;
 
     if (isStateUpdate && this.keywordManager.isArchived(newState)) {
-      this.removeTaskFromStateManager(updatedTask);
+      if (publishUi) {
+        this.removeTaskFromStateManager(updatedTask);
+      } else {
+        this.removeCommittedTask(updatedTask);
+      }
       return;
     }
 
@@ -869,6 +1377,16 @@ export class TaskUpdateCoordinator {
     // in the sync phase, but finalize must be able to re-add too (e.g. the
     // async phase resolved a different line via rawText). Push when missing.
     const finalizeUpdate = (updates: Partial<Task>): void => {
+      if (!publishUi) {
+        this.taskStateManager.commitTaskByPathAndLine(
+          updatedTask.path,
+          updatedTask.line,
+          updates,
+          cellIndex,
+          updatedTask,
+        );
+        return;
+      }
       const existing = this.taskStateManager.findTaskByPathAndLine(
         updatedTask.path,
         updatedTask.line,
@@ -950,6 +1468,19 @@ export class TaskUpdateCoordinator {
           deadlineDateRepeat: updatedTask.deadlineDateRepeat,
           scheduledWarningPeriod: updatedTask.scheduledWarningPeriod,
           deadlineWarningPeriod: updatedTask.deadlineWarningPeriod,
+          urgency,
+        });
+        break;
+
+      case 'dependency-reference':
+        // Property-only writes must preserve keyword, dates and recurrence.
+        finalizeUpdate({
+          rawText: updatedTask.rawText,
+          id: updatedTask.id,
+          properties: updatedTask.properties,
+          blockedBy: updatedTask.blockedBy,
+          archivedBlockers: updatedTask.archivedBlockers,
+          propertyIssues: updatedTask.propertyIssues,
           urgency,
         });
         break;
@@ -1149,8 +1680,21 @@ export class TaskUpdateCoordinator {
    * Remove a task from the state manager and notify subscribers.
    * Used when a task transitions to an archived state.
    */
-  private removeTaskFromStateManager(task: Task): void {
+  private removeTaskFromStateManager(task: Task, commit = true): void {
     this.taskStateManager.removeTasks(
+      (t) =>
+        t.path === task.path &&
+        t.line === task.line &&
+        (task.tableCell?.cellIndex === undefined
+          ? true
+          : t.tableCell?.cellIndex === task.tableCell.cellIndex),
+      commit,
+    );
+  }
+
+  /** Advance only dependency truth after a superseded archived write. */
+  private removeCommittedTask(task: Task): void {
+    this.taskStateManager.removeCommittedTasks(
       (t) =>
         t.path === task.path &&
         t.line === task.line &&

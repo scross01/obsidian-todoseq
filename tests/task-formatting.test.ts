@@ -3,6 +3,8 @@
  */
 
 import {
+  BlockedLockWidget,
+  DependencyIssueWidget,
   PriorityWidget,
   TaskKeywordDecorator,
 } from '../src/view/editor-extensions/task-formatting';
@@ -61,6 +63,97 @@ describe('PriorityWidget', () => {
   it('ignoreEvent returns false', () => {
     const widget = new (PriorityWidget as any)('C', 'low');
     expect(widget.ignoreEvent()).toBe(false);
+  });
+});
+
+describe('DependencyIssueWidget', () => {
+  beforeAll(() => {
+    installObsidianDomMocks();
+  });
+
+  it('renders an accessible warning with the issue count', () => {
+    const widget = new DependencyIssueWidget(
+      [
+        {
+          code: 'missing-reference',
+          fingerprint: 'missing:a',
+          message: 'Dependency missing.',
+          sourceKey: 'test.md:0',
+        },
+        {
+          code: 'cycle',
+          fingerprint: 'cycle:b',
+          message: 'Cycle detected.',
+          sourceKey: 'test.md:0',
+        },
+      ],
+      'test.md:0',
+    );
+
+    const el = widget.toDOM();
+    expect(el.classList.contains('todoseq-dependency-issue-icon')).toBe(true);
+    expect(el.classList.contains('todoseq-editor-issue-badge')).toBe(true);
+    expect(el.getAttribute('data-icon')).toBe('alert-triangle');
+    expect(el.getAttribute('title')).toBe('Dependency missing. (+1 more)');
+    expect(el.getAttribute('aria-label')).toContain('Dependency problem:');
+  });
+
+  it('compares by task key and issue fingerprints', () => {
+    const issue = {
+      code: 'missing-reference' as const,
+      fingerprint: 'missing:a',
+      message: 'Dependency missing.',
+      sourceKey: 'test.md:0',
+    };
+    expect(
+      new DependencyIssueWidget([issue], 'test.md:0').eq(
+        new DependencyIssueWidget([issue], 'test.md:0'),
+      ),
+    ).toBe(true);
+    expect(
+      new DependencyIssueWidget([issue], 'test.md:0').eq(
+        new DependencyIssueWidget([issue], 'test.md:1'),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('BlockedLockWidget', () => {
+  beforeAll(() => {
+    installObsidianDomMocks();
+  });
+
+  it('renders an accessible lock carrying the blocking reasons', () => {
+    const widget = new BlockedLockWidget(
+      'Blocked by TODO Blocker.',
+      'test.md:0',
+    );
+
+    const el = widget.toDOM();
+    expect(el.classList.contains('todoseq-task-blocked-icon')).toBe(true);
+    expect(el.getAttribute('data-icon')).toBe('lock');
+    expect(el.getAttribute('data-task-key')).toBe('test.md:0');
+    expect(el.getAttribute('title')).toBe('Blocked by TODO Blocker.');
+    expect(el.getAttribute('aria-label')).toBe('Blocked by TODO Blocker.');
+    expect(el.getAttribute('role')).toBe('img');
+  });
+
+  it('compares by task key and label', () => {
+    expect(
+      new BlockedLockWidget('Blocked.', 'test.md:0').eq(
+        new BlockedLockWidget('Blocked.', 'test.md:0'),
+      ),
+    ).toBe(true);
+    expect(
+      new BlockedLockWidget('Blocked.', 'test.md:0').eq(
+        new BlockedLockWidget('Blocked.', 'test.md:1'),
+      ),
+    ).toBe(false);
+    expect(
+      new BlockedLockWidget('Blocked.', 'test.md:0').eq(
+        new BlockedLockWidget('Different reason.', 'test.md:0'),
+      ),
+    ).toBe(false);
   });
 });
 
@@ -517,6 +610,7 @@ describe('TaskKeywordDecorator date-line decorations (E4 audit)', () => {
     // Simulate a task line immediately before the date line.
     decorator['previousTaskLine'] = 0;
     decorator['previousTaskIndent'] = '';
+    decorator['previousTaskDateIndent'] = '';
     return decorator;
   };
 
@@ -571,5 +665,299 @@ describe('TaskKeywordDecorator date-line decorations (E4 audit)', () => {
 
     expect(added).toHaveLength(2);
     expect(added[0].deco.spec.class).toBe('todoseq-started-line');
+  });
+
+  it('decorates a same-depth nested quoted date line', () => {
+    const decorator = makeDecorator();
+    decorator['previousTaskDateIndent'] = '> > ';
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '> > SCHEDULED: <2026-01-16 Fri>',
+      { from: 0, to: 30 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-scheduled-line');
+    expect(added[1].deco.spec.attributes['data-date-keyword']).toBe(
+      'SCHEDULED:',
+    );
+  });
+
+  it('leaves a date quoted deeper than the task unstyled', () => {
+    const decorator = makeDecorator();
+    decorator['previousTaskDateIndent'] = '> > ';
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '> > > SCHEDULED: <2026-01-16 Fri>',
+      { from: 0, to: 32 },
+      builder,
+    );
+
+    expect(added).toHaveLength(0);
+  });
+
+  it('leaves a trailing block anchor out of the date-line span', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+    const lineText = 'SCHEDULED: <2026-11-24 Tue> ^abc123';
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      lineText,
+      { from: 100, to: 100 + lineText.length },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-scheduled-line');
+    expect(added[0].from).toBe(100);
+    expect(added[0].to).toBe(100 + 'SCHEDULED: <2026-11-24 Tue>'.length);
+    expect(added[1].to).toBe(100 + 'SCHEDULED:'.length);
+  });
+
+  it('leaves a trailing block anchor out of the description span', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+    const lineText = 'DESCRIPTION: Some text ^abc123';
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      lineText,
+      { from: 0, to: lineText.length },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[0].deco.spec.class).toBe('todoseq-task-description');
+    expect(added[0].to).toBe('DESCRIPTION: Some text'.length);
+  });
+});
+
+describe('TaskKeywordDecorator property-drawer decorations', () => {
+  const collectBuilder = () => {
+    const added: Array<{ from: number; to: number; deco: any }> = [];
+    const builder = {
+      add: (from: number, to: number, deco: any) => {
+        added.push({ from, to, deco });
+      },
+    };
+    return { added, builder };
+  };
+
+  const makeDecorator = (indent = '') => {
+    const mockEditorView = {
+      state: {
+        doc: {
+          lines: 2,
+          line: jest
+            .fn()
+            .mockReturnValue({ text: '', from: 0, to: 0, number: 1 }),
+          lineAt: jest.fn().mockReturnValue({ number: 1 }),
+        },
+        selection: { main: { head: 0, from: 0, to: 0 } },
+      },
+      dom: {
+        parentElement: {
+          classList: { contains: jest.fn().mockReturnValue(true) },
+        },
+      },
+    };
+    const decorator = new (TaskKeywordDecorator as any)(
+      mockEditorView,
+      createBaseSettings(),
+      { testRegex: /TODO/ },
+    );
+    decorator['previousTaskLine'] = 0;
+    decorator['previousTaskIndent'] = indent;
+    return decorator;
+  };
+
+  it('decorates a drawer on a top-level task', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':PROPERTIES:',
+      { from: 0, to: 12 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      ':ID: paper-01',
+      { from: 13, to: 26 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      3,
+      ':END:',
+      { from: 27, to: 31 },
+      builder,
+    );
+
+    expect(added.map((entry) => entry.deco.spec.class)).toEqual([
+      'todoseq-properties-line',
+      'todoseq-properties-line',
+      'todoseq-properties-key',
+      'todoseq-properties-line',
+    ]);
+    expect(added[0].deco.spec.attributes['data-properties-line']).toBe(
+      'boundary',
+    );
+    expect(added[1].deco.spec.attributes['data-properties-line']).toBe('entry');
+    expect(added[2].from).toBe(13);
+    expect(added[2].to).toBe(17);
+    expect(decorator['inPropertiesDrawer']).toBe(false);
+  });
+
+  it('does not style a naked key line without a drawer', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':ID: paper-01',
+      { from: 0, to: 13 },
+      builder,
+    );
+
+    expect(added).toHaveLength(0);
+  });
+
+  it('stops styling once the drawer closes', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':PROPERTIES:',
+      { from: 0, to: 12 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      ':END:',
+      { from: 13, to: 17 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      3,
+      ':ID: stray',
+      { from: 18, to: 28 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+  });
+
+  it('decorates an indented drawer under an indented task', () => {
+    const decorator = makeDecorator('  ');
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '  :PROPERTIES:',
+      { from: 0, to: 14 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      '  :ID: paper-01',
+      { from: 15, to: 30 },
+      builder,
+    );
+
+    expect(added.map((entry) => entry.deco.spec.class)).toEqual([
+      'todoseq-properties-line',
+      'todoseq-properties-line',
+      'todoseq-properties-key',
+    ]);
+    expect(added[2].from).toBe(17);
+    expect(added[2].to).toBe(21);
+  });
+
+  it('treats an anchored :END: as the drawer boundary', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':PROPERTIES:',
+      { from: 0, to: 12 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      ':END: ^abc123',
+      { from: 13, to: 26 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      3,
+      ':ID: stray',
+      { from: 27, to: 37 },
+      builder,
+    );
+
+    expect(added).toHaveLength(2);
+    expect(added[1].deco.spec.class).toBe('todoseq-properties-line');
+    expect(added[1].deco.spec.attributes['data-properties-line']).toBe(
+      'boundary',
+    );
+    expect(added[1].to).toBe(13 + ':END:'.length);
+    expect(decorator['inPropertiesDrawer']).toBe(false);
+  });
+
+  it('leaves a trailing block anchor out of a drawer entry span', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+    const lineText = ':ID: paper-01 ^abc123';
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      ':PROPERTIES:',
+      { from: 0, to: 12 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      lineText,
+      { from: 13, to: 13 + lineText.length },
+      builder,
+    );
+
+    expect(added[1].deco.spec.class).toBe('todoseq-properties-line');
+    expect(added[1].to).toBe(13 + ':ID: paper-01'.length);
+  });
+
+  it('decorates a quoted drawer and its key', () => {
+    const decorator = makeDecorator();
+    const { added, builder } = collectBuilder();
+
+    decorator['checkAndDecorateDateLine'](
+      1,
+      '> :PROPERTIES:',
+      { from: 0, to: 14 },
+      builder,
+    );
+    decorator['checkAndDecorateDateLine'](
+      2,
+      '> :ID: paper-01',
+      { from: 15, to: 30 },
+      builder,
+    );
+
+    expect(added.map((entry) => entry.deco.spec.class)).toEqual([
+      'todoseq-properties-line',
+      'todoseq-properties-line',
+      'todoseq-properties-key',
+    ]);
+    expect(added[2].from).toBe(17);
+    expect(added[2].to).toBe(21);
   });
 });

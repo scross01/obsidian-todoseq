@@ -1,6 +1,10 @@
 import { SearchParser } from './search-parser';
 import { SearchEvaluator } from './search-evaluator';
-import { SearchError, SearchNode } from './search-types';
+import {
+  DependencyStatusProvider,
+  SearchError,
+  SearchNode,
+} from './search-types';
 import { Task } from '../types/task';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { PropertySearchEngine } from '../services/property-search-engine';
@@ -25,6 +29,7 @@ export class Search {
     caseSensitive = false,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
+    dependencyStatus?: DependencyStatusProvider,
   ): Promise<boolean> {
     try {
       // Route through Search.parse (not SearchParser.parse) so jest.spyOn on
@@ -38,6 +43,9 @@ export class Search {
         caseSensitive,
         settings,
         propertySearchEngine,
+        dependencyStatus
+          ? SearchEvaluator.buildBatchContext(ast, settings, dependencyStatus)
+          : undefined,
       );
     } catch (error) {
       if (error instanceof SearchError) {
@@ -75,6 +83,7 @@ export class Search {
     caseSensitive = false,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
+    dependencyStatus?: DependencyStatusProvider,
   ): Promise<Task[]> {
     if (!query.trim()) return tasks;
     try {
@@ -94,7 +103,7 @@ export class Search {
           engineFiles.set(
             resolution.key,
             await SearchEvaluator.resolveEngineFiles(
-              resolution.query,
+              resolution.descriptor,
               resolution.effectiveCaseSensitive,
               propertySearchEngine,
             ),
@@ -107,7 +116,7 @@ export class Search {
         caseSensitive,
         settings,
         engineFiles,
-        SearchEvaluator.buildBatchContext(ast, settings),
+        SearchEvaluator.buildBatchContext(ast, settings, dependencyStatus),
       );
     } catch (error) {
       if (error instanceof SearchError) {

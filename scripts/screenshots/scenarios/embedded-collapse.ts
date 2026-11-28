@@ -1,11 +1,11 @@
 import { defineScript } from 'obsidian-demo-recorder';
 import {
-  COLLAPSE_SEEDS,
   TOGGLE_VIEW_MODE,
   leaveReadingMode,
   waitForPlugin,
   waitForReadingMode,
 } from './helpers';
+import { COLLAPSE_SEEDS } from './seeds/collapse.ts';
 
 /**
  * Docs scenarios for collapsible embedded lists (the Collapsible Task Lists

@@ -90,7 +90,7 @@ export class StatusBarManager {
 
     // Populate the search filter with file name only
     // Omit path filter for files without parent directory
-    const hasParentDirectory = activeFile.path.contains('/');
+    const hasParentDirectory = activeFile.path.includes('/');
     const pathFilter =
       hasParentDirectory && activeFile instanceof TFile
         ? `path:"${activeFile.parent?.path || ''}" `

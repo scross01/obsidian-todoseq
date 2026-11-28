@@ -1,6 +1,6 @@
 # Settings
 
-TODOseq provides configuration options to customize the plugin to your workflow. This guide covers all available settings and their impact on functionality.
+These are the settings TODOseq adds to Obsidian, with their defaults and effects.
 
 ![TODOseq Settings](./assets/todoseq-settings.png){.ts-img-full .ts-img-dark}
 ![TODOseq Settings](./assets/todoseq-settings-light.png){.ts-img-full .ts-img-light}
@@ -13,6 +13,10 @@ Access TODOseq settings through Obsidian's settings interface:
 2. Navigate to "Community plugins"
 3. Find "TODOseq" in the list
 4. Click on "TODOseq" to view and edit settings
+
+### New and existing installs
+
+When you install TODOseq for the first time, it starts with the defaults below, including in a shared or template vault. Review the options on this page and adjust them for the vault. Updating an existing install keeps your current settings.
 
 ## General Settings
 
@@ -28,7 +32,19 @@ Access TODOseq settings through Obsidian's settings interface:
 
 **Visual Effects When Enabled:**
 
-Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. All task states use your Obsidian theme's accent color. See [Editor Integration](editor.md) and [Reader View](reader.md) documentation for full details.
+Task keywords (`TODO`, `DOING`, `DONE`, etc.) appear in bold font. Active task states use a blend of your Obsidian theme's accent color; completed and archived states fade to a much quieter accent, muted title text and a neutral priority badge. Embedded task-list keywords stay uncolored so reporting lists remain distinct from capture. See [Editor Integration](editor.md), [Reader View](reader.md) and [Embedded Task Lists](embedded-task-lists.md) for full details.
+
+## Reader View Settings
+
+### Hide Task Properties in Reading View
+
+**Setting**: "Hide task properties in Reading view" toggle
+
+**Description**: Hides every task-owned property block in Reading view, including empty, unclosed and otherwise-expanded blocks. The properties remain in the note and can still be read by other tools. When this is off, closed drawers with at least one property can be collapsed with the Reading-view disclosure.
+
+**Scope**: Reading view only. The editor is unchanged.
+
+**Default**: Off
 
 ## Task Recognition Settings
 
@@ -391,6 +407,28 @@ FIXME Handle edge cases
 - Manage tasks in collapsible sections
 
 ### Track Closed Date
+
+### Enforce blocked tasks
+
+**Setting**: "Enforce blocked tasks" (toggle)
+
+**Description**: When on (the default), completing a task from any plugin surface is refused while a `BLOCKER` dependency is incomplete, missing, ambiguous or excluded. The notice names the blocking reasons.
+
+Use **Complete anyway** in the task context menu, or the **Complete blocked task** command, to bypass the gate for a deliberate override. Turning the setting off disables the gate without changing derived blocked status in search, dashboards or row styling. Manual edits, sync and external file changes are outside this gate; notes remain the source of truth.
+
+### Respect parent and ordered task dependencies
+
+**Setting**: "Respect parent and ordered task dependencies" (toggle, default off)
+
+**Description**: Adds opt-in structural reasons. An unfinished nested task blocks an incomplete parent, and every later task in an `ORDERED` task's group waits for it. Markdown hierarchy can use headings or indentation; plain keyword tasks do not need list markers or checkboxes. A non-task heading is a hard boundary, blank lines preserve an indented group, and dedented prose closes it. Explicit `BLOCKER` references and `previous-sibling` remain independent of this setting. Changing the toggle refreshes blocked status immediately without rewriting notes or restarting.
+
+### Require checkboxes to be complete
+
+**Setting**: "Require checkboxes to be complete" (toggle, default off)
+
+**Description**: Adds unchecked descendant checkboxes as blocking reasons, independently of parent/ORDERED rules. Markdown checks the bounded task subtree, including keywordless checkbox rows, and excludes the parent's own checkbox; Org checks the current entry body and stops at the next headline. Archived branches are outside an outer task's checks. `NOBLOCKING` on the task suppresses these reasons locally. Changing the toggle refreshes blocked status immediately without rewriting notes.
+
+### Track closed date
 
 **Setting**: "Track closed date" (toggle)
 

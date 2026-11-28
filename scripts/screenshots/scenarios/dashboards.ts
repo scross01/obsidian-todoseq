@@ -1,11 +1,11 @@
 import { defineScript } from 'obsidian-demo-recorder';
 import {
-  DASHBOARD_SEEDS,
   TOGGLE_VIEW_MODE,
   leaveReadingMode,
   waitForPlugin,
   waitForReadingMode,
 } from './helpers';
+import { DASHBOARD_SEEDS } from './seeds/dashboard.ts';
 
 /**
  * Docs scenarios for the Dashboards page (docs/dashboards.md).

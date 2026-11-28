@@ -1,5 +1,6 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import { DEMO_SEEDS, waitForPlugin, waitForTaskListView } from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { DEMO_SEEDS } from './seeds/demo.ts';
 
 /**
  * Docs scenarios for the Task List page (docs/task-list.md).
@@ -17,8 +18,10 @@ export default defineScript({
   id: 'docs-task-list',
   title: 'docs task list scenarios',
   format: 'mp4',
-  width: 1400,
-  height: 900,
+  // The docs' committed captures use this window size: a larger one only adds
+  // empty canvas below the side panel and the command palette.
+  width: 1024,
+  height: 640,
   stills: { mode: 'only', scale: 1 },
   setup: {
     // The recorder hides Obsidian's ribbon and status bar by default

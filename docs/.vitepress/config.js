@@ -34,6 +34,8 @@ export default {
           { text: 'Task Urgency', link: '/urgency' },
           { text: 'Warning Periods', link: '/warning-periods' },
           { text: 'Moving Tasks', link: '/moving-tasks' },
+          { text: 'Task IDs & Anchors', link: '/task-ids' },
+          { text: 'Task Dependencies', link: '/task-dependencies' },
           { text: 'Auto-Archive', link: '/auto-archive' },
           { text: 'Import', link: '/import' },
         ],

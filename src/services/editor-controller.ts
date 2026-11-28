@@ -9,7 +9,10 @@ import {
   modifyLinesForMigration,
   readTaskBlockFromLines,
 } from '../utils/task-sub-bullets';
-import { getStateTransitionManager } from './task-update-coordinator';
+import {
+  getStateTransitionManager,
+  type TaskUpdateOutcome,
+} from './task-update-coordinator';
 import {
   getTodayDailyNote,
   isDailyNotesPluginEnabledSync,
@@ -17,13 +20,19 @@ import {
 } from '../utils/daily-note-utils';
 import {
   findDateLine,
-  findDescriptionLine,
+  findDescriptionLineInSource,
+  parseDescriptionLineInfo,
   getTaskIndent,
+  getOwnedDateLineType,
   getDateLineIndent,
   parseTableCells,
   isTableRow,
-  getCellTaskLine,
 } from '../utils/task-line-utils';
+import { splitTrailingBlockAnchor } from '../utils/block-anchor';
+import {
+  findTaskBlockAnchor,
+  relocateBlockAnchorInEditor,
+} from '../utils/task-block-anchor';
 import { TaskContextMenu } from '../view/components/task-context-menu';
 import {
   DatePicker,
@@ -42,6 +51,18 @@ export class EditorController {
     private plugin: TodoTracker,
     private keywordManager: KeywordManager,
   ) {}
+
+  /** Report a typed failure from a table-cell editor action once. */
+  private reportTableUpdateFailure(
+    outcome: TaskUpdateOutcome,
+    fallback: string,
+  ): void {
+    if (outcome.status === 'failed') {
+      new Notice(outcome.reason ?? fallback);
+    } else if (outcome.status === 'not-found') {
+      new Notice(fallback);
+    }
+  }
 
   /**
    * Parse a task from a line of text
@@ -132,10 +153,20 @@ export class EditorController {
 
     if (!isDateLine) return lineNumber;
 
-    // Walk upward to find parent task
+    // Walk upward to find parent task, then confirm this date line is owned by
+    // that task. A date quoted deeper than the task is body text, not one of
+    // its date lines.
     for (let i = lineNumber - 1; i >= 0; i--) {
       const prev = editor.getLine(i);
-      if (parser?.testRegex.test(prev)) return i;
+      if (parser?.testRegex.test(prev)) {
+        const taskIndent =
+          prev.match(/^[ \t]*(?:>[ \t]*)+/)?.[0] ??
+          prev.match(/^[ \t]*/)?.[0] ??
+          '';
+        return getOwnedDateLineType(line, taskIndent) !== null
+          ? i
+          : lineNumber;
+      }
       // Stop at empty line
       if (prev.trim() === '') break;
     }
@@ -218,142 +249,97 @@ export class EditorController {
     // Table cell task detection
     if (isTableRow(line) && parser && !parser.testRegex.test(line)) {
       const cells = parseTableCells(line);
+      const filePath = view.file?.path ?? '';
 
-      // If cellIndex is provided (e.g., from keyword context menu), use it directly
+      const dispatchTableTask = (task: Task): void => {
+        if (checking) return;
+
+        let targetState: string = newState ?? '';
+        if (!newState) {
+          const stateManager = getStateTransitionManager(
+            this.plugin.taskUpdateCoordinator,
+            this.keywordManager,
+            this.plugin.settings?.stateTransitions,
+          );
+          targetState = stateManager.getNextState(task.state);
+        }
+
+        const coordinator = this.plugin.taskUpdateCoordinator;
+        coordinator
+          ?.updateTask({
+            task,
+            type: 'state',
+            source: 'editor',
+            newState: targetState,
+          })
+          .then((outcome) =>
+            this.reportTableUpdateFailure(outcome, 'Failed to update task'),
+          )
+          .catch((error) => {
+            new Notice('Failed to update task');
+            console.error('Error updating task:', error);
+          });
+      };
+
       if (
         cellIndex !== undefined &&
         cellIndex >= 0 &&
         cellIndex < cells.length
       ) {
-        const { content } = cells[cellIndex];
+        const content = cells[cellIndex]?.content;
         if (content) {
-          const taskLine = getCellTaskLine(content);
-          if (taskLine && parser.testRegex.test(taskLine)) {
-            const task = parser.parseLineAsTask(
-              taskLine,
-              lineNumber,
-              view.file?.path ?? '',
-            );
-            if (task) {
-              task.isTableTask = true;
-              task.tableCell = { cellIndex };
-              if (checking) return true;
-              let targetState: string = newState ?? '';
-              if (!newState) {
-                const stateManager = getStateTransitionManager(
-                  this.plugin.taskUpdateCoordinator,
-                  this.keywordManager,
-                  this.plugin.settings?.stateTransitions,
-                );
-                targetState = stateManager.getNextState(task.state);
-              }
-              this.plugin.taskUpdateCoordinator
-                ?.updateTask({
-                  task,
-                  type: 'state',
-                  source: 'editor',
-                  newState: targetState,
-                })
-                .catch((error) => {
-                  new Notice('Failed to update task');
-                  console.error('Error updating task:', error);
-                });
-              return true;
-            }
-          }
+          const task = parser.parseTableTaskFromCell(
+            content,
+            lineNumber,
+            filePath,
+            cellIndex,
+          );
+          if (task) dispatchTableTask(task);
         }
         return true;
       }
 
       const cursor = editor.getCursor();
-
-      // First pass: find the cell the cursor is in
       let foundTask = false;
+
+      // First pass: find the cell the cursor is in.
       for (let i = 0; i < cells.length; i++) {
         const { content, start, end } = cells[i];
         if (!content) continue;
         if (cursor.ch >= start && cursor.ch < end) {
-          const taskLine = getCellTaskLine(content);
-          if (taskLine && parser.testRegex.test(taskLine)) {
-            const task = parser.parseLineAsTask(
-              taskLine,
-              lineNumber,
-              view.file?.path ?? '',
-            );
-            if (task) {
-              task.isTableTask = true;
-              task.tableCell = { cellIndex: i };
-              if (checking) return true;
-              let targetState: string = newState ?? '';
-              if (!newState) {
-                const stateManager = getStateTransitionManager(
-                  this.plugin.taskUpdateCoordinator,
-                  this.keywordManager,
-                  this.plugin.settings?.stateTransitions,
-                );
-                targetState = stateManager.getNextState(task.state);
-              }
-              this.plugin.taskUpdateCoordinator
-                ?.updateTask({
-                  task,
-                  type: 'state',
-                  source: 'editor',
-                  newState: targetState,
-                })
-                .catch((error) => {
-                  new Notice('Failed to update task');
-                  console.error('Error updating task:', error);
-                });
-              foundTask = true;
-            }
+          const task = parser.parseTableTaskFromCell(
+            content,
+            lineNumber,
+            filePath,
+            i,
+          );
+          if (task) {
+            dispatchTableTask(task);
+            foundTask = true;
           }
           break;
         }
       }
 
-      // Second pass: cursor not in any cell — find first task cell on the line
-      // Handles command palette, right-click keyword, and other non-cursor-based invocations
+      // Second pass: cursor not in any cell — find first task cell on the line.
+      // Handles command palette, right-click keyword, and other non-cursor-based invocations.
       if (!foundTask) {
         for (let i = 0; i < cells.length; i++) {
           const { content } = cells[i];
           if (!content) continue;
-          const taskLine = getCellTaskLine(content);
-          if (taskLine && parser.testRegex.test(taskLine)) {
-            const task = parser.parseLineAsTask(
-              taskLine,
-              lineNumber,
-              view.file?.path ?? '',
-            );
-            if (task) {
-              task.isTableTask = true;
-              task.tableCell = { cellIndex: i };
-              if (checking) return true;
-              let targetState: string = newState ?? '';
-              if (!newState) {
-                const stateManager = getStateTransitionManager(
-                  this.plugin.taskUpdateCoordinator,
-                  this.keywordManager,
-                  this.plugin.settings?.stateTransitions,
-                );
-                targetState = stateManager.getNextState(task.state);
-              }
-              this.plugin.taskUpdateCoordinator
-                ?.updateTask({
-                  task,
-                  type: 'state',
-                  source: 'editor',
-                  newState: targetState,
-                })
-                .catch((error) => {
-                  new Notice('Failed to update task');
-                  console.error('Error updating task:', error);
-                });
-              break;
-            }
+          const task = parser.parseTableTaskFromCell(
+            content,
+            lineNumber,
+            filePath,
+            i,
+          );
+          if (task) {
+            dispatchTableTask(task);
+            break;
           }
         }
-        return true;
       }
+      return true;
     }
 
     if (!parser?.testRegex.test(line)) {
@@ -486,41 +472,47 @@ export class EditorController {
       const cursor = editor.getCursor();
       const cells = parseTableCells(line);
       const parser = vaultScanner.getParser()!;
+      const filePath = view.file?.path ?? '';
 
-      // First pass: find the cell the cursor is in
+      const dispatchTableTask = (task: Task): void => {
+        let targetState: string = newState ?? '';
+        if (!newState) {
+          const stateManager = getStateTransitionManager(
+            this.plugin.taskUpdateCoordinator,
+            this.keywordManager,
+            this.plugin.settings?.stateTransitions,
+          );
+          targetState = stateManager.getCycleState(task.state);
+        }
+
+        const coordinator = this.plugin.taskUpdateCoordinator;
+        coordinator
+          ?.updateTaskState(task, targetState, 'editor')
+          .then((outcome) =>
+            this.reportTableUpdateFailure(outcome, 'Failed to update task'),
+          )
+          .catch((error) => {
+            new Notice('Failed to update task');
+            console.error('Error updating task:', error);
+          });
+      };
+
       let foundTask = false;
+
+      // First pass: find the cell the cursor is in.
       for (let i = 0; i < cells.length; i++) {
         const { content, start, end } = cells[i];
         if (!content) continue;
         if (cursor.ch >= start && cursor.ch < end) {
-          const taskLine = getCellTaskLine(content);
-          if (taskLine && parser.testRegex.test(taskLine)) {
-            const task = parser.parseLineAsTask(
-              taskLine,
-              lineNumber,
-              view.file?.path ?? '',
-            );
-            if (task) {
-              task.isTableTask = true;
-              task.tableCell = { cellIndex: i };
-              if (checking) return true;
-              let targetState: string = newState ?? '';
-              if (!newState) {
-                const stateManager = getStateTransitionManager(
-                  this.plugin.taskUpdateCoordinator,
-                  this.keywordManager,
-                  this.plugin.settings?.stateTransitions,
-                );
-                targetState = stateManager.getCycleState(task.state);
-              }
-              this.plugin.taskUpdateCoordinator
-                ?.updateTaskState(task, targetState, 'editor')
-                .catch((error) => {
-                  new Notice('Failed to update task');
-                  console.error('Error updating task:', error);
-                });
-              foundTask = true;
-            }
+          const task = parser.parseTableTaskFromCell(
+            content,
+            lineNumber,
+            filePath,
+            i,
+          );
+          if (task) {
+            dispatchTableTask(task);
+            foundTask = true;
           }
           break;
         }
@@ -533,43 +525,22 @@ export class EditorController {
         return true;
       }
 
-      // Second pass: cursor not in any cell — find first task cell on the line
-      if (!foundTask) {
-        for (let i = 0; i < cells.length; i++) {
-          const { content } = cells[i];
-          if (!content) continue;
-          const taskLine = getCellTaskLine(content);
-          if (taskLine && parser.testRegex.test(taskLine)) {
-            const task = parser.parseLineAsTask(
-              taskLine,
-              lineNumber,
-              view.file?.path ?? '',
-            );
-            if (task) {
-              task.isTableTask = true;
-              task.tableCell = { cellIndex: i };
-              if (checking) return true;
-              let targetState: string = newState ?? '';
-              if (!newState) {
-                const stateManager = getStateTransitionManager(
-                  this.plugin.taskUpdateCoordinator,
-                  this.keywordManager,
-                  this.plugin.settings?.stateTransitions,
-                );
-                targetState = stateManager.getCycleState(task.state);
-              }
-              this.plugin.taskUpdateCoordinator
-                ?.updateTaskState(task, targetState, 'editor')
-                .catch((error) => {
-                  new Notice('Failed to update task');
-                  console.error('Error updating task:', error);
-                });
-            }
-            break;
-          }
+      // Second pass: cursor not in any cell — find first task cell on the line.
+      for (let i = 0; i < cells.length; i++) {
+        const { content } = cells[i];
+        if (!content) continue;
+        const task = parser.parseTableTaskFromCell(
+          content,
+          lineNumber,
+          filePath,
+          i,
+        );
+        if (task) {
+          dispatchTableTask(task);
+          break;
         }
-        return true;
       }
+      return true;
     }
 
     // Parse the task from the line (this will return null for lines without task keywords)
@@ -767,28 +738,45 @@ export class EditorController {
 
     if (checking) return true;
 
+    const taskLineSplit = splitTrailingBlockAnchor(line);
+    const taskLineAnchor = taskLineSplit.anchor;
+
     // Parse task to get indent
     const task = parser.parseLineAsTask(line, lineNumber, '');
     const taskIndent = task
       ? getTaskIndent(task)
       : (line.match(/^(\s*)/)?.[1] ?? '');
 
-    // Build lines array to search for existing DESCRIPTION: (stop early if possible)
-    const totalLines = Math.min(lineNumber + 10, editor.lineCount());
-    const lines: string[] = [];
-    for (let i = 0; i < totalLines; i++) {
-      lines.push(editor.getLine(i));
-    }
-
-    const existingIdx = findDescriptionLine(lines, lineNumber + 1, taskIndent);
+    // Detect an existing description before touching the task-line anchor: if
+    // one exists, selecting it must leave the editor byte-for-byte unchanged.
+    // The scan reads only through the task's metadata block.
+    const existingIdx = findDescriptionLineInSource(
+      editor,
+      lineNumber + 1,
+      taskIndent,
+      this.keywordManager,
+    );
 
     if (existingIdx >= 0) {
-      // DESCRIPTION: already exists — move cursor to end of description text
-      const descLine = editor.getLine(existingIdx);
-      const descContent = descLine.replace(/^[\s>]*DESCRIPTION:\s*/, '');
-      const descEnd = descLine.indexOf(descContent) + descContent.length;
-      editor.setCursor({ line: existingIdx, ch: descEnd });
+      // DESCRIPTION: already exists — move cursor to the end of its value,
+      // before trailing whitespace or a block anchor. Empty values still end
+      // after the DESCRIPTION: prefix.
+      const descInfo = parseDescriptionLineInfo(editor.getLine(existingIdx));
+      editor.setCursor({
+        line: existingIdx,
+        ch: descInfo?.valueEnd ?? editor.getLine(existingIdx).length,
+      });
       return true;
+    }
+
+    // Inserting DESCRIPTION directly below the task line would otherwise
+    // leave a task-line anchor stranded above the new metadata.
+    if (taskLineAnchor) {
+      editor.replaceRange(
+        taskLineSplit.text,
+        { line: lineNumber, ch: 0 },
+        { line: lineNumber, ch: line.length },
+      );
     }
 
     // Insert new DESCRIPTION: line after the task line
@@ -803,8 +791,28 @@ export class EditorController {
       { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
     );
 
-    // Position cursor after "DESCRIPTION: " for immediate typing
-    editor.setCursor({ line: insertLine, ch: descLine.length });
+    if (task) {
+      relocateBlockAnchorInEditor(
+        editor,
+        task.line,
+        getTaskIndent(task),
+        taskLineAnchor,
+      );
+    }
+
+    // Position the cursor inside the description, before any suffix the
+    // relocation placed on this line.
+    const inserted = editor.getLine(insertLine) ?? '';
+    const anchorIndex = taskLineAnchor
+      ? inserted.indexOf(`^${taskLineAnchor}`)
+      : -1;
+    editor.setCursor({
+      line: insertLine,
+      ch:
+        anchorIndex >= 0
+          ? anchorIndex
+          : Math.min(descLine.length, inserted.length),
+    });
     return true;
   }
 
@@ -1053,6 +1061,30 @@ export class EditorController {
     return dateLineIndex >= 0 ? dateLineIndex : null;
   }
 
+  /** Read the live editor buffer as lines. */
+  private editorLines(editor: Editor): string[] {
+    return Array.from({ length: editor.lineCount() }, (_, i) =>
+      editor.getLine(i),
+    );
+  }
+
+  private blockAnchorOfEditor(editor: Editor, task: Task): string | null {
+    if (
+      task.isTableTask ||
+      task.sourceFormat === 'org' ||
+      task.sourceFormat === 'code-comment'
+    ) {
+      return null;
+    }
+    return (
+      findTaskBlockAnchor(
+        this.editorLines(editor),
+        task.line,
+        getTaskIndent(task),
+      )?.anchor ?? null
+    );
+  }
+
   /**
    * Insert a new date line at the appropriate position
    * @param editor - The editor instance
@@ -1080,6 +1112,19 @@ export class EditorController {
       ? getTaskIndent(task)
       : (taskLine.match(/^(\s*)/)?.[1] ?? '');
     const dateLineIndent = task ? getDateLineIndent(task) : taskIndent;
+    const taskLineAnchor = task ? this.blockAnchorOfEditor(editor, task) : null;
+
+    const writer = this.plugin.taskEditor;
+    if (task && writer?.insertDateLineFromEditor) {
+      const result = writer.insertDateLineFromEditor(
+        editor,
+        task,
+        dateType,
+        `<${currentDate}>`,
+      );
+      this.moveCursorToDateLine(editor, result.line);
+      return;
+    }
 
     // Create the date line with the correct indent (2 spaces more than task indent)
     const dateLine = `${dateLineIndent}${dateType}: <${currentDate}>`;
@@ -1140,7 +1185,6 @@ export class EditorController {
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
-      this.moveCursorToDateLine(editor, insertLine);
     } else if (isInsertingBeforeDateLine) {
       // Inserting before an existing date line (e.g., adding scheduled before deadline)
       // Add newline before but no newline after (since there's already a date line after)
@@ -1150,7 +1194,6 @@ export class EditorController {
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
-      this.moveCursorToDateLine(editor, insertLine);
     } else {
       // Insert with newline before (no newline after - existing content follows naturally)
       editor.replaceRange(
@@ -1158,8 +1201,17 @@ export class EditorController {
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
         { line: insertLine - 1, ch: editor.getLine(insertLine - 1).length },
       );
-      this.moveCursorToDateLine(editor, insertLine);
     }
+
+    if (task) {
+      relocateBlockAnchorInEditor(
+        editor,
+        task.line,
+        getTaskIndent(task),
+        taskLineAnchor,
+      );
+    }
+    this.moveCursorToDateLine(editor, insertLine);
   }
 
   /**
@@ -1685,6 +1737,21 @@ export class EditorController {
               });
           }
         },
+        onCompleteAnyway: (task: Task) => {
+          const coordinator = this.plugin.taskUpdateCoordinator;
+          if (!coordinator) return;
+          const target =
+            coordinator.stateTransitionManager.getNextCompletedOrArchivedState(
+              task.state,
+            );
+          return coordinator.updateTask({
+            task,
+            type: 'state',
+            source: 'editor',
+            newState: target,
+            forceCompletion: true,
+          });
+        },
         onDeadlineDateChange: (
           task: Task,
           date: Date | null,
@@ -1712,6 +1779,10 @@ export class EditorController {
       {
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       },
       this.plugin.app,
       this.plugin.taskStateManager,
@@ -1802,70 +1873,80 @@ export class EditorController {
         const { content, start, end } = cells[i];
         if (!content) continue;
         if (cursor.ch >= start && cursor.ch < end) {
-          const taskLine = getCellTaskLine(content);
-          if (taskLine && parser.testRegex.test(taskLine)) {
-            const task = parser.parseLineAsTask(
-              taskLine,
-              cursor.line,
-              view.file?.path ?? '',
-            );
-            if (task) {
-              task.isTableTask = true;
-              task.tableCell = { cellIndex: i };
-              if (checking) return true;
-              const cmEditor = (view.editor as { cm?: EditorView })?.cm;
-              if (!cmEditor) return false;
-              const pos2 = editor.posToOffset({ line: cursor.line, ch: 0 });
-              const coords = cmEditor.coordsAtPos(pos2);
-              if (!coords) return false;
-              const initialDate =
-                mode === 'scheduled' ? task.scheduledDate : task.deadlineDate;
-              const initialRepeat =
-                mode === 'scheduled'
-                  ? task.scheduledDateRepeat
-                  : task.deadlineDateRepeat;
-              const datePicker = new DatePicker(
-                {
-                  onDateSelected: (
-                    date: Date | null,
-                    repeat: DateRepeatInfo | null,
-                    selectedMode: DatePickerMode,
-                  ) => {
-                    const taskUpdateCoordinator =
-                      this.plugin.taskUpdateCoordinator;
-                    if (taskUpdateCoordinator) {
-                      const updateType =
-                        selectedMode === 'scheduled'
-                          ? 'scheduled-date'
-                          : 'deadline-date';
-                      taskUpdateCoordinator
-                        .updateTask({
-                          task,
-                          type: updateType,
-                          source: 'editor',
-                          newDate: date,
-                          newRepeat: repeat,
-                        })
-                        .catch((error) => {
-                          console.error('Error updating task date:', error);
-                        });
-                    }
-                  },
+          const task = parser.parseTableTaskFromCell(
+            content,
+            cursor.line,
+            view.file?.path ?? '',
+            i,
+          );
+          if (task) {
+            if (checking) return true;
+            const cmEditor = (view.editor as { cm?: EditorView })?.cm;
+            if (!cmEditor) return false;
+            const pos2 = editor.posToOffset({ line: cursor.line, ch: 0 });
+            const coords = cmEditor.coordsAtPos(pos2);
+            if (!coords) return false;
+            const initialDate =
+              mode === 'scheduled' ? task.scheduledDate : task.deadlineDate;
+            const initialRepeat =
+              mode === 'scheduled'
+                ? task.scheduledDateRepeat
+                : task.deadlineDateRepeat;
+            const initialWarning =
+              mode === 'scheduled'
+                ? task.scheduledWarningPeriod
+                : task.deadlineWarningPeriod;
+            const datePicker = new DatePicker(
+              {
+                onDateSelected: (
+                  date: Date | null,
+                  repeat: DateRepeatInfo | null,
+                  selectedMode: DatePickerMode,
+                  warningPeriod?: WarningPeriodInfo | null,
+                ) => {
+                  const taskUpdateCoordinator =
+                    this.plugin.taskUpdateCoordinator;
+                  if (taskUpdateCoordinator) {
+                    const updateType =
+                      selectedMode === 'scheduled'
+                        ? 'scheduled-date'
+                        : 'deadline-date';
+                    taskUpdateCoordinator
+                      .updateTask({
+                        task,
+                        type: updateType,
+                        source: 'editor',
+                        newDate: date,
+                        newRepeat: repeat,
+                        newWarningPeriod: warningPeriod,
+                      })
+                      .then((outcome) =>
+                        this.reportTableUpdateFailure(
+                          outcome,
+                          'Failed to update task date',
+                        ),
+                      )
+                      .catch((error) => {
+                        new Notice('Failed to update task date');
+                        console.error('Error updating task date:', error);
+                      });
+                  }
                 },
-                { weekStartsOn: this.plugin.settings.weekStartsOn },
-              );
-              datePicker
-                .show(
-                  { x: coords.left, y: coords.top + 20 },
-                  mode,
-                  initialDate ?? undefined,
-                  initialRepeat ?? undefined,
-                )
-                .catch((error) => {
-                  console.error('Error showing date picker:', error);
-                });
-              return true;
-            }
+              },
+              { weekStartsOn: this.plugin.settings.weekStartsOn },
+            );
+            datePicker
+              .show(
+                { x: coords.left, y: coords.top + 20 },
+                mode,
+                initialDate ?? undefined,
+                initialRepeat ?? undefined,
+                initialWarning ?? undefined,
+              )
+              .catch((error) => {
+                console.error('Error showing date picker:', error);
+              });
+            return true;
           }
           break;
         }
@@ -1913,6 +1994,10 @@ export class EditorController {
       mode === 'scheduled' ? task.scheduledDate : task.deadlineDate;
     const initialRepeat =
       mode === 'scheduled' ? task.scheduledDateRepeat : task.deadlineDateRepeat;
+    const initialWarning =
+      mode === 'scheduled'
+        ? task.scheduledWarningPeriod
+        : task.deadlineWarningPeriod;
 
     // Create date picker with callbacks
     const datePicker = new DatePicker(
@@ -1921,6 +2006,7 @@ export class EditorController {
           date: Date | null,
           repeat: DateRepeatInfo | null,
           selectedMode: DatePickerMode,
+          warningPeriod?: WarningPeriodInfo | null,
         ) => {
           const taskUpdateCoordinator = this.plugin.taskUpdateCoordinator;
           if (taskUpdateCoordinator) {
@@ -1933,6 +2019,7 @@ export class EditorController {
                 source: 'editor',
                 newDate: date,
                 newRepeat: repeat,
+                newWarningPeriod: warningPeriod,
               })
               .catch((error) => {
                 new Notice('Failed to update task date');
@@ -1953,6 +2040,7 @@ export class EditorController {
         mode,
         initialDate,
         initialRepeat,
+        initialWarning,
       )
       .catch((error) => {
         new Notice('Failed to show date picker');

@@ -30,7 +30,9 @@ interface ArchiveDialogPlugin {
       task: Task,
       newState: string,
       source?: string,
-    ): Promise<void>;
+    ): Promise<
+      import('../../services/task-update-coordinator').TaskUpdateOutcome
+    >;
   };
   archiveService: {
     evaluateArchiveCriteria(
@@ -46,9 +48,24 @@ interface ArchiveDialogPlugin {
   };
   keywordManager: KeywordManager;
   vaultScanner: { getKeywordManager(): KeywordManager } | null;
+  taskDependencyManager?: {
+    getIncomingActiveReferences(task: Task): {
+      dependent: Task;
+      references: string[];
+    }[];
+  } | null;
+  migrateArchivedDependents?: (
+    task: Task,
+    incoming: readonly { dependent: Task; references: string[] }[],
+  ) => Promise<{
+    migrated: number;
+    failures: { path: string; reference: string; reason?: string }[];
+  }>;
   saveSettings(): Promise<void>;
   /** Revert the most recent archive run (same flow as the palette command). */
   performUndo(): void | Promise<void>;
+  /** Retry dependent-reference migrations that failed during the run. */
+  retryReferenceRepairs?: () => void | Promise<void>;
   app: App;
 }
 
@@ -923,22 +940,63 @@ export class ArchiveDialog {
             target,
             'task-list',
           ),
+        getIncomingReferences: (task) =>
+          this.plugin.taskDependencyManager?.getIncomingActiveReferences(
+            task,
+          ) ?? [],
+        migrateDependents: this.plugin.migrateArchivedDependents
+          ? (task, incoming) =>
+              this.plugin.migrateArchivedDependents!(task, incoming)
+          : undefined,
       });
 
       const archivedCount = result.archived.length;
       const skippedCount = result.skipped.length;
-      this.close();
-      showArchiveRunNotice(
+      const blockedCount = result.skipped.filter(
+        (skip) => skip.reason === 'blocked',
+      ).length;
+      const staleCount = skippedCount - blockedCount;
+      const skipped: string[] = [];
+      if (blockedCount > 0) {
+        skipped.push(
+          `${blockedCount} task${
+            blockedCount === 1 ? '' : 's'
+          } blocked by dependencies`,
+        );
+      }
+      if (staleCount > 0) {
+        skipped.push(
+          `${staleCount} task${
+            staleCount === 1 ? '' : 's'
+          } changed since preview`,
+        );
+      }
+      const failureCount = result.referenceFailures.length;
+      const summary = [
         `TODOseq archived ${archivedCount} task${
           archivedCount === 1 ? '' : 's'
-        }` +
-          (skippedCount > 0
-            ? `, skipped ${skippedCount} (changed since preview)`
-            : ''),
-        {
-          actionLabel: 'Undo',
-          onAction: () => void this.plugin.performUndo(),
-        },
+        }.`,
+        skipped.length > 0 ? `Skipped ${skipped.join(' and ')}.` : '',
+        failureCount > 0
+          ? `${failureCount} dependent reference${
+              failureCount === 1 ? '' : 's'
+            } could not be updated.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      this.close();
+      showArchiveRunNotice(
+        summary,
+        failureCount > 0 && this.plugin.retryReferenceRepairs
+          ? {
+              actionLabel: 'Retry repairs',
+              onAction: () => void this.plugin.retryReferenceRepairs?.(),
+            }
+          : {
+              actionLabel: 'Undo',
+              onAction: () => void this.plugin.performUndo(),
+            },
       );
       // No vault rescan here. The update coordinator already refreshed the
       // state manager (archived tasks were removed). A full rescan would read

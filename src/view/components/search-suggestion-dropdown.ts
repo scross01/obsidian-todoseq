@@ -80,17 +80,21 @@ export class SearchSuggestionDropdown extends BaseDropdown {
           allSuggestions = await SearchSuggestions.getAllFiles(this.vault);
         }
         break;
-      case 'tag':
-        allSuggestions = SearchSuggestions.getAllTags(
-          this.tasks,
-          this.viewMode,
+      case 'tag': {
+        const tags = SearchSuggestions.getAllTags(this.tasks, this.viewMode);
+        allSuggestions = Array.from(new Set([...tags, 'none'])).sort((a, b) =>
+          a.localeCompare(b),
         );
         break;
+      }
       case 'state':
         allSuggestions = SearchSuggestions.getAllStates(this.settings);
         break;
       case 'priority':
         allSuggestions = SearchSuggestions.getPriorityOptions();
+        break;
+      case 'blocked':
+        allSuggestions = SearchSuggestions.getBlockedOptions();
         break;
       case 'scheduled':
         {

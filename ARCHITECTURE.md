@@ -264,6 +264,8 @@ graph TB
 
 **TaskUpdateCoordinator** (`src/services/task-update-coordinator.ts`)
 
+The unified `updateTask` entry is also the blocked-completion gate. Before it reserves a file generation or performs an optimistic mutation, it consults the current `TaskDependencyManager` snapshot for incomplete→completed state transitions. The default-on `enforceBlockedTasks` setting controls the gate; `forceCompletion` is an explicit, narrowly scoped bypass used by the Complete anyway menu action and the `complete-blocked-task` command. The dependency manager is injected by `PluginLifecycleManager`, so the gate uses the same revisioned graph as search and rendering. Dependency-property mutations (`BLOCKER` add/remove, archive history and promotion) also route through `updateTask` as a typed `dependency-reference` update, so they serialize with state and date writes in the per-file queue; `TaskWriter` remains the only low-level content writer. Task identity writes (ID and Markdown block anchor) remain TaskWriter operations, and the context menu only copies after a successful persistence result.
+
 - **Responsibility**: Centralized, unified update pipeline with optimistic UI and race condition prevention
 - **Key Patterns**: Command pattern, optimistic updates, sync/async phase separation, per-task locking, file queue management
 - **Interface**: `updateTask(context)`, `updateTaskState()`, `updateTaskPriority()`, `updateTaskScheduledDate()`, `updateTaskDeadlineDate()`, `updateTaskRecurrence()`, `updateTaskByPath()`
@@ -656,14 +658,15 @@ graph TB
 - **Key Patterns**: Parser combinators, syntax tree construction, AST caching with FIFO eviction
 - **Interface**: Query parsing, AST generation, property filter parsing, `clearCache()` for AST cache invalidation
 - **AST Cache**: `astCache: Map<string, SearchNode>` capped at 50 entries (`AST_CACHE_MAX_SIZE`) with strict FIFO eviction on insertion (`astCache.keys().next().value → delete`) when the size cap is reached. Repeat calls for the same query string return the identical AST instance — the AST is immutable post-parse (SearchEvaluator never mutates it), so sharing is safe. Invalid queries are not cached: the parser throws `SearchError` before reaching the cache-write branch, so invalid-query evaluation still re-parses on each call.
-- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c) and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, description, heading, state, non-date words) stay accepted. Operator tokens are uppercase-only (`OR`/`AND`); lowercase `or`/`and` are ordinary search words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
+- **Validation contract**: closed-domain values are rejected at parse time — `priority:` accepts only high/med/medium/low/none (aliases a/b/c), `blocked:` accepts only unquoted lowercase `true`/`false`, and date prefixes reject date-shaped calendar-invalid values (`2026-02-30`), including range bounds and `<`/`<=`/`>`/`>=` forms; open-domain values (path, file, tag, content, description, heading, state, non-date words) stay accepted. Operator tokens match case-insensitively (`OR`/`AND`); the quoted forms "or"/"and" search the literal words. Errors are `SearchError`s surfaced to users via `Search.getError()`.
 
 **SearchEvaluator** (`src/search/search-evaluator.ts`)
 
 - **Responsibility**: Task matching and filtering based on query AST
 - **Key Patterns**: Visitor pattern, filter chain execution, property search integration
-- **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`
-- **Default search domain**: an unprefixed term or phrase (`evaluateTerm`/`evaluatePhrase`, via `getSearchableFields`) matches the full original task line (`rawText`), the task's `DESCRIPTION:` line, the file path, or the filename. Use `content:` for the task line alone, `description:` for the description alone, and `heading:` for the enclosing heading. `text` is deliberately _not_ indexed: it is `rawText` with the keyword/priority/reference markers stripped, hence a contiguous substring that can never match something `rawText` does not.
+- **Interface**: Task evaluation, result filtering, `evaluatePropertyFilter()`, and a batch-local dependency blocked-key set acquired once per pass for `blocked:` filters
+- **Default search domain**: an unprefixed term or phrase (`evaluateTerm`/`evaluatePhrase`, via `getSearchableFields`) matches the full original task line (`rawText`), the task's `DESCRIPTION:` line, the file path, or the filename. It also matches `text` when it differs from `rawText`: the parser strips the keyword, priority token and footnote/embed references, so displayed text such as `Review report` (from `Review[^1] report`) is not a contiguous substring of the raw line. Use `content:` for the displayed task text alone, `description:` for the description alone, and `heading:` for the enclosing heading. `parentHeading` is excluded from default matching and reached only through `heading:`.
+- **Text matching**: default mode folds both sides through `SearchTextCache` (`src/search/search-text.ts`) — lowercase, NFD, removal of marks whose preceding base is Latin, the ø/ł/đ/ð/ħ/ı/ß/æ/œ/þ table, then NFC. Only pass-local non-ASCII values are memoized; ASCII takes a lowercase fast path. Strict mode (the A/a toggle) skips folding and compares original text. Phrase leaves use escaped literal text with Unicode outer boundaries (`[\p{L}\p{N}\p{M}\p{Pc}]` on each side), not `\b` or the `i` flag; prefix values keep their substring behavior. Tags are extracted from the original line before folding, and `state:` group aliases are resolved from the original value before any literal comparison.
 - **Note**: evaluation assumes parse-time validation has run — `DateUtils.parseDateValue` fails closed on invalid dates so the evaluator's remaining `false` fallbacks are last-resort, not primary behavior
 
 **SearchTokenizer** (`src/search/search-tokenizer.ts`)
@@ -671,7 +674,7 @@ graph TB
 - **Responsibility**: Lexical analysis of search queries
 - **Key Patterns**: Tokenization, pattern matching, property token detection
 - **Interface**: Token generation, lexical analysis, property token handling
-- **Case**: operator tokens (`OR`, `AND`) are matched case-sensitively by design; ordinary words like "or" remain searchable as text
+- **Case**: operator tokens (`OR`/`AND`) match case-insensitively (Obsidian-parity grammar, word-boundary anchored); the quoted forms "or"/"and" are the escape hatch for searching the literal words.
 
 **SearchSuggestions** (`src/search/search-suggestions.ts`)
 
@@ -1152,7 +1155,7 @@ graph LR
 
 - **Responsibility**: Utility class for evaluating property values in search queries, centralizing date parsing, comparison, and evaluation logic
 - **Key Patterns**: Static utility methods, date parsing, comparison operators
-- **Interface**: `parsePropertyValueAsDate()`, `parseDateForComparison()`, `compareDate()`, `evaluateDateComparison()`
+- **Interface**: `matchingKeys()`, `matchesPropertyValue()`, `matchesPropertyFilter()`, `parsePropertyValueAsDate()`, `parseDateForComparison()`, `compareDate()`, `evaluateDateComparison()`
 - **Date Formats**: YYYY-MM-DD, YYYY-MM, YYYY, relative dates (today, tomorrow, overdue), date ranges
 - **Used by**: SearchEvaluator, PropertySearchEngine
 
@@ -1277,6 +1280,18 @@ To add support for a new file format:
 1. Implement the `ITaskParser` interface
 2. Register the parser in `PluginLifecycleManager.registerParsers()`
 3. Add tests following the patterns in `tests/org-mode-parser.test.ts`
+
+## Task property drawers
+
+Structural rebuilds use one source-order sweep per file for Org checkbox ownership and a per-path first-word index for reader row lookup, so work scales with the entries in scope rather than parent × all-tasks or row × all-tasks cross products. `src/utils/task-structure.ts` builds a source-ordered parent, sibling-group and checkbox-ownership index in one bounded pass per file. Heading tasks own their section; indented tasks nest by effective indentation. `VaultScanner` publishes a parallel, memory-only `StructuralEntry[]` per path (`src/utils/task-structure-entries.ts`) with a monotonic `structureRevision`: non-task headings, dedented prose, keywordless checkbox rows and archived task lines. Blank lines are implicit (their absence preserves the group). The dependency manager rebuilds when either the task revision or the structure revision changes and consumes both; non-task headings and archived branches are barriers, and prose closure replaces the affected group key so later indentation cannot reconnect. Org checkbox scope is computed from published heading lines (current entry body only), while Markdown walks the task subtree. `ORDERED` and `NOBLOCKING` are local typed drawer properties with Org non-nil semantics; `NOBLOCKING` suppresses effective blocked status and its reasons but is not inherited and does not complete the task. Structure is never persisted and is rebuilt from the current source publication.
+
+`src/services/task-dependency-manager.ts` derives the dependency graph from the central task snapshot. It indexes IDs and file-scoped block anchors, resolves only local `BLOCKER` / `ARCHIVED_BLOCKER` source, and publishes immutable per-revision blocked keys plus typed reasons. Only direct prerequisites gate completion; SCCs are diagnostics and never override direct checks. Reads validate `TaskStateManager.getRevision()` synchronously, so silent updates, line shifts and replacement arrays cannot leave a stale blocked result. During a scan, incomplete tasks with dependencies report pending validation rather than a broken reference. The manager owns no persistent index and performs no writes; archived references are inactive until an exact target re-enters the permitted scanned set, at which point they participate immediately while 089 reconciles the source property.
+
+`src/utils/task-properties.ts` is the single bounded reader for Org-style `:PROPERTIES:` drawers. It returns ordered lexical entries with source spans, classifies only `ID`, `BLOCKER` and `ARCHIVED_BLOCKER`, and emits typed `TaskPropertyIssue` diagnostics for malformed drawers, malformed property entries, misplaced date or description metadata, duplicate keys, invalid IDs and invalid references. The Markdown and Org parsers attach the extracted values to `Task`; unknown properties remain source data and are never modeled, while reserved date and description names are diagnosed as misplaced metadata. `TaskWriter` uses the same scanner to mutate supported keys through its existing editor/vault serialization, while copy, move and migrate retain the entire bounded drawer as part of the task block. Dependency references share one format-aware lexer: whitespace-separated exact IDs, plus file-qualified `[[note#^anchor]]` tokens in Markdown; `previous-sibling` is a reserved relation token rather than an ID. Property inheritance and trigger execution are not part of this layer.
+
+`src/view/editor-extensions/property-drawer-fold.ts` registers a CodeMirror fold service for task-owned drawers. `src/utils/property-drawer-fold.ts` performs a bounded 60-line owner and drawer read, accepts only closed drawers with at least one property, and returns a range starting after the `:PROPERTIES:` line so the header remains visible while the entries and `:END:` fold. Fold state is editor-owned and is never written to the note or plugin data.
+
+`ReaderViewFormatter` turns a closed, non-empty, task-owned drawer into an in-place Reading-view disclosure. A separate icon-only button using Obsidian's native `collapse-icon` and `right-triangle` indicator is inserted before the `:PROPERTIES:` header; the header span remains visible, the button carries `aria-expanded`, and the entry and close spans plus their line breaks carry a drawer-scoped body attribute. The toggle only changes DOM `hidden` state. When the default-off `hideTaskPropertiesInReadingView` setting is enabled, every recognized task-owned block is marked hidden and no button is created, including empty, unclosed and otherwise-expanded blocks. This path also works when `formatTaskKeywords` is off. No editor path reads the setting, so the editor fold remains independent. Drawer state is never written to the note; enabling the setting saves only the preference through the normal settings path. Standalone and unsupported blocks remain unchanged.
 
 ## Data Models and Type System
 
@@ -1583,6 +1598,10 @@ The tokenizer treats adjacency as conjunction at `AND` binding power (80), above
 
 `TaskParser.extractSubtasks` records an inclusive `subtaskSpan` on a task when it counts checkbox children, in addition to the counts. `TaskStateManager` uses that parser-owned span plus checkbox and indentation qualification for both keyword-task and checkbox-only optimistic updates; it does not infer ancestry from indentation alone or invent it for snapshots without a span. `adjustLineIndices` shifts or removes span endpoints when metadata lines are inserted or deleted. Reparsing replaces the span along with the counts, so a later scan restores source truth.
 
-## Batch state-group search
+## Property filter resolution
 
-`Search.filterTasks` builds a per-pass batch context for the state-group aliases the query uses (`state:active`, `state:waiting`, and so on). It resolves each group once through `KeywordManager` and passes exact/lowercase keyword sets down through `filterTasksByNode`, `evaluateSync`, and `evaluateStateFilter`; rows only do set membership. Per-row `Search.evaluate` keeps the existing per-call resolution, and the context is rebuilt on every batch so settings edits and custom keywords are picked up immediately. `collectEngineResolutions` remains the separate batch seam for property-engine filters.
+A parsed `property_filter` node owns a lossless `PropertyQueryDescriptor` (`key`, `kind`, `value`, `exact`, `keyExact`). The bulk path transports that descriptor to the engine from both `Search.filterTasks` and the dashboard window adapters; it does not rebuild it from a display string, which cannot distinguish `[type:""]` from `[type]` or `[type:"null"]` from `[type:null]`. Resolution identity is built by one helper from every descriptor field plus the effective case mode, encoded as length-prefixed parts, so separators and quoting cannot collide. Duplicate nodes resolve once per batch; distinct intent resolves separately. The legacy string adapter remains only for older string callers.
+
+## Batch search context
+
+`Search.filterTasks` builds one per-pass context. State-group aliases (`state:active`, `state:waiting`, and so on) resolve once through `KeywordManager` into exact/lowercase sets, passed down through `filterTasksByNode`, `evaluateSync`, and `evaluateStateFilter`; rows only do set membership. The same context owns the `SearchTextCache` used for folded values and phrase patterns, so repeated query leaves, shared paths and repeated tags are folded once per pass. Per-row `Search.evaluate` creates a minimal context per call, and every batch rebuilds its context, so settings edits, custom keywords, renames and text edits are visible on the next pass without invalidation. `collectEngineResolutions` remains the separate batch seam for property-engine filters.

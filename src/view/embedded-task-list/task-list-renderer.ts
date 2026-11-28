@@ -1,5 +1,7 @@
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { TaskTransferResult } from '../../services/task-writer';
+import { showReferenceRepairNotice } from '../components/reference-repair-notice';
+import { getStateTransitionManager } from '../../services/task-update-coordinator';
 import TodoTracker from '../../main';
 import { TodoseqParameters } from './code-block-parser';
 import { setIcon, Notice } from 'obsidian';
@@ -11,6 +13,7 @@ import {
 } from '../../utils/daily-note-utils';
 import { readTaskBlockFromVault } from '../../utils/task-sub-bullets';
 import { EmbeddedTaskItemRenderer } from './embedded-task-item-renderer';
+import type { UrgencyScoreContext } from '../../utils/task-urgency';
 
 /**
  * Renders interactive task lists within code blocks.
@@ -41,10 +44,26 @@ export class EmbeddedTaskListRenderer {
           this.handleScheduledDateChange(task, date, repeat, warningPeriod),
         onDeadlineDateChange: (task, date, repeat, warningPeriod) =>
           this.handleDeadlineDateChange(task, date, repeat, warningPeriod),
+        onCompleteAnyway: (task) =>
+          this.plugin.taskUpdateCoordinator?.updateTask({
+            task,
+            type: 'state',
+            source: 'embedded',
+            newState: getStateTransitionManager(
+              this.plugin.taskUpdateCoordinator,
+              this.plugin.keywordManager,
+              this.plugin.settings?.stateTransitions,
+            ).getNextCompletedOrArchivedState(task.state),
+            forceCompletion: true,
+          }),
       },
       {
         weekStartsOn: plugin.settings.weekStartsOn,
         migrateToTodayState: plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: plugin.settings.enforceBlockedTasks,
+        taskWriter: plugin.taskEditor,
+        dependencyManager: plugin.taskDependencyManager,
+        taskUpdateCoordinator: plugin.taskUpdateCoordinator,
       },
       plugin.app,
       this.plugin.taskStateManager,
@@ -125,6 +144,20 @@ export class EmbeddedTaskListRenderer {
       case 'partial':
         new Notice('Task copied, but the original could not be updated');
         break;
+      case 'partial-references': {
+        const failed =
+          result.referenceRepairs?.reduce(
+            (total, report) => total + report.failed.length,
+            0,
+          ) ?? 0;
+        showReferenceRepairNotice(
+          this.plugin.taskEditor,
+          failed,
+          result.unreadablePaths,
+          result.referenceDiscoveryFailed,
+        );
+        break;
+      }
     }
   }
 
@@ -242,7 +275,9 @@ export class EmbeddedTaskListRenderer {
     isCollapsed?: boolean,
     toggleCollapse?: (containerId: string) => void,
     containerId?: string,
+    urgencyContext?: UrgencyScoreContext,
   ): void {
+    this.itemRenderer.setUrgencyScoreContext?.(urgencyContext);
     // Handle collapsible mode with incremental updates to prevent flicker
     if (params.collapse) {
       const hasTitle = !!params.title;
@@ -923,6 +958,10 @@ export class EmbeddedTaskListRenderer {
       this.taskContextMenu.updateConfig({
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       });
     }
   }

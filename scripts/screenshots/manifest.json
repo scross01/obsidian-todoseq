@@ -3,173 +3,173 @@
     "todoseq-editor-checkbox-interaction": {
       "id": "todoseq-editor-checkbox-interaction",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "fba3afc5f19fc898a119ca0ca7e965053571e52b1593696f9b89389114ac3fea",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "0e5ead147b9ee72f791d30e04856aed863d29a557e819ed17b3fc4e916e4c414",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-date-autocomplete": {
       "id": "todoseq-editor-date-autocomplete",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "d30a5b7acdbdd41cc6fe3020e42270a61e7e2b30fcd82950c7c610f670074607",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "a13677e81fb236fc3b982d6f8a074e2f2597c8bd4ac771b0c512b9d887d46dc8",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-task-styling": {
       "id": "todoseq-editor-task-styling",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "4f94dc9eb7b80d666c9636b2f2768c2e195e796f680fdb50aa18952874315b93",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "bac54d7bf394ab7ab8506873643329f68be416cc414719b78e6c136857559e78",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-view": {
       "id": "todoseq-editor-view",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "77085d83994e8f01fbb8ad2b29e0851eb4f368ea3e00dfe69609d1d1bd1c0a48",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "481e516a1a52630be49e2c433cd427f637a927db6e7071bc33cbd4c348f87489",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-command-palette": {
       "id": "todoseq-command-palette",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "5a0211d030f22db3914fbc61c521a1ab0d8fcf02eeb167b525c16c8113613e46",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "5da23133f975a4a83f97d1acb24f9ae302cd766a16e249aae7966e88142a1844",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-context-menu": {
       "id": "todoseq-context-menu",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "44a9d94499efe3d89d22e0305c25744e9878c31eb902846ba77124e19919ead7",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "0300844201af08c864c3ebd1c42f6fc5f561d02f8ff439bcdd3e249e704e1ddf",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-date-picker": {
       "id": "todoseq-date-picker",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "88e91fa56fac37f6c2a77ac519713c9c36cfa4df1b5e0e14efafa2f649437b57",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "4172cc2b8f372b02e115012ad3bdd3de9f2cb96d345985678bef11d60b00ed67",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-sidepanel-with-context-menu": {
       "id": "todoseq-editor-sidepanel-with-context-menu",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "35caa051a19cfb6569565b93471d5c9160bbb2b5c346a5d878bb3ed3586a3b48",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "f134b184239d5ae3b2b2bcb2169b771a395eb029d942b29012cda337bdaa397c",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-search-and-settings-toolbar": {
       "id": "todoseq-search-and-settings-toolbar",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "50c578463bf115c561ddb78ff79b83ce4e2d5d6f0fec2db2b46fec0ea70eebab",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "18caed1d11b7d184c98a4dd0b9fe4a0e885c8672d1fa21d26363e17c35545d7d",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-task-list-example": {
       "id": "todoseq-task-list-example",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "90135145170a3952763a3f05dd76aae020367ea115ce3e2a41b9834ec7e17139",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "ca6f6b2ff17ddc8ed658bf27d008be1337b1b3dd7c2c58cfd706706212aeee42",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-embedded-tasklist": {
       "id": "todoseq-editor-embedded-tasklist",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "60f3daae944a1661bd83cf6ecfa53aebaf1ac88b1b286d24e40ad1595ead64de",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "535d6e1ed1bcc1a1d8975134affdd135f696f098ae4aa3176eb7e9d49b2ecfc4",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-list-empty": {
       "id": "todoseq-embedded-list-empty",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
       "outputSha256": "5c786b37072157f8d54cde02cef18cd150859719f415ef3ad32b7be66da9f66f",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-list-error": {
       "id": "todoseq-embedded-list-error",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
       "outputSha256": "be046434795601ffe1b599bc87191604b152da6f588a460ee508c582141a6991",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-list-example": {
       "id": "todoseq-embedded-list-example",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "49f8a8236791663c5bb9f156f9d0073ce525f83dab02ff9c37c624c20db25467",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "1afd598a6eefa9ee51a45d5e48f82314ae95c415eaf3c9bb3c5ed91460430c7e",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-reader-view": {
       "id": "todoseq-reader-view",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "4ca549d23dcd6f093433befbf3c2fa39f74f40cab0e1cf51e26bf233ea887426",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "435583e444aa5c645dcf3bb7bcd318adbe855cb9ca827767f1834a7ad0240cba",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-screenshot-dark": {
       "id": "todoseq-screenshot-dark",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "2f79b00898e8216e016485d78eaf65444a682eab3b56890917faf09c69758790",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "6b4179789a941271694554ea5336cf636bdb2150f74d131841f8ab0bd0832da0",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-search-options-menu": {
       "id": "todoseq-search-options-menu",
       "scenarioId": "docs-search",
-      "scenarioHash": "f214c5545eb1c2acc3d920726cfae7fd17b2716e4cc24e81f7fb4df2d44b41aa",
-      "pluginBuildHash": "bc4a4c462ca66fb52e5f61fc10aa7e1b883dde4e08ef7b82f8f074d25726bfed",
-      "outputSha256": "95b2b5d2ef48bc0c9d3bb6c35970cdc4cc41853cc39fb7b5c27061b744c3a359",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "09186b025abf5fd433bf8b89cb17f6bf38744dbc5ef159282636c9371a61e97a",
+      "pluginBuildHash": "0443faa9352540b9740d6a8c4d1baacd63c901ef569008608ace8a5cce5476c2",
+      "outputSha256": "301ccbfbfd0b119b4968201fa60b91f6ad3d681313852a742d8aedd40169193b",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-settings": {
       "id": "todoseq-settings",
       "scenarioId": "docs-settings",
-      "scenarioHash": "b67ad6d1e64b90c27c690295c2d389ce245758a7956b3bff70a528a7fde6b9f8",
-      "pluginBuildHash": "35ec86132f93a0e1e8488ef93113333384ba023b7fb5020fc7d38f8b15f4aa5c",
-      "outputSha256": "c9aef7b96a40ec5ca3448e73f9da13a475119f1ab7511fe05a4990c9cd48cbe7",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "69a43fedd268fab4d7b5694f8e129df12375fdbcc013948ee7c989c9265833c9",
+      "pluginBuildHash": "f9f8156bf3a10a73724b611990a4560e554522c2dab20d6ae055d8f73170b0dd",
+      "outputSha256": "c76077393752d60067fb46183d4db302c1c9ef89fee3b9d38034da8c2b331bc6",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-task-entry": {
       "id": "todoseq-task-entry",
       "scenarioId": "docs-task-entry",
-      "scenarioHash": "d8d01d1007bfc18834c9fb2ff43a19f882c30ee17c9a47d3c0bff3d256fc4ca8",
-      "pluginBuildHash": "fa95bd5cd79f8644162f691f394c4f8b982221e8dd21fcef5127a694a80c2acf",
-      "outputSha256": "1f86b35c52787144e7a6c8abbbec8b72b055251f9a7d6e92bc62bfbe5082b9e0",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "4754e0efa18228cd78c2595e18fdd5717315f1443f98481272bdca89f5360783",
+      "pluginBuildHash": "51112726594c130d87643f50e13b9180aac3aea12a409ecd0e7dc572cc62714b",
+      "outputSha256": "fd24f9071748581ce974c6bc4bb993824425575b3395fc29c4742f9d888a4f48",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-display-forms": {
       "id": "todoseq-dashboard-display-forms",
@@ -201,353 +201,407 @@
     "todoseq-archive-dialog": {
       "id": "todoseq-archive-dialog",
       "scenarioId": "docs-auto-archive",
-      "scenarioHash": "e6b7734b3f2be7646967726892cca3cc6639be45667cd2a04a8f81709eee5065",
-      "pluginBuildHash": "7ecc67f7554e6374632a4e944cf26411a2fb9ef87df48f0b79b0a43e35685563",
-      "outputSha256": "841e436ba739203261fe48e5bf6044a966c6f6e7d59b3e8db2a2da30679f3e07",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "5fb0e0dadbec97c8e7ffdd3a31073c557ca7b8e78c11afcfd3bd24cb3099920d",
+      "pluginBuildHash": "d039d5e49df65725ae279b0663d611f812f5e8bc53dcb730994f65668d6eef96",
+      "outputSha256": "544a971c2b1b6268fcb8e748fe461f7f106c41e2be5bf03ec17cf86c51192add",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-task-context-menu": {
       "id": "todoseq-task-context-menu",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "350f90700b1813a33c5edafab95191518addf47abf81621f7ba9037e6e8108ba",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "c103f43f9897ad7cf2a054d4a351928a72de45b6a12b765320e3a0d08c58d219",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-basic-usage": {
       "id": "todoseq-dashboard-basic-usage",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "8a330dba5f948438a2bb50f9ea1fef041fb973c47a4107c94f5f7b516b80f3d0",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "b37a9ee586b4fbb83a188ce19c21b10c1cbbf4ead7eead88edaef9fc54cc4115",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-donut": {
       "id": "todoseq-dashboard-example-donut",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "018b77b5a6ccd04753b8d1513b06f6a4255fd4ff2a1251ec5f89d7e0e646b577",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "b900d12f3d52ff39ebc3f07035a512390b0ff185e0a975396c1cc708c8bd0770",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-heatmap": {
       "id": "todoseq-dashboard-example-heatmap",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "01636c8a950891200dea982d57ce0a30dc576f841fc107033e231f19cccf0787",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "c4c6aa0bfecac45ea8a201c9bb594651f106a381623ff429eaa0577d382893b9",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-strip": {
       "id": "todoseq-dashboard-example-strip",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "f865c798a3d5b1eaaa29f19c550dda8a70d4e0d2325d6fb73dd076343fc1e8b2",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "e3995f6e0385cc67fed66331366510e5d41faf3a9cc4abce59ba92a16118e238",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-tiles": {
       "id": "todoseq-dashboard-example-tiles",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "d83aee74107bd0bd6b05d91c80e3821cf08c7ebd73d2b9c515da7f15561de9ba",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "a395d18fd3a8fab4268f4e32ef9cacba9f28647f963af77a5f4b091c4bb77bca",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-search-options-menu-light": {
       "id": "todoseq-search-options-menu-light",
       "scenarioId": "docs-search",
-      "scenarioHash": "f214c5545eb1c2acc3d920726cfae7fd17b2716e4cc24e81f7fb4df2d44b41aa",
-      "pluginBuildHash": "bc4a4c462ca66fb52e5f61fc10aa7e1b883dde4e08ef7b82f8f074d25726bfed",
-      "outputSha256": "9af435f57e1e5f1bf15c4de424ac6d738b3977938f499f755f8dade86229601e",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "09186b025abf5fd433bf8b89cb17f6bf38744dbc5ef159282636c9371a61e97a",
+      "pluginBuildHash": "0443faa9352540b9740d6a8c4d1baacd63c901ef569008608ace8a5cce5476c2",
+      "outputSha256": "ee6ce7481d33df24cbf4e806f07785de6fc324ea743e68c1a96a6f2cbf44c13d",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-checkbox-interaction-light": {
       "id": "todoseq-editor-checkbox-interaction-light",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "74444857eff4b51e36204d44e5f7642dbd2fcb90fd49035c01657b5c79784675",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "ce86ca0fcb1d49c0349c91ee584047086595d51c558a53db66e2bff90cac021c",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-date-autocomplete-light": {
       "id": "todoseq-editor-date-autocomplete-light",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "a3fdfed72f9c0cfa0a811b8dfcb75a409068770f5c9a2cf433161321845f3367",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "df902b07d4094ff38a2674af887004539f0932c26e7269e492e9df73fa8f079f",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-task-styling-light": {
       "id": "todoseq-editor-task-styling-light",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "87707c8aaf7341cc33eb7cd1b156c0d4d14207727cf9795bba21d711384adf2c",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "68a5d192dc2380cc318cb4c516257f2c5e18ad36474af1b09e3bcc103eb684f8",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-view-light": {
       "id": "todoseq-editor-view-light",
       "scenarioId": "docs-editor",
-      "scenarioHash": "bf88a733538953567eb5bb2518d15c7dd31a4b86b7b62f0a9fb20722e41aaaaf",
-      "pluginBuildHash": "c28655301714b6dcfdf268f4c6355130d63a3e0485df0034fbcb8cfb1c87b002",
-      "outputSha256": "b0da99c9d7c916a1d5c0627723967fac5440af2599882dc21a7b0e1ccf3a57ed",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "03cbf9369ccc2b67e8b43e2f63b62a7fa941e08ce6c6a139727d8da2322a3bd5",
+      "pluginBuildHash": "0d53f78c7b6ca0459ef9b8674347b34a9612853e837de672c6d08cea2d722746",
+      "outputSha256": "46d9b35337de615a2e637cf35dc3f030ab839c7b67cd073d5585e0214cb84f7f",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-command-palette-light": {
       "id": "todoseq-command-palette-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "a7d83db662db0399d12ada2bccef180800e8bb4e59a9cb036a520709330f071a",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "2018958327dc0c7b88fd3a485022d5816a998ed4c394f502058f371d624588f6",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-context-menu-light": {
       "id": "todoseq-context-menu-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "d3f922047432c91f7c008b175d379f9647ef5ac102a9d50aae8b3d6f11787145",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "b5e5e4b51601eb18545333f003494c8934da7681353e08eb2fe8dbecb093bf09",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-date-picker-light": {
       "id": "todoseq-date-picker-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "402eb5a0d6fdd2dd51535efcf19fce53284985247be4b046b0e48fa52b50721a",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "839e8bcead6ba2de3fc15d844492e0981592482a4a6f9d6483399f548b40665f",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-sidepanel-with-context-menu-light": {
       "id": "todoseq-editor-sidepanel-with-context-menu-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "d89ed137058649aa0045aa56b6699b2dfb63517aee343f6a70e77dab933b8e5c",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "f094dc3b77453a79f78e5b2bcbadf93f4ffc7f4832bb6134837a28efb6116979",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-search-and-settings-toolbar-light": {
       "id": "todoseq-search-and-settings-toolbar-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "0c3d909ef9d490af3b32dd935cdb629f5a122895ecbb2ff870af1dd78e81e475",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "5cef97fa349cc648ffe0647d795a8774f7e02634eca4a1a70d3a42adf35bc886",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-task-context-menu-light": {
       "id": "todoseq-task-context-menu-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "0da3007db70a4effbf4a55ec14f4a7bbf0d7086485e6df4345f2f592cc374f69",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "9def100af00b47325b6b0b15ad83cf37ac741f4965a3c449b017c3710e116933",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-task-list-example-light": {
       "id": "todoseq-task-list-example-light",
       "scenarioId": "docs-task-list",
-      "scenarioHash": "e07e6cd29b223f0ae00bfe370d574785bf64e42c5f67780101e2b2e39f32a706",
-      "pluginBuildHash": "61007b613cfb2f8412429cda14268f7d068869d920a3bd225ce10a289eaf342d",
-      "outputSha256": "e7b5da2a13b919b41e125426143420267aa8d6efc363efbd2e8c67aab5987156",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "ba7ca6601beb4ed93adef9b5e8785a84519a3f05a6ac8aacd7f739564adffbd5",
+      "pluginBuildHash": "25a21e888924b19a1aec072fd4e8bb45d7e5c4dcc7320968661f72053eb95047",
+      "outputSha256": "14beb9ae03972b8f56aac78738ebb9704663429b28de2a46227a7f07304a8fad",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-editor-embedded-tasklist-light": {
       "id": "todoseq-editor-embedded-tasklist-light",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "f4b4f6abaabcc6eacf4213451c7e01448b7467733bb8b0ad5d94d85baf055246",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "095a26acf86a82d82b4186feb5ff3755a456b717ba04a731d78648722187eaf2",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-list-empty-light": {
       "id": "todoseq-embedded-list-empty-light",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
       "outputSha256": "2fd3223395870aaae271d9502cfc35bc527bc0b1a1e82118e0ff20de8c3dc81b",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-list-error-light": {
       "id": "todoseq-embedded-list-error-light",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
       "outputSha256": "c1a19f81ef9232b29d82a53790191f55fb1396a4b633f978f731bdf73da90ee9",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-list-example-light": {
       "id": "todoseq-embedded-list-example-light",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "d1f77a3a36b5f0a95d15e63f17f131386f7ddac18da91c2f1e58a6052b54ee93",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "9982608f037bdacae9350299b40088da8f293f1d26988630008cbc9f8c203169",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-reader-view-light": {
       "id": "todoseq-reader-view-light",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "f9fdeacf2c5e49b2e3404a4746813c15cdd7b3d5ae751e77baa819b50beeb32f",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "ea0a3217db0e47c325fab26d43bc4fbce05365ec09806fa4f6aa36ebf4b01a6f",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-screenshot-dark-light": {
       "id": "todoseq-screenshot-dark-light",
       "scenarioId": "docs-embedded-reader",
-      "scenarioHash": "d4e278fd0ec40a379ed91b6dc361bc2c3965888db4180f4c886885f7dc5fc96f",
-      "pluginBuildHash": "76b4c51313c345225a6eae905115af042d561e41c0b0282e575c1042b85ed980",
-      "outputSha256": "90664425e7211c4a268df51be32905ef674b1dbc2a5982ab5567ddd219785aae",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "c626f9fdfd6844c4d9756640df8d5b0fa089c873edba66099d67fc0d225bb836",
+      "pluginBuildHash": "0f18085f66a16caa237b7c86c7702cdce6bdd52c79de871ee20d8d9d4a7f77c8",
+      "outputSha256": "63d3bf0aadb2bfe46360219c5bb7a062a8cacbc4597b724c509bf1e31b0ad131",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-settings-light": {
       "id": "todoseq-settings-light",
       "scenarioId": "docs-settings",
-      "scenarioHash": "b67ad6d1e64b90c27c690295c2d389ce245758a7956b3bff70a528a7fde6b9f8",
-      "pluginBuildHash": "35ec86132f93a0e1e8488ef93113333384ba023b7fb5020fc7d38f8b15f4aa5c",
-      "outputSha256": "622221d01698af4b3553fc4ff3563a346635bdd6ba5c34b567685d576cccce29",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "69a43fedd268fab4d7b5694f8e129df12375fdbcc013948ee7c989c9265833c9",
+      "pluginBuildHash": "f9f8156bf3a10a73724b611990a4560e554522c2dab20d6ae055d8f73170b0dd",
+      "outputSha256": "11d950178800e21cb5386841530396c499903bcd19b6af2d3de1951f267db04e",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-basic-usage-light": {
       "id": "todoseq-dashboard-basic-usage-light",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "9965b50323e7a85d8468801e75961df91355f5673d91d83a0657dcee37002e76",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "bed7d180e9413a322def08419ef5c022c1391409aef857ca730d5f3478c263fa",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-donut-light": {
       "id": "todoseq-dashboard-example-donut-light",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "b539444993a3ba0517a7197709b9968c8f80bd45ba77761212e9c42d3f552970",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "fc5839e8d094136a4114e3ed9cb7027a1755569baf87858939281dcf46d0dd3c",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-heatmap-light": {
       "id": "todoseq-dashboard-example-heatmap-light",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "1755b7341db4cc6ec27b181536bd9fc2bb3c7091a7ab995673c262f1ef860e21",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "049726c5af9706f156629f73445520a864c25dfc2ebbe07f8b8250babc153940",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-strip-light": {
       "id": "todoseq-dashboard-example-strip-light",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "beb77e54b1da0bb5131c0ae9f26a75091eacb6adba8df8d7f553d7b140271e50",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "e3bda03bcbb729535c3a91c5fe36245153b4fafcac71aa5fe1137bdb02baacb3",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-dashboard-example-tiles-light": {
       "id": "todoseq-dashboard-example-tiles-light",
       "scenarioId": "docs-dashboards",
-      "scenarioHash": "b3b5827039f6ce2e0b08a595445a6a47d9bfd8ae0fff8940b52f8bd70a7de7bf",
-      "pluginBuildHash": "b20b8cfe1196d4417903356847a1a4dfbb52f1be30bb95d6977cf7e7a3f1136b",
-      "outputSha256": "621e1dc72dfd7d3f6c0920aa2f16426a6d49f604ab4c20dd669a2d71c39ce27a",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "b5f3789cfecabfb0fafdd7b140ef5179489eef0fe383cfbcc7a03802fded2cf3",
+      "pluginBuildHash": "ed9e8432f8ed4184e2a3c52029cbaa1645d7f7a4e706804dadb1b783f9e4a56e",
+      "outputSha256": "e93902378322cc9abd17f0262d28f376771fd47ddfab1a51af6b74447e9a7edd",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-archive-dialog-light": {
       "id": "todoseq-archive-dialog-light",
       "scenarioId": "docs-auto-archive",
-      "scenarioHash": "e6b7734b3f2be7646967726892cca3cc6639be45667cd2a04a8f81709eee5065",
-      "pluginBuildHash": "7ecc67f7554e6374632a4e944cf26411a2fb9ef87df48f0b79b0a43e35685563",
-      "outputSha256": "0ca66d12abea766263a7a1ac625509043d553556bd85133112337148c7a193e8",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "5fb0e0dadbec97c8e7ffdd3a31073c557ca7b8e78c11afcfd3bd24cb3099920d",
+      "pluginBuildHash": "d039d5e49df65725ae279b0663d611f812f5e8bc53dcb730994f65668d6eef96",
+      "outputSha256": "082ca5b34047009741ab75fbb41149d8dada39074fd68cdb2739598be107d1a7",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-task-entry-light": {
       "id": "todoseq-task-entry-light",
       "scenarioId": "docs-task-entry",
-      "scenarioHash": "d8d01d1007bfc18834c9fb2ff43a19f882c30ee17c9a47d3c0bff3d256fc4ca8",
-      "pluginBuildHash": "fa95bd5cd79f8644162f691f394c4f8b982221e8dd21fcef5127a694a80c2acf",
-      "outputSha256": "25dacdc8ff0034a8d1d2fafe9f5d9f5cdce0899799b65ce768c442f3288e507e",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "c52994c"
+      "scenarioHash": "4754e0efa18228cd78c2595e18fdd5717315f1443f98481272bdca89f5360783",
+      "pluginBuildHash": "51112726594c130d87643f50e13b9180aac3aea12a409ecd0e7dc572cc62714b",
+      "outputSha256": "4ab6e0432d4c8568c8ab7211543063bad3b7966e9fa5baf890ba05ef7e2cf1b7",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-warning-period-arrows": {
       "id": "todoseq-warning-period-arrows",
       "scenarioId": "docs-warning-periods",
-      "scenarioHash": "7bd6150092fbf5659dcaccba00d877169f49c519348b9bedef1dcbe410ebd401",
-      "pluginBuildHash": "dbe1098c5db7e27716c53a505c92a9136f862b6397bab9ec98db3ce9a5fdb5fc",
-      "outputSha256": "9e40ada42eb1c5fd10501ddecd780d8b8ce1c63b4e64fa567647bdaa46ac8b71",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "d236e06"
+      "scenarioHash": "682b47372aca2235af417373634664b0c96e4591e5bb265499e67e4284393322",
+      "pluginBuildHash": "67d5415ecc5f73ff461eba05fc38099e445eae4cd82da888da63267672af87fb",
+      "outputSha256": "5c2bc4fc843d93b997ee3489f123cc10503762f1f84b4ea19bb7e2e38de07eee",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-warning-period-arrows-light": {
       "id": "todoseq-warning-period-arrows-light",
       "scenarioId": "docs-warning-periods",
-      "scenarioHash": "7bd6150092fbf5659dcaccba00d877169f49c519348b9bedef1dcbe410ebd401",
-      "pluginBuildHash": "dbe1098c5db7e27716c53a505c92a9136f862b6397bab9ec98db3ce9a5fdb5fc",
-      "outputSha256": "91de29d6e1da2155589cd927830caf5929dab509a85712575114696424c2b9f8",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "d236e06"
+      "scenarioHash": "682b47372aca2235af417373634664b0c96e4591e5bb265499e67e4284393322",
+      "pluginBuildHash": "67d5415ecc5f73ff461eba05fc38099e445eae4cd82da888da63267672af87fb",
+      "outputSha256": "e9146bd11276b4cf91975291be0a93033a878ec390b8a3b1a0532d3b9cd4d000",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-collapse-collapsed": {
       "id": "todoseq-embedded-collapse-collapsed",
       "scenarioId": "docs-embedded-collapse",
-      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
-      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
-      "outputSha256": "867a4b2add88e81ef7f98b58e6bc5e380162a143360fbdee48a17a22aa6bc4f1",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "e90739b"
+      "scenarioHash": "d2222e0f95dacbe5e10af3e54045f7440289abe86b8b6ad5dd508e8d1f02186c",
+      "pluginBuildHash": "edb25284def80c4855fdfcb5c3722d662f010e0fde9e4e2be9f52d42297dfc52",
+      "outputSha256": "f6c4765ce1ff289152d937cb834786e67590e2ffb54d4f3f72930174f8a32231",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-collapse-expanded": {
       "id": "todoseq-embedded-collapse-expanded",
       "scenarioId": "docs-embedded-collapse",
-      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
-      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
-      "outputSha256": "3afca867c84ab89fb5a04b16b71c5a902a4485228837d2d557fc4731dfa8abf5",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "e90739b"
+      "scenarioHash": "d2222e0f95dacbe5e10af3e54045f7440289abe86b8b6ad5dd508e8d1f02186c",
+      "pluginBuildHash": "edb25284def80c4855fdfcb5c3722d662f010e0fde9e4e2be9f52d42297dfc52",
+      "outputSha256": "aea304f2a205c69f23fafd55beb695950b2964e9b2878619627ecba9988c125e",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-collapse-collapsed-light": {
       "id": "todoseq-embedded-collapse-collapsed-light",
       "scenarioId": "docs-embedded-collapse",
-      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
-      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
-      "outputSha256": "9ef585c46041fffbb59c31aff69cc4176064153b891daad80717f02d862c66ed",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "e90739b"
+      "scenarioHash": "d2222e0f95dacbe5e10af3e54045f7440289abe86b8b6ad5dd508e8d1f02186c",
+      "pluginBuildHash": "edb25284def80c4855fdfcb5c3722d662f010e0fde9e4e2be9f52d42297dfc52",
+      "outputSha256": "2a2f28ae6a14efd6a73d4b0591e64e9926b37d079c9f6d5d6d2b4402e9a441c9",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
     },
     "todoseq-embedded-collapse-expanded-light": {
       "id": "todoseq-embedded-collapse-expanded-light",
       "scenarioId": "docs-embedded-collapse",
-      "scenarioHash": "454fe0cbda8911261efa06483db5d572ee812f502f944bbe84e436b87ca65dd1",
-      "pluginBuildHash": "b78b7052e8b7b1d23e61607769324f08a626e8eb58c94560ad4e270a577c2460",
-      "outputSha256": "b7da3fa2246454a9aaf22332ad45644e81bf4ed952b4b7007718b93a8a11c501",
-      "capturedAt": "2026-10-02",
-      "capturedAtCommit": "e90739b"
+      "scenarioHash": "d2222e0f95dacbe5e10af3e54045f7440289abe86b8b6ad5dd508e8d1f02186c",
+      "pluginBuildHash": "edb25284def80c4855fdfcb5c3722d662f010e0fde9e4e2be9f52d42297dfc52",
+      "outputSha256": "f64f8331cb4d9cd3fdbf953b3cfe9914e604d97e1c7d917dedefb0bcfa114520",
+      "capturedAt": "2026-11-25",
+      "capturedAtCommit": "c0527af"
+    },
+    "todoseq-task-dependency-blocked": {
+      "id": "todoseq-task-dependency-blocked",
+      "scenarioId": "docs-task-dependencies",
+      "scenarioHash": "de97a4d3d3ec2fac424f7aff58634a6b8edcfd1c3851a1b95dc42db4f65168b3",
+      "pluginBuildHash": "5ecb9fcb4cc7b6c07878bc0bc765e28f4cd6ec8c7cb5733f082015b013bc3b1e",
+      "outputSha256": "b5ba61a89a3a1b1885805f2412ef20663e2b5b357ee4a28c45f586508f964d93",
+      "capturedAt": "2026-11-26",
+      "capturedAtCommit": "dba7ae4"
+    },
+    "todoseq-task-dependency-issues": {
+      "id": "todoseq-task-dependency-issues",
+      "scenarioId": "docs-task-dependencies",
+      "scenarioHash": "de97a4d3d3ec2fac424f7aff58634a6b8edcfd1c3851a1b95dc42db4f65168b3",
+      "pluginBuildHash": "5ecb9fcb4cc7b6c07878bc0bc765e28f4cd6ec8c7cb5733f082015b013bc3b1e",
+      "outputSha256": "8c9dc69204cc932bb3a1dc7ea5176ccd873499aea40730ddf4deb93e2e268583",
+      "capturedAt": "2026-11-26",
+      "capturedAtCommit": "dba7ae4"
+    },
+    "todoseq-org-properties-generated": {
+      "id": "todoseq-org-properties-generated",
+      "scenarioId": "docs-org-properties",
+      "scenarioHash": "e1792250727a127a0d2dfbf3e74fae1daa4c0d35046c4156a4f791ac0d87236c",
+      "pluginBuildHash": "8b6df87dbbcb6acc639f6a24e16d439e6a751cebdc18d93e86b2e69520cee64f",
+      "outputSha256": "99862ba2961cafb8084c6d1dc601e227585aa2b598f981746ada84acdf6825d3",
+      "capturedAt": "2026-11-26",
+      "capturedAtCommit": "dba7ae4"
+    },
+    "todoseq-task-dependency-blocked-light": {
+      "id": "todoseq-task-dependency-blocked-light",
+      "scenarioId": "docs-task-dependencies",
+      "scenarioHash": "de97a4d3d3ec2fac424f7aff58634a6b8edcfd1c3851a1b95dc42db4f65168b3",
+      "pluginBuildHash": "5ecb9fcb4cc7b6c07878bc0bc765e28f4cd6ec8c7cb5733f082015b013bc3b1e",
+      "outputSha256": "52757ec6865bf10fdb0f42a075c93a1c6f46b3076fbfcb4656ca34890c6065f1",
+      "capturedAt": "2026-11-26",
+      "capturedAtCommit": "dba7ae4"
+    },
+    "todoseq-task-dependency-issues-light": {
+      "id": "todoseq-task-dependency-issues-light",
+      "scenarioId": "docs-task-dependencies",
+      "scenarioHash": "de97a4d3d3ec2fac424f7aff58634a6b8edcfd1c3851a1b95dc42db4f65168b3",
+      "pluginBuildHash": "5ecb9fcb4cc7b6c07878bc0bc765e28f4cd6ec8c7cb5733f082015b013bc3b1e",
+      "outputSha256": "efb00c92d596b666a6f89e608c5ea259e5d249eea838e365bdf949069c1bb8a3",
+      "capturedAt": "2026-11-26",
+      "capturedAtCommit": "dba7ae4"
+    },
+    "todoseq-org-properties-generated-light": {
+      "id": "todoseq-org-properties-generated-light",
+      "scenarioId": "docs-org-properties",
+      "scenarioHash": "e1792250727a127a0d2dfbf3e74fae1daa4c0d35046c4156a4f791ac0d87236c",
+      "pluginBuildHash": "8b6df87dbbcb6acc639f6a24e16d439e6a751cebdc18d93e86b2e69520cee64f",
+      "outputSha256": "28565de969f23d7eea0362322fdefb8082bf50a770deccc112b1a27935f9f708",
+      "capturedAt": "2026-11-26",
+      "capturedAtCommit": "dba7ae4"
     }
   }
 }

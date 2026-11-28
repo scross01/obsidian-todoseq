@@ -128,6 +128,26 @@ work (home OR office) -weekend       // Work tasks at home/office, not weekends
 "star wars" (movie OR series) -spoiler  // Star Wars content without spoilers
 ```
 
+## Accent and Latin-letter matching
+
+Default search folds both the query and candidate text: lowercase, canonical
+decomposition, removal of diacritics attached to a Latin base, a fixed table
+for letters without a canonical decomposition (`ø→o`, `ł→l`, `đ/ð→d`, `ħ→h`,
+`ı→i`, `ß→ss`, `æ→ae`, `œ→oe`, `þ→th`), then NFC recomposition. `cafe` finds
+`café`, `lodz` finds `Łódź`, and `strasse` finds `Straße`; accents typed into
+the query find plain candidates too.
+
+Only Latin-attached marks are removed. Japanese, Indic, Arabic and emoji
+sequences keep their marks and joiners, and compatibility forms (`Ａ`, `①`,
+`ﬀ`) are not normalized. The A/a toggle disables folding and compares original
+spelling and case. Quoted property values remain exact and are never folded.
+
+Phrases use complete-word boundaries over `[\p{L}\p{N}\p{M}\p{Pc}]` in both
+modes, so `"star"` does not match `starfish`, `"東京"` does not match `東京都`,
+and `"C++"` matches only the literal punctuation. Prefix values remain
+substrings. The folding cache (`SearchTextCache`) is pass-local and stores only
+non-ASCII values; there is no persistent normalized index.
+
 ## Implementation Details
 
 ### Architecture

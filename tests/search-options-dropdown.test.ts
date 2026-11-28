@@ -204,6 +204,13 @@ describe('SearchOptionsDropdown - Comprehensive Tests', () => {
       expect(suggestionItems?.length).toBeGreaterThan(0);
     });
 
+    it('filters prefix options through the shared matcher', async () => {
+      await dropdown.showOptionsDropdown('TAG:');
+
+      // @ts-ignore - inspecting the filtered state
+      expect(dropdown.currentSuggestions).toEqual(['tag:']);
+    });
+
     it('should render search options with descriptions', async () => {
       await dropdown.showOptionsDropdown();
 

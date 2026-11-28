@@ -1,5 +1,6 @@
 import TodoTracker from '../../main';
 import { Task } from '../../types/task';
+import type { DependencyIssue } from '../../types/task-dependency';
 import { TaskParser } from '../../parser/task-parser';
 import { VaultScanner } from '../../services/vault-scanner';
 import { stripMarkdownForDisplay } from '../../utils/task-utils';
@@ -10,10 +11,48 @@ import {
 } from '../../utils/settings-utils';
 import { PRIORITY_TOKEN_REGEX } from '../../utils/patterns';
 import { getPriorityLevelName } from '../../utils/task-format';
-import { MarkdownPostProcessorContext, TFile, setTooltip } from 'obsidian';
+import {
+  MarkdownPostProcessorContext,
+  Notice,
+  TFile,
+  setIcon,
+  setTooltip,
+} from 'obsidian';
 import { StateMenuBuilder } from '../components/state-menu-builder';
-import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import {
+  getStateTransitionManager,
+  type TaskUpdateOutcome,
+} from '../../services/task-update-coordinator';
 import { getTableCellIndex } from '../../utils/task-line-utils';
+import { resolveDependencyMarker } from '../components/dependency-marker';
+import { getIssueKindLabel } from '../components/task-issues';
+
+/** One text-node piece of a rendered source line inside a block. */
+interface RenderedPropertyLinePart {
+  node: Text;
+  /** Offset of this piece within the text node. */
+  nodeStart: number;
+  /** Offset of this piece within the rendered line. */
+  offset: number;
+  text: string;
+}
+
+interface RenderedPropertyLine {
+  text: string;
+  parts: RenderedPropertyLinePart[];
+  /** The <br> that introduced this line, or null for the first/newline split. */
+  breakBefore: HTMLBRElement | null;
+}
+
+type PropertyLineRole = 'start' | 'entry' | 'end';
+
+interface PendingPropertyDrawer {
+  id: string;
+  closed: boolean;
+  entryCount: number;
+  startBreak: HTMLBRElement | null;
+  bodyBreaks: HTMLBRElement[];
+}
 
 /**
  * Cached regex for priority tokens with global flag.
@@ -37,6 +76,14 @@ export class ReaderViewFormatter {
   // file reads are amortized across all metadata paragraphs and date
   // paragraphs in the same render pass.
   private readonly sourceLinesCache: Map<string, string[]> = new Map();
+
+  // Per-source-path first-word index, rebuilt when the task revision changes.
+  // Avoids scanning every vault task for every rendered row.
+  private readerTaskIndex: {
+    path: string;
+    revision: number;
+    byFirstWord: Map<string, Task[]>;
+  } | null = null;
 
   // Double-click detection state
   private lastClickTime = 0;
@@ -153,7 +200,9 @@ export class ReaderViewFormatter {
    */
   registerPostProcessor(): void {
     this.plugin.registerMarkdownPostProcessor(async (element, context) => {
-      if (!this.plugin.settings.formatTaskKeywords) {
+      const { formatTaskKeywords, hideTaskPropertiesInReadingView } =
+        this.plugin.settings;
+      if (!formatTaskKeywords && !hideTaskPropertiesInReadingView) {
         return;
       }
 
@@ -163,6 +212,15 @@ export class ReaderViewFormatter {
 
       // Check if we need to update the parser (e.g., if settings changed)
       this.ensureParserUpToDate();
+
+      if (!formatTaskKeywords) {
+        try {
+          await this.processPropertiesLines(element, context);
+        } catch (error) {
+          console.debug('[TODOseq] Property hide pass failed:', error);
+        }
+        return;
+      }
 
       // Process task keywords in the rendered content
       this.processTaskKeywords(element);
@@ -175,10 +233,16 @@ export class ReaderViewFormatter {
       // rendered DOM such that the heading task and the metadata paragraph
       // are in separate post-processor invocations (close+reopen path).
       try {
+        // Mark rendered tasks that are blocked in the current derived graph.
+        await this.processDependencyMarkers(element, context);
+
         await this.processDateLines(element, context);
 
         // Process DESCRIPTION lines. Same chunked-render caveat as above.
         await this.processDescriptionLines(element, context);
+
+        // Style task property drawers as quiet metadata.
+        await this.processPropertiesLines(element, context);
       } catch (error) {
         // Don't let a failed async source-file read tear down the rest of
         // the post-processor — checkbox / keyword handlers must still
@@ -195,6 +259,615 @@ export class ReaderViewFormatter {
       // Attach keyword click handlers for task state toggling and context menu
       this.attachKeywordClickHandlers(element, context);
     });
+  }
+
+  /**
+   * Draw one dependency marker per rendered task row: the lock for ordinary
+   * blocked state, or the warning triangle for a source diagnostic, which
+   * outranks the blocked state it causes. Uses the post-processor's cached
+   * source lines only as a fallback when Obsidian did not stamp `data-line` on
+   * the list item.
+   */
+  private async processDependencyMarkers(
+    element: HTMLElement,
+    context: MarkdownPostProcessorContext,
+  ): Promise<void> {
+    const taskItems = element.querySelectorAll(
+      '.task-list-item, p, li, h1, h2, h3, h4, h5, h6, td',
+    );
+    if (taskItems.length === 0) return;
+
+    const manager = this.plugin.taskDependencyManager;
+    const parser = this.getTaskParser();
+    let sourceLines: string[] | null = null;
+    const seen = new Set<number>();
+
+    const issuesByLine = new Map<number, DependencyIssue[]>();
+    const prefix = `${context.sourcePath}:`;
+    if (manager) {
+      for (const issue of manager.getIssues()) {
+        if (
+          issue.code === 'pending-validation' ||
+          !issue.sourceKey?.startsWith(prefix)
+        ) {
+          continue;
+        }
+        const linePart = issue.sourceKey.slice(prefix.length);
+        // Table tasks append `:cellIndex`; they still belong to the source line.
+        const lineMatch = /^(\d+)(?::\d+)?$/.exec(linePart);
+        if (!lineMatch) continue;
+        const line = Number(lineMatch[1]);
+        const list = issuesByLine.get(line) ?? [];
+        list.push(issue);
+        issuesByLine.set(line, list);
+      }
+    }
+
+    for (const item of taskItems) {
+      if (!item.instanceOf(HTMLElement)) continue;
+      // A task-list item contains its paragraph; processing both removes the
+      // badge the first pass just added. Keep the list item as the owner.
+      if (item.closest('.task-list-item') && !item.matches('.task-list-item')) {
+        continue;
+      }
+      if (item.closest('.todoseq-embedded-task-list-container')) continue;
+
+      // Re-rendering must converge on one badge per row, and a row that is no
+      // longer blocked must lose the old one.
+      item
+        .querySelectorAll(
+          '.todoseq-reader-blocked-badge, .todoseq-reader-issue-badge',
+        )
+        .forEach((badge) => badge.remove());
+
+      if (!manager) continue;
+
+      // Reading mode's data-line is chunk-relative, not a source line, so the
+      // parsed snapshot is the authoritative match. Rendered link text also
+      // differs from [[file#^anchor]] source, hence matching task text.
+      let line = this.findTaskLineForElement(item, context.sourcePath, context);
+      if (line < 0) {
+        const lineAttr = item.getAttribute('data-line');
+        line = lineAttr !== null ? parseInt(lineAttr, 10) : NaN;
+      }
+      if (!Number.isFinite(line) || line < 0) {
+        if (!sourceLines) {
+          sourceLines = await this.getSourceLinesCached(context);
+        }
+        line = sourceLines
+          ? this.findSourceLineForTaskElement(item, sourceLines, parser)
+          : -1;
+      }
+      if (line < 0 || seen.has(line)) continue;
+      seen.add(line);
+
+      const key = `${context.sourcePath}:${line}`;
+      const container =
+        item.querySelector<HTMLElement>('.todoseq-task') ?? item;
+      const keyedIssues = manager
+        .getIssuesForTask(key)
+        .filter((issue) => issue.code !== 'pending-validation');
+      const issues =
+        keyedIssues.length > 0 ? keyedIssues : issuesByLine.get(line);
+
+      // The marker belongs beside the keyword, not at the end of the list
+      // item: appending would put it after a property drawer's `:END:`.
+      const insertMarker = (marker: HTMLElement): void => {
+        const keyword = container.querySelector('.todoseq-keyword-formatted');
+        if (keyword) {
+          container.insertBefore(marker, keyword);
+          return;
+        }
+        const checkbox = container.querySelector('input[type="checkbox"]');
+        if (checkbox) {
+          checkbox.after(marker);
+          return;
+        }
+        container.prepend(marker);
+      };
+
+      if (issues?.length) {
+        const first = issues[0].message;
+        const detail =
+          issues.length > 1 ? `${first} (+${issues.length - 1} more)` : first;
+        const warning = createSpan({
+          cls: 'todoseq-dependency-issue-icon todoseq-reader-issue-badge',
+          attr: {
+            'data-task-key': key,
+            'aria-label': `${getIssueKindLabel(issues[0] ?? {})}: ${detail}`,
+            role: 'img',
+          },
+        });
+        setIcon(warning, 'alert-triangle');
+        setTooltip(warning, detail);
+        insertMarker(warning);
+        continue;
+      }
+
+      const marker = resolveDependencyMarker(manager, key);
+      if (!marker || marker.kind !== 'blocked') continue;
+
+      const reasons = manager.getBlockingReasons(key);
+      const details = reasons.map((reason) => reason.message).join(' ');
+      const label = details || 'Blocked by an incomplete dependency';
+
+      const badge = createSpan({
+        cls: 'todoseq-task-blocked-icon todoseq-reader-blocked-badge',
+        attr: {
+          'data-task-key': key,
+          'aria-label': label,
+          role: 'button',
+          tabindex: '0',
+        },
+      });
+      setIcon(badge, 'lock');
+      setTooltip(badge, label);
+      const showDetails = (event: Event): void => {
+        event.preventDefault();
+        event.stopPropagation();
+        new Notice(label, 8000);
+      };
+      badge.addEventListener('click', showDetails);
+      badge.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+      });
+      insertMarker(badge);
+    }
+  }
+
+  /** Match a rendered row to the parsed task snapshot, longest text first. */
+  private findTaskLineForElement(
+    item: HTMLElement,
+    sourcePath: string,
+    context: MarkdownPostProcessorContext,
+  ): number {
+    const renderedText = (item.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (!renderedText) return -1;
+
+    const section = context.getSectionInfo?.(item);
+    const revision =
+      typeof this.plugin.taskStateManager.getRevision === 'function'
+        ? this.plugin.taskStateManager.getRevision()
+        : this.plugin.taskStateManager.getTasks().length;
+    if (
+      !this.readerTaskIndex ||
+      this.readerTaskIndex.path !== sourcePath ||
+      this.readerTaskIndex.revision !== revision
+    ) {
+      const byFirstWord = new Map<string, Task[]>();
+      for (const task of this.plugin.taskStateManager.getTasks()) {
+        if (task.path !== sourcePath) continue;
+        const first = (task.text ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .split(' ')[0]
+          ?.toLowerCase();
+        if (!first) continue;
+        const list = byFirstWord.get(first) ?? [];
+        list.push(task);
+        byFirstWord.set(first, list);
+      }
+      this.readerTaskIndex = { path: sourcePath, revision, byFirstWord };
+    }
+
+    const candidates = new Set<Task>();
+    for (const word of renderedText.toLowerCase().split(/\s+/)) {
+      for (const task of this.readerTaskIndex.byFirstWord.get(word) ?? []) {
+        candidates.add(task);
+      }
+    }
+
+    let best: Task | null = null;
+    let bestInSection: Task | null = null;
+    for (const task of candidates) {
+      const text = (task.text ?? '').replace(/\s+/g, ' ').trim();
+      if (!text || !renderedText.includes(text)) continue;
+      if (!best || text.length > (best.text ?? '').length) best = task;
+      if (
+        section &&
+        task.line >= section.lineStart &&
+        task.line <= section.lineEnd &&
+        (!bestInSection || text.length > (bestInSection.text ?? '').length)
+      ) {
+        bestInSection = task;
+      }
+    }
+    return (bestInSection ?? best)?.line ?? -1;
+  }
+
+  /** Match a rendered task row to its source line when `data-line` is absent. */
+  private findSourceLineForTaskElement(
+    item: HTMLElement,
+    lines: string[],
+    parser: TaskParser | null,
+  ): number {
+    if (!parser) return -1;
+    const renderedText = (item.textContent ?? '')
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/\s*CLOSED:.*$/im, '')
+      .replace(/\s*SCHEDULED:.*$/im, '')
+      .replace(/\s*DEADLINE:.*$/im, '')
+      .replace(/\s*STARTED:.*$/im, '')
+      .trim();
+    if (!renderedText) return -1;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (!parser.testRegex.test(line)) continue;
+      const normalized = line
+        .trim()
+        .replace(/\s+/g, ' ')
+        .replace(/\s*\^[a-zA-Z0-9-]+$/, '');
+      if (normalized.endsWith(renderedText)) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Style bounded task property drawers as quiet metadata.
+   *
+   * Reader mode can place several source lines in one paragraph separated by
+   * `<br>`, so a block's flat text never equals a drawer line. The drawer is
+   * split back into rendered lines instead. Only lines inside a complete
+   * `:PROPERTIES:` … `:END:` pair owned by a task are styled; a naked `:KEY:`
+   * line stays prose, matching the parser.
+   */
+  private async processPropertiesLines(
+    element: HTMLElement,
+    context?: MarkdownPostProcessorContext,
+  ): Promise<void> {
+    const parser = this.getTaskParser();
+    if (!parser || !element.textContent?.includes(':PROPERTIES:')) return;
+
+    const shouldFormat = this.plugin.settings.formatTaskKeywords;
+    const shouldHide = this.plugin.settings.hideTaskPropertiesInReadingView;
+    if (!shouldFormat && !shouldHide) return;
+
+    const blocks = Array.from(
+      element.querySelectorAll<HTMLElement>('p, li, td'),
+    );
+    let inDrawer = false;
+    let sawTaskLine = false;
+    let nextDrawerId = 0;
+    const drawers: PendingPropertyDrawer[] = [];
+    let activeDrawer: PendingPropertyDrawer | null = null;
+    const segments: Array<{
+      node: Text;
+      from: number;
+      to: number;
+      cls: string;
+      entry: boolean;
+      role: PropertyLineRole;
+      drawerId: string | null;
+    }> = [];
+
+    for (const block of blocks) {
+      // Outer containers are covered when their nested block is processed.
+      const hasNestedDrawer = Array.from(
+        block.querySelectorAll<HTMLElement>('p, li, td'),
+      ).some((nested) => nested.textContent?.includes(':PROPERTIES:'));
+      if (hasNestedDrawer) continue;
+      if (block.querySelector('.todoseq-properties-line')) continue;
+
+      for (const line of this.collectRenderedLines(block)) {
+        const text = line.text.trim();
+        const addRange = (
+          start: number,
+          end: number,
+          cls: string,
+          entry: boolean,
+          role: PropertyLineRole,
+          drawerId: string | null,
+        ): void => {
+          for (const part of line.parts) {
+            const from = Math.max(start, part.offset);
+            const to = Math.min(end, part.offset + part.text.length);
+            if (from >= to) continue;
+            segments.push({
+              node: part.node,
+              from: part.nodeStart + from - part.offset,
+              to: part.nodeStart + to - part.offset,
+              cls,
+              entry,
+              role,
+              drawerId,
+            });
+          }
+        };
+
+        if (!inDrawer) {
+          if (parser.testRegex.test(text)) {
+            sawTaskLine = true;
+            continue;
+          }
+          if (text !== ':PROPERTIES:') continue;
+
+          const ownedByTask =
+            sawTaskLine ||
+            (await this.hasPrecedingTaskAsync(
+              block as HTMLParagraphElement,
+              context,
+            ));
+          if (!ownedByTask) continue;
+          inDrawer = true;
+          const drawer: PendingPropertyDrawer = {
+            id: String(nextDrawerId++),
+            closed: false,
+            entryCount: 0,
+            startBreak: line.breakBefore,
+            bodyBreaks: [],
+          };
+          drawers.push(drawer);
+          activeDrawer = drawer;
+          addRange(
+            0,
+            line.text.length,
+            'todoseq-properties-line',
+            false,
+            'start',
+            drawer.id,
+          );
+          continue;
+        }
+
+        if (!text) {
+          if (activeDrawer && line.breakBefore) {
+            activeDrawer.bodyBreaks.push(line.breakBefore);
+          }
+          continue;
+        }
+        if (text === ':END:') {
+          const drawer = activeDrawer;
+          if (drawer) {
+            drawer.closed = true;
+            if (line.breakBefore) drawer.bodyBreaks.push(line.breakBefore);
+          }
+          inDrawer = false;
+          activeDrawer = null;
+          addRange(
+            0,
+            line.text.length,
+            'todoseq-properties-line',
+            false,
+            'end',
+            drawer?.id ?? null,
+          );
+          continue;
+        }
+
+        const quote = /^(?:>\s*)+/.exec(text);
+        const stripped = quote ? text.slice(quote[0].length) : text;
+        const keyEnd = stripped.indexOf(':', 1);
+        if (keyEnd < 0 || !stripped.startsWith(':')) {
+          inDrawer = false;
+          activeDrawer = null;
+          continue;
+        }
+        const drawerId = activeDrawer?.id ?? null;
+        if (activeDrawer) {
+          activeDrawer.entryCount++;
+          if (line.breakBefore) activeDrawer.bodyBreaks.push(line.breakBefore);
+        }
+        const keyStart =
+          line.text.length -
+          line.text.trimStart().length +
+          (quote ? quote[0].length : 0);
+        addRange(
+          keyStart,
+          keyStart + keyEnd + 1,
+          'todoseq-properties-line todoseq-properties-key',
+          true,
+          'entry',
+          drawerId,
+        );
+        addRange(
+          keyStart + keyEnd + 1,
+          line.text.length,
+          'todoseq-properties-line',
+          true,
+          'entry',
+          drawerId,
+        );
+      }
+    }
+
+    const collapsibleDrawers = drawers.filter(
+      (drawer) => drawer.closed && drawer.entryCount > 0,
+    );
+    const collapsibleIds = new Set(
+      collapsibleDrawers.map((drawer) => drawer.id),
+    );
+    const hiddenDrawers = shouldHide ? drawers : [];
+    const hiddenIds = new Set(hiddenDrawers.map((drawer) => drawer.id));
+    const disclosureDrawers = shouldHide ? [] : collapsibleDrawers;
+
+    for (const drawer of drawers) {
+      const isHidden = hiddenIds.has(drawer.id);
+      const isCollapsible = collapsibleIds.has(drawer.id);
+      if (!isHidden && !isCollapsible) continue;
+
+      for (const br of drawer.bodyBreaks) {
+        if (isHidden) {
+          br.dataset.propertiesHidden = drawer.id;
+        } else {
+          br.dataset.propertiesBody = drawer.id;
+        }
+      }
+      if (isHidden && drawer.startBreak) {
+        drawer.startBreak.dataset.propertiesHidden = drawer.id;
+      }
+    }
+
+    // Apply right-to-left so earlier offsets in a shared text node stay valid.
+    segments
+      .sort((a, b) => b.from - a.from)
+      .forEach((segment) => {
+        const isHidden =
+          segment.drawerId !== null && hiddenIds.has(segment.drawerId);
+        const isCollapsible =
+          segment.drawerId !== null && collapsibleIds.has(segment.drawerId);
+        if (!shouldFormat && !isHidden) return;
+
+        const attrs: Record<string, string> = {
+          'data-properties-line': segment.entry ? 'entry' : 'boundary',
+          'aria-label': 'task properties',
+          role: 'note',
+        };
+        let cls = segment.cls;
+        if (isHidden && segment.drawerId) {
+          attrs['data-properties-hidden'] = segment.drawerId;
+        } else if (isCollapsible && segment.drawerId) {
+          attrs['data-properties-role'] = segment.role;
+          if (segment.role === 'start') {
+            attrs['data-properties-drawer'] = segment.drawerId;
+          }
+          if (segment.entry || segment.role === 'end') {
+            attrs['data-properties-body'] = segment.drawerId;
+            cls = `${cls} todoseq-properties-body`;
+          }
+        }
+
+        this.wrapTextRange(segment.node, segment.from, segment.to, cls, attrs);
+      });
+
+    for (const drawer of disclosureDrawers) {
+      this.addPropertiesDisclosure(element, drawer.id);
+    }
+  }
+
+  /** Add an accessible, native-style disclosure control before the drawer header. */
+  private addPropertiesDisclosure(root: HTMLElement, drawerId: string): void {
+    const header = root.querySelector<HTMLElement>(
+      `[data-properties-drawer="${drawerId}"][data-properties-role="start"]`,
+    );
+    if (!header) return;
+
+    const button = createEl('button', {
+      cls: 'todoseq-properties-toggle collapse-icon',
+      attr: {
+        type: 'button',
+        'aria-expanded': 'true',
+        'aria-label': 'Collapse task properties',
+        'data-properties-drawer': drawerId,
+      },
+    });
+    setIcon(button, 'right-triangle');
+
+    const body = Array.from(
+      root.querySelectorAll<HTMLElement>(
+        `[data-properties-body="${drawerId}"]`,
+      ),
+    );
+
+    button.addEventListener('click', (event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const expanded = button.getAttribute('aria-expanded') !== 'false';
+      const next = !expanded;
+
+      body.forEach((element) => {
+        element.hidden = !next;
+      });
+      button.setAttribute('aria-expanded', String(next));
+      button.setAttribute(
+        'aria-label',
+        next ? 'Collapse task properties' : 'Expand task properties',
+      );
+      button.toggleClass('is-collapsed', !next);
+    });
+
+    const host = header.parentElement;
+    if (host?.matches('p, li, td')) {
+      host.classList.add('todoseq-properties-host');
+    }
+
+    header.before(button);
+  }
+
+  /**
+   * Split a block into rendered lines, treating `<br>` and newlines as line
+   * breaks, and keep each line's text-node spans so it can be styled.
+   */
+  private collectRenderedLines(block: HTMLElement): RenderedPropertyLine[] {
+    const lines: RenderedPropertyLine[] = [];
+    let current: RenderedPropertyLine = {
+      text: '',
+      parts: [],
+      breakBefore: null,
+    };
+    const flush = (breakBefore: HTMLBRElement | null = null): void => {
+      lines.push(current);
+      current = { text: '', parts: [], breakBefore };
+    };
+
+    const walk = (parent: Node): void => {
+      parent.childNodes.forEach((child) => {
+        if (child.nodeType === Node.TEXT_NODE) {
+          const nodeText = child.textContent ?? '';
+          const pieces = nodeText.split('\n');
+          let nodeStart = 0;
+          pieces.forEach((piece, index) => {
+            if (index > 0) flush(null);
+            if (piece) {
+              current.parts.push({
+                node: child as Text,
+                nodeStart,
+                offset: current.text.length,
+                text: piece,
+              });
+              current.text += piece;
+            }
+            nodeStart += piece.length + (index < pieces.length - 1 ? 1 : 0);
+          });
+        } else if (child.nodeName === 'BR') {
+          flush(child as HTMLBRElement);
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          walk(child);
+        }
+      });
+    };
+
+    walk(block);
+    flush();
+    return lines;
+  }
+
+  /** Wrap a character range of one text node in a classed span. */
+  private wrapTextRange(
+    node: Text,
+    from: number,
+    to: number,
+    cls: string,
+    attrs: Record<string, string>,
+  ): void {
+    const text = node.textContent ?? '';
+    const parent = node.parentNode;
+    if (!parent) return;
+
+    if (from <= 0 && to >= text.length) {
+      const span = createSpan({ cls, attr: attrs });
+      span.textContent = text;
+      parent.replaceChild(span, node);
+      return;
+    }
+
+    const before = text.slice(0, from);
+    const middle = text.slice(from, to);
+    const after = text.slice(to);
+    if (!middle) return;
+
+    const span = createSpan({ cls, attr: attrs });
+    span.textContent = middle;
+    if (after) {
+      parent.insertBefore(
+        node.ownerDocument.createTextNode(after),
+        node.nextSibling,
+      );
+    }
+    parent.insertBefore(span, node.nextSibling);
+    if (before) node.textContent = before;
+    else parent.removeChild(node);
   }
 
   /**
@@ -243,6 +916,7 @@ export class ReaderViewFormatter {
   ): Promise<void> {
     const checkbox = event.target as HTMLInputElement;
     const isChecked = checkbox.checked;
+    const priorDataTask = checkbox.getAttribute('data-task');
     // Find the task list item containing this checkbox
     const taskListItem = checkbox.closest('.task-list-item');
     if (!taskListItem) {
@@ -341,8 +1015,9 @@ export class ReaderViewFormatter {
 
     // Use unified updateTaskByPath method - handles fresh lookup, optimistic update,
     // file write, recurrence, line adjustment, and UI refresh
+    let outcome: TaskUpdateOutcome | null = null;
     if (this.plugin.taskUpdateCoordinator) {
-      await this.plugin.taskUpdateCoordinator.updateTaskByPath(
+      outcome = await this.plugin.taskUpdateCoordinator.updateTaskByPath(
         taskToUpdate.path,
         taskToUpdate.line,
         newState,
@@ -356,6 +1031,18 @@ export class ReaderViewFormatter {
         newState,
         true,
       );
+      outcome = { status: 'applied' };
+    }
+
+    // A refusal writes nothing, so the rendered control must spring back.
+    if (outcome && outcome.status !== 'applied') {
+      checkbox.checked = !isChecked;
+      if (priorDataTask !== null) {
+        checkbox.setAttribute('data-task', priorDataTask);
+      } else {
+        checkbox.removeAttribute('data-task');
+      }
+      return;
     }
 
     // Refresh the reader view to show changes (like CLOSED date line added/removed)
@@ -1238,6 +1925,11 @@ export class ReaderViewFormatter {
         if (isCompleted) {
           this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
         }
+
+        // Apply archived task text styling if needed
+        if (isArchived) {
+          this.applyArchivedTaskStylingToTaskContainer(taskContainer);
+        }
       }
     }
   }
@@ -1505,6 +2197,11 @@ export class ReaderViewFormatter {
     // Apply completed task text styling if needed
     if (isCompleted) {
       this.applyCompletedTaskStylingToTaskContainer(taskContainer, keyword);
+    }
+
+    // Apply archived task text styling if needed
+    if (isArchived) {
+      this.applyArchivedTaskStylingToTaskContainer(taskContainer);
     }
   }
 

@@ -793,6 +793,10 @@ describe('EmbeddedTaskListRenderer', () => {
       expect(mockUpdateConfig).toHaveBeenCalledWith({
         weekStartsOn: 'Monday',
         migrateToTodayState: 'MIGRATED',
+        enforceBlockedTasks: true,
+        taskUpdateCoordinator: expect.anything(),
+        taskWriter: undefined,
+        dependencyManager: undefined,
       });
     });
 

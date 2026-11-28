@@ -1,5 +1,11 @@
+import { Notice } from 'obsidian';
 import { EditorController } from '../src/services/editor-controller';
 import { TaskParser } from '../src/parser/task-parser';
+
+jest.mock('obsidian', () => ({
+  ...jest.requireActual('obsidian'),
+  Notice: jest.fn(),
+}));
 import { TodoTrackerSettings } from '../src/settings/settings-types';
 import {
   createBaseSettings,
@@ -14,6 +20,7 @@ describe('Editor Controller - Task State Methods', () => {
   let settings: TodoTrackerSettings;
 
   beforeEach(() => {
+    (Notice as unknown as jest.Mock).mockClear();
     settings = createBaseSettings({
       languageCommentSupport: false,
       additionalInactiveKeywords: [],
@@ -494,6 +501,50 @@ describe('Editor Controller - Task State Methods', () => {
 
         expect(result).toBe(true);
       });
+
+      it('shows the reason when a table state update returns failed', async () => {
+        mockEditor.getLine = () => '| TODO task |';
+        mockView.file = { path: 'test.md' };
+        mockPlugin.taskUpdateCoordinator.updateTask.mockResolvedValueOnce({
+          status: 'failed',
+          reason: 'Could not verify the task row before writing.',
+        });
+
+        await editorController.handleUpdateTaskStateAtLine(
+          false,
+          0,
+          mockEditor as any,
+          mockView as any,
+          'DOING',
+          0,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(Notice).toHaveBeenCalledWith(
+          'Could not verify the task row before writing.',
+        );
+      });
+
+      it('does not duplicate coordinator refusal feedback for table state updates', async () => {
+        mockEditor.getLine = () => '| TODO task |';
+        mockView.file = { path: 'test.md' };
+        mockPlugin.taskUpdateCoordinator.updateTask.mockResolvedValueOnce({
+          status: 'refused',
+          reasons: [],
+        });
+
+        await editorController.handleUpdateTaskStateAtLine(
+          false,
+          0,
+          mockEditor as any,
+          mockView as any,
+          'DONE',
+          0,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(Notice).not.toHaveBeenCalled();
+      });
     });
 
     describe('handleUpdateTaskCycleStateAtLine - table cell tasks', () => {
@@ -529,6 +580,95 @@ describe('Editor Controller - Task State Methods', () => {
         expect(
           mockPlugin.taskUpdateCoordinator.updateTaskState,
         ).toHaveBeenCalled();
+      });
+
+      it('shows a returned failure from a table cycle', async () => {
+        mockEditor.getLine = () => '| TODO task |';
+        mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+        mockView.file = { path: 'test.md' };
+        mockPlugin.taskUpdateCoordinator.updateTaskState.mockResolvedValueOnce({
+          status: 'failed',
+          reason: 'Could not verify the task row before writing.',
+        });
+
+        await editorController.handleUpdateTaskCycleStateAtLine(
+          false,
+          0,
+          mockEditor as any,
+          mockView as any,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(Notice).toHaveBeenCalledWith(
+          'Could not verify the task row before writing.',
+        );
+      });
+
+      it('stays quiet for an applied table cycle', async () => {
+        mockEditor.getLine = () => '| TODO task |';
+        mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+        mockView.file = { path: 'test.md' };
+        mockPlugin.taskUpdateCoordinator.updateTaskState.mockResolvedValueOnce({
+          status: 'applied',
+        });
+
+        await editorController.handleUpdateTaskCycleStateAtLine(
+          false,
+          0,
+          mockEditor as any,
+          mockView as any,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(Notice).not.toHaveBeenCalled();
+      });
+
+      it('shows the fallback when a table cycle rejects', async () => {
+        mockEditor.getLine = () => '| TODO task |';
+        mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+        mockView.file = { path: 'test.md' };
+        mockPlugin.taskUpdateCoordinator.updateTaskState.mockRejectedValueOnce(
+          new Error('write failed'),
+        );
+
+        await editorController.handleUpdateTaskCycleStateAtLine(
+          false,
+          0,
+          mockEditor as any,
+          mockView as any,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 0));
+
+        expect(Notice).toHaveBeenCalledWith('Failed to update task');
+      });
+
+      it('should preserve inline recurrence metadata from the cell', async () => {
+        mockEditor.getLine = () =>
+          '| TODO task<br>SCHEDULED: <2026-03-10 Tue .+1d -3d> | keep |';
+        mockEditor.getCursor = () => ({ line: 0, ch: 5 });
+        mockView.file = { path: 'test.md' };
+
+        await editorController.handleUpdateTaskCycleStateAtLine(
+          false,
+          0,
+          mockEditor as any,
+          mockView as any,
+        );
+
+        const [task] =
+          mockPlugin.taskUpdateCoordinator.updateTaskState.mock.calls[0];
+        expect(task.text).toBe('task');
+        expect(task.scheduledDateRepeat).toEqual({
+          type: '.+',
+          unit: 'd',
+          value: 1,
+          raw: '.+1d',
+        });
+        expect(task.scheduledWarningPeriod).toEqual({
+          value: 3,
+          unit: 'd',
+          isFirstOnly: false,
+        });
       });
     });
   });

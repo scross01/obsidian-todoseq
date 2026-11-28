@@ -24,7 +24,7 @@ import {
 } from './helpers/test-helper';
 import { TaskParser } from '../src/parser/task-parser';
 import { VaultScanner } from '../src/services/vault-scanner';
-import { App, TFile } from 'obsidian';
+import { App, TFile, setIcon } from 'obsidian';
 import { installObsidianDomMocks } from './helpers/obsidian-dom-mock';
 
 installObsidianDomMocks();
@@ -101,6 +101,7 @@ jest.mock('obsidian', () => ({
       getFiles: jest.fn().mockReturnValue([]),
     };
   },
+  setIcon: jest.fn(),
   setTooltip: jest.fn((el: HTMLElement, tooltip: string) => {
     el.setAttribute('title', tooltip);
   }),
@@ -2334,6 +2335,493 @@ describe('ReaderViewFormatter', () => {
     });
   });
 
+  describe('processPropertiesLines', () => {
+    const run = async (container: HTMLElement): Promise<void> => {
+      const processPropertiesLines = (
+        formatter as unknown as {
+          processPropertiesLines: (
+            el: HTMLElement,
+            ctx?: MarkdownPostProcessorContextLike,
+          ) => Promise<void>;
+        }
+      ).processPropertiesLines;
+      await processPropertiesLines.call(formatter, container);
+    };
+
+    /** Build a paragraph whose source lines are separated by <br>. */
+    const buildBlock = (
+      parent: HTMLElement,
+      lines: string[],
+      tag = 'p',
+    ): HTMLElement => {
+      const block = activeDocument.createElement(tag);
+      lines.forEach((line, index) => {
+        if (index > 0) block.append(activeDocument.createElement('br'));
+        block.append(line);
+      });
+      parent.append(block);
+      return block;
+    };
+
+    const getToggle = (root: ParentNode): HTMLButtonElement => {
+      const toggle = root.querySelector<HTMLButtonElement>(
+        'button.todoseq-properties-toggle',
+      );
+      if (!toggle) throw new Error('Expected a task properties toggle');
+      return toggle;
+    };
+
+    const getBodies = (root: ParentNode): HTMLElement[] =>
+      Array.from(root.querySelectorAll<HTMLElement>('[data-properties-body]'));
+
+    const getHidden = (root: ParentNode): HTMLElement[] =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>('[data-properties-hidden]'),
+      );
+
+    test('styles a drawer rendered with <br> line breaks', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':BLOCKER: data-02',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      // Start/end boundaries, plus a key and value span for each entry.
+      expect(drawer.querySelectorAll('.todoseq-properties-line')).toHaveLength(
+        6,
+      );
+      expect(drawer.querySelector('.todoseq-properties-key')?.textContent).toBe(
+        ':ID:',
+      );
+      expect(drawer.textContent).toBe(
+        ':PROPERTIES::ID: paper-01:BLOCKER: data-02:END:',
+      );
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('leaves the task line unstyled when it shares a paragraph', async () => {
+      const container = activeDocument.createElement('div');
+      const paragraph = buildBlock(container, [
+        'TODO something',
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(
+        paragraph.querySelector('.todoseq-properties-line'),
+      ).not.toBeNull();
+      const taskText = paragraph.firstChild as Text;
+      expect(taskText.textContent).toBe('TODO something');
+      expect(
+        taskText.parentElement?.closest('.todoseq-properties-line'),
+      ).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not style a naked key line', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      const keyLine = activeDocument.createElement('p');
+      keyLine.textContent = ':ID: paper-01';
+      container.append(task, keyLine);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(keyLine.querySelector('.todoseq-properties-line')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not style a drawer without a task owner', async () => {
+      const container = activeDocument.createElement('div');
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-line')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('adds an expanded disclosure to a closed task-owned drawer', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      const toggle = getToggle(drawer);
+      expect(toggle.textContent).toBe('');
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      expect(toggle.getAttribute('aria-label')).toBe(
+        'Collapse task properties',
+      );
+      expect(toggle.classList.contains('collapse-icon')).toBe(true);
+      expect(toggle.classList.contains('is-collapsed')).toBe(false);
+      expect(setIcon).toHaveBeenCalledWith(toggle, 'right-triangle');
+      const header = drawer.querySelector('.todoseq-properties-line');
+      expect(header?.textContent).toBe(':PROPERTIES:');
+      expect(header?.parentElement?.tagName).toBe('P');
+      expect(
+        header?.parentElement?.classList.contains('todoseq-properties-host'),
+      ).toBe(true);
+      expect(header?.previousElementSibling).toBe(toggle);
+      const bodies = getBodies(drawer);
+      expect(bodies.length).toBeGreaterThan(0);
+      bodies.forEach((element) => expect(element.hidden).toBe(false));
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('collapses the drawer body and leaves the header visible', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+      await run(container);
+      const taskText = task.textContent;
+
+      const toggle = getToggle(drawer);
+      toggle.click();
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle.getAttribute('aria-label')).toBe('Expand task properties');
+      expect(toggle.classList.contains('is-collapsed')).toBe(true);
+      expect(toggle.isConnected).toBe(true);
+      expect(
+        drawer.querySelector('.todoseq-properties-line')?.textContent,
+      ).toBe(':PROPERTIES:');
+      getBodies(drawer).forEach((element) => expect(element.hidden).toBe(true));
+      expect(task.textContent).toBe(taskText);
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('expands the drawer body again from the same toggle', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+      await run(container);
+
+      const toggle = getToggle(drawer);
+      toggle.click();
+      toggle.click();
+
+      expect(toggle.getAttribute('aria-expanded')).toBe('true');
+      getBodies(drawer).forEach((element) =>
+        expect(element.hidden).toBe(false),
+      );
+      expect(toggle.classList.contains('is-collapsed')).toBe(false);
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not add a toggle to an empty drawer', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [':PROPERTIES:', ':END:']);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not add a toggle to an unclosed drawer', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [':PROPERTIES:', ':ID: paper-01']);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('does not add a toggle to a standalone drawer', async () => {
+      const container = activeDocument.createElement('div');
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('toggles two task drawers independently', async () => {
+      const container = activeDocument.createElement('div');
+      const task1 = activeDocument.createElement('p');
+      task1.textContent = 'TODO first';
+      const drawer1 = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: first-01',
+        ':END:',
+      ]);
+      const task2 = activeDocument.createElement('p');
+      task2.textContent = 'TODO second';
+      const drawer2 = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: second-01',
+        ':END:',
+      ]);
+      container.prepend(task1);
+      container.insertBefore(task2, drawer2);
+      activeDocument.body.append(container);
+      await run(container);
+
+      const toggle1 = getToggle(drawer1);
+      const toggle2 = getToggle(drawer2);
+      toggle1.click();
+
+      expect(toggle1.getAttribute('aria-expanded')).toBe('false');
+      expect(toggle2.getAttribute('aria-expanded')).toBe('true');
+      getBodies(drawer2).forEach((element) =>
+        expect(element.hidden).toBe(false),
+      );
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hides the closing line when collapsed', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+      await run(container);
+
+      getToggle(drawer).click();
+
+      const end = getBodies(drawer).find(
+        (element) => element.textContent === ':END:',
+      );
+      expect(end).toBeDefined();
+      expect(end?.hidden).toBe(true);
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hides the line breaks around blank drawer lines when collapsed', async () => {
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        '',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+      await run(container);
+
+      getToggle(drawer).click();
+
+      const breaks = Array.from(
+        drawer.querySelectorAll<HTMLBRElement>('br[data-properties-body]'),
+      );
+      expect(breaks).toHaveLength(3);
+      breaks.forEach((element) => expect(element.hidden).toBe(true));
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hide setting removes a populated drawer without a toggle', async () => {
+      mockPlugin.settings.hideTaskPropertiesInReadingView = true;
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+      const hidden = getHidden(drawer);
+      expect(hidden.length).toBeGreaterThanOrEqual(6);
+      expect(
+        hidden.some((element) => element.textContent === ':PROPERTIES:'),
+      ).toBe(true);
+      expect(
+        hidden.some((element) => element.textContent?.includes('paper-01')),
+      ).toBe(true);
+      expect(hidden.some((element) => element.textContent === ':END:')).toBe(
+        true,
+      );
+      expect(drawer.querySelectorAll('[data-properties-body]').length).toBe(0);
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hide setting removes an empty drawer', async () => {
+      mockPlugin.settings.hideTaskPropertiesInReadingView = true;
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [':PROPERTIES:', ':END:']);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+      const hidden = getHidden(drawer);
+      expect(hidden).toHaveLength(3);
+      expect(
+        hidden.some((element) => element.textContent === ':PROPERTIES:'),
+      ).toBe(true);
+      expect(hidden.some((element) => element.textContent === ':END:')).toBe(
+        true,
+      );
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hide setting leaves following prose visible after an unclosed drawer', async () => {
+      mockPlugin.settings.hideTaskPropertiesInReadingView = true;
+      const container = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO something';
+      container.append(task);
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        'Following prose',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+      const hidden = getHidden(drawer);
+      expect(
+        hidden.some((element) => element.textContent === ':PROPERTIES:'),
+      ).toBe(true);
+      expect(
+        hidden.some((element) => element.textContent?.includes('paper-01')),
+      ).toBe(true);
+      expect(
+        hidden.some((element) => element.textContent === 'Following prose'),
+      ).toBe(false);
+      expect(drawer.textContent).toContain('Following prose');
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hide setting leaves a standalone drawer visible', async () => {
+      mockPlugin.settings.hideTaskPropertiesInReadingView = true;
+      const container = activeDocument.createElement('div');
+      const drawer = buildBlock(container, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      activeDocument.body.append(container);
+
+      await run(container);
+
+      expect(drawer.querySelector('.todoseq-properties-toggle')).toBeNull();
+      expect(getHidden(drawer)).toHaveLength(0);
+
+      activeDocument.body.removeChild(container);
+    });
+
+    test('hide setting runs with keyword formatting off without formatting tasks', async () => {
+      mockPlugin.settings.formatTaskKeywords = false;
+      mockPlugin.settings.hideTaskPropertiesInReadingView = true;
+      formatter.registerPostProcessor();
+      const callback =
+        mockPlugin.registerMarkdownPostProcessor.mock.calls[0][0];
+
+      const element = activeDocument.createElement('div');
+      const task = activeDocument.createElement('p');
+      task.textContent = 'TODO hidden task';
+      element.append(task);
+      const drawer = buildBlock(element, [
+        ':PROPERTIES:',
+        ':ID: paper-01',
+        ':END:',
+      ]);
+      const date = activeDocument.createElement('p');
+      date.textContent = 'SCHEDULED: <2026-11-23 Mon>';
+      element.append(date);
+      activeDocument.body.append(element);
+
+      await callback(element, { sourcePath: 'test.md' });
+
+      expect(getHidden(drawer).length).toBeGreaterThan(0);
+      expect(element.querySelector('.todoseq-keyword-formatted')).toBeNull();
+      expect(element.querySelector('.todoseq-scheduled-line')).toBeNull();
+
+      activeDocument.body.removeChild(element);
+    });
+  });
+
   // ---------------------------------------------------------------------
   // Source-file fallback for preceding-task detection
   //
@@ -3467,6 +3955,29 @@ describe('ReaderViewFormatter', () => {
 
       activeDocument.body.removeChild(li);
     });
+
+    test('should apply archived styling for an archived keyword', () => {
+      const li = activeDocument.createElement('li');
+      li.className = 'task-list-item';
+      const checkbox = activeDocument.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'task-list-item-checkbox';
+      li.appendChild(checkbox);
+      li.appendChild(activeDocument.createTextNode('ARCHIVED archived task'));
+      activeDocument.body.appendChild(li);
+
+      const processTaskListItemDirectly = (
+        formatter as unknown as {
+          processTaskListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processTaskListItemDirectly;
+
+      processTaskListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-archived-task-text')).not.toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
   });
 
   describe('processListItemDirectly', () => {
@@ -3515,6 +4026,24 @@ describe('ReaderViewFormatter', () => {
         '.todoseq-completed-task-text',
       );
       expect(completedContainer).not.toBeNull();
+
+      activeDocument.body.removeChild(li);
+    });
+
+    test('should apply archived styling for an archived keyword', () => {
+      const li = activeDocument.createElement('li');
+      li.appendChild(activeDocument.createTextNode('ARCHIVED archived task'));
+      activeDocument.body.appendChild(li);
+
+      const processListItemDirectly = (
+        formatter as unknown as {
+          processListItemDirectly: (el: HTMLElement) => void;
+        }
+      ).processListItemDirectly;
+
+      processListItemDirectly.call(formatter, li);
+
+      expect(li.querySelector('.todoseq-archived-task-text')).not.toBeNull();
 
       activeDocument.body.removeChild(li);
     });

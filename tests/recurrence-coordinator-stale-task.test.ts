@@ -31,6 +31,7 @@ Object.assign(mockFile, {
 
 const mockParser = {
   getDateLineType: jest.fn(),
+  parseFile: jest.fn(),
 };
 
 const mockApp = {
@@ -66,9 +67,12 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     mockTaskStateManager = {
       findTaskByPathAndLine: jest.fn(),
       updateTask: jest.fn(),
-      getTasks: jest.fn(),
+      getTasks: jest.fn(() => []),
       setTasks: jest.fn(),
     } as unknown as TaskStateManager;
+    mockParser.parseFile.mockImplementation(() =>
+      mockTaskStateManager.getTasks(),
+    );
     coordinator = new RecurrenceCoordinator(
       mockPlugin,
       mockTaskStateManager,
@@ -76,7 +80,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       {},
     );
     mockUpdateCoordinator = {
-      updateTaskRecurrence: jest.fn().mockResolvedValue(undefined),
+      updateTaskRecurrence: jest.fn().mockResolvedValue({ status: 'applied' }),
     };
     coordinator.setTaskUpdateCoordinator(mockUpdateCoordinator);
   });
@@ -132,19 +136,17 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       state: 'TODO',
       completed: false,
     };
-    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
-      storedTask,
-    );
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([storedTask]);
     (mockApp.vault.read as jest.Mock).mockResolvedValue(
       '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
 
     await coordinator.performRecurrenceUpdate(staleTask);
 
-    expect(mockTaskStateManager.findTaskByPathAndLine).toHaveBeenCalledWith(
+    expect(mockParser.parseFile).toHaveBeenCalledWith(
+      '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
       'test.md',
-      0,
-      undefined,
+      mockFile,
     );
     expect(mockUpdateCoordinator.updateTaskRecurrence).toHaveBeenCalledTimes(1);
     const [passedTask, _options] =
@@ -154,6 +156,31 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(passedTask.rawText).toBe(storedTask.rawText);
     expect(passedTask.text).toBe(storedTask.text);
     expect(passedTask.state).toBe(storedTask.state);
+  });
+
+  it('uses a moved identity instead of the captured line', async () => {
+    const staleTask = { ...createBaseTask(), id: 'recurring' };
+    const movedTask: Task = {
+      ...staleTask,
+      line: 3,
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+      completed: false,
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([movedTask]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      null,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      'one\ntwo\nthree\n- [ ] TODO my task\n  SCHEDULED: <2026-06-24 Wed +1d>',
+    );
+
+    await coordinator.performRecurrenceUpdate(staleTask);
+
+    const [passedTask] =
+      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
+    expect(passedTask.line).toBe(3);
+    expect(passedTask.rawText).toBe(movedTask.rawText);
   });
 
   it('keeps original date/repeat fields when re-resolving', async () => {
@@ -168,9 +195,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       text: 'my task',
       state: 'TODO',
     };
-    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
-      storedTask,
-    );
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([storedTask]);
     (mockApp.vault.read as jest.Mock).mockResolvedValue(
       '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
@@ -185,23 +210,24 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(passedTask.deadlineDateRepeat).toEqual(staleTask.deadlineDateRepeat);
   });
 
-  it('falls back to the original task when no stored task is found', async () => {
-    // Archived or removed between scheduling and firing.
+  it('refuses a removed target instead of reusing the captured snapshot', async () => {
     const staleTask = createBaseTask();
-    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
-      null,
-    );
+    const sibling: Task = {
+      ...staleTask,
+      line: 0,
+      text: 'another task',
+      rawText: '- [ ] TODO another task',
+      state: 'TODO',
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([sibling]);
     (mockApp.vault.read as jest.Mock).mockResolvedValue(
-      '- [ ] DOING my task\n  DEADLINE: <2026-06-24 Wed +1d>',
+      '- [ ] TODO another task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
 
     const result = await coordinator.performRecurrenceUpdate(staleTask);
 
-    expect(result.success).toBe(true);
-    const [passedTask] =
-      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
-    // No stored task found → original captured task is used.
-    expect(passedTask).toBe(staleTask);
+    expect(result.success).toBe(false);
+    expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
   });
 
   it('keeps the original task when stored rawText matches (content unchanged)', async () => {
@@ -216,9 +242,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       // subtaskCount that the merge in the fix doesn't touch).
       rawText: staleTask.rawText,
     };
-    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
-      storedTask,
-    );
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([storedTask]);
     (mockApp.vault.read as jest.Mock).mockResolvedValue(
       '- [ ] DOING my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
@@ -242,9 +266,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       state: 'TODO',
       completed: false,
     };
-    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
-      storedTask,
-    );
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([storedTask]);
     (mockApp.vault.read as jest.Mock).mockResolvedValue(
       '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
@@ -281,9 +303,7 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       scheduledDate: new Date('2000-01-01'),
       deadlineDate: new Date('2000-01-01'),
     };
-    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
-      storedTask,
-    );
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([storedTask]);
     (mockApp.vault.read as jest.Mock).mockResolvedValue(
       '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
@@ -302,9 +322,114 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
     expect(passedTask.deadlineDate).toBe(staleTask.deadlineDate);
   });
 
-  it('keeps original task when findTaskByPathAndLine returns null even if file changed', async () => {
-    // Fast-path for "task no longer in state manager": use the closure
-    // snapshot. This matches existing behavior; pins it.
+  it('relocates an unanchored row by unique content after a metadata shift', async () => {
+    const staleTask = createBaseTask();
+    const sibling: Task = {
+      ...staleTask,
+      line: 0,
+      text: 'another task',
+      rawText: '- [ ] TODO another task',
+      state: 'TODO',
+      scheduledDate: new Date(2026, 6, 2),
+    };
+    const moved: Task = {
+      ...staleTask,
+      line: 4,
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+      scheduledDate: new Date(2026, 6, 3),
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+      sibling,
+      moved,
+    ]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      sibling,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      [
+        '- [ ] TODO another task',
+        '  SCHEDULED: <2026-07-02 Thu +1d>',
+        '',
+        '',
+        '- [ ] TODO my task',
+        '  SCHEDULED: <2026-07-03 Fri +1d>',
+      ].join('\n'),
+    );
+
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
+
+    expect(result.success).toBe(true);
+    const [passedTask] =
+      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
+    expect(passedTask.line).toBe(4);
+    expect(passedTask.text).toBe('my task');
+    expect(passedTask.scheduledDate).toEqual(staleTask.scheduledDate);
+  });
+
+  it('accepts rapid keyword cycling when the row content is otherwise stable', async () => {
+    const staleTask = createBaseTask();
+    const liveTask: Task = {
+      ...staleTask,
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([liveTask]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      liveTask,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
+    );
+
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
+
+    expect(result.success).toBe(true);
+    const [passedTask] =
+      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
+    expect(passedTask.rawText).toBe(liveTask.rawText);
+    expect(passedTask.state).toBe('TODO');
+  });
+
+  it('refuses a moved row when both identity and content are ambiguous', async () => {
+    const staleTask = createBaseTask();
+    const sibling: Task = {
+      ...staleTask,
+      line: 0,
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+    };
+    const duplicate: Task = {
+      ...staleTask,
+      line: 4,
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([
+      sibling,
+      duplicate,
+    ]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      sibling,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      [
+        '- [ ] TODO my task',
+        '  SCHEDULED: <2026-06-23 Tue +1d>',
+        '',
+        '',
+        '- [ ] TODO my task',
+        '  SCHEDULED: <2026-06-24 Wed +1d>',
+      ].join('\n'),
+    );
+
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
+
+    expect(result.success).toBe(false);
+    expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stale line when no identity resolves', async () => {
     const staleTask = createBaseTask();
     (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
       null,
@@ -313,10 +438,32 @@ describe('RecurrenceCoordinator - stale task re-resolution', () => {
       '- [ ] ARCHIVED my task\n  DEADLINE: <2026-06-24 Wed +1d>',
     );
 
-    await coordinator.performRecurrenceUpdate(staleTask);
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
 
-    const [passedTask] =
-      mockUpdateCoordinator.updateTaskRecurrence.mock.calls[0];
-    expect(passedTask).toBe(staleTask);
+    expect(result.success).toBe(false);
+    expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
+  });
+
+  it('refuses an identified sibling when the anonymous target is gone', async () => {
+    const staleTask = createBaseTask();
+    const identified: Task = {
+      ...staleTask,
+      line: 0,
+      id: 'sibling',
+      rawText: '- [ ] TODO my task',
+      state: 'TODO',
+    };
+    (mockTaskStateManager.getTasks as jest.Mock).mockReturnValue([identified]);
+    (mockTaskStateManager.findTaskByPathAndLine as jest.Mock).mockReturnValue(
+      identified,
+    );
+    (mockApp.vault.read as jest.Mock).mockResolvedValue(
+      '- [ ] TODO my task\n  DEADLINE: <2026-06-24 Wed +1d>',
+    );
+
+    const result = await coordinator.performRecurrenceUpdate(staleTask);
+
+    expect(result.success).toBe(false);
+    expect(mockUpdateCoordinator.updateTaskRecurrence).not.toHaveBeenCalled();
   });
 });

@@ -200,6 +200,10 @@ describe('TodoTrackerSettingTab', () => {
       app: appMock,
       settings: settings,
       saveSettings: jest.fn().mockResolvedValue(undefined),
+      taskDependencyManager: { clearCache: jest.fn() },
+      lifecycleManager: {
+        scheduleDependencySurfaceRefresh: jest.fn(),
+      },
       recreateParser: jest.fn().mockResolvedValue(undefined),
       scanVault: jest.fn().mockResolvedValue(undefined),
       refreshVisibleEditorDecorations: jest.fn(),
@@ -778,6 +782,13 @@ describe('TodoTrackerSettingTab', () => {
         name: 'Format task keywords',
         control: { type: 'toggle', key: 'formatTaskKeywords' },
       });
+      expect(defs[1]).toMatchObject({
+        name: 'Hide task properties in Reading view',
+        control: {
+          type: 'toggle',
+          key: 'hideTaskPropertiesInReadingView',
+        },
+      });
 
       const groups = defs.filter((d): d is GroupDef => {
         return 'type' in d && d.type === 'group';
@@ -841,12 +852,53 @@ describe('TodoTrackerSettingTab', () => {
       ).toHaveBeenCalledWith('todoseq-view');
     });
 
+    it.each([
+      'enforceTaskHierarchyDependencies',
+      'enforceCheckboxDependencies',
+    ])(
+      'setControlValue for %s invalidates and refreshes dependencies',
+      async (key) => {
+        await (settingTab as any).setControlValue(key, true);
+
+        expect(
+          (pluginMock.taskDependencyManager as { clearCache: jest.Mock })
+            .clearCache,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+          (
+            pluginMock.lifecycleManager as {
+              scheduleDependencySurfaceRefresh: jest.Mock;
+            }
+          ).scheduleDependencySurfaceRefresh,
+        ).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it('setControlValue for formatTaskKeywords triggers updateTaskFormatting', async () => {
       await (settingTab as any).setControlValue('formatTaskKeywords', true);
 
       expect(
         pluginMock.updateTaskFormatting as jest.Mock,
       ).toHaveBeenCalledTimes(1);
+    });
+
+    it('setControlValue for the Reading-view hide setting refreshes readers without rerendering', async () => {
+      const settings = pluginMock.settings as unknown as {
+        hideTaskPropertiesInReadingView: boolean;
+      };
+      const updateSpy = jest.spyOn(settingTab, 'update');
+
+      await (settingTab as any).setControlValue(
+        'hideTaskPropertiesInReadingView',
+        true,
+      );
+
+      expect(settings.hideTaskPropertiesInReadingView).toBe(true);
+      expect(pluginMock.saveSettings as jest.Mock).toHaveBeenCalledTimes(1);
+      expect(
+        pluginMock.refreshReaderViewFormatter as jest.Mock,
+      ).toHaveBeenCalledTimes(1);
+      expect(updateSpy).not.toHaveBeenCalled();
     });
 
     it('setControlValue for includeCodeBlocks disables language comment support and rescans', async () => {

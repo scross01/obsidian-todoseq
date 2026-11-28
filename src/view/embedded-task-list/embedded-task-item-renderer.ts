@@ -28,17 +28,29 @@ import {
 import { DateUtils } from '../../utils/date-utils';
 import { formatRepeatDescription } from '../../utils/date-repeater';
 import { getPriorityLevelName } from '../../utils/task-format';
+import type { TaskUpdateOutcome } from '../../services/task-update-coordinator';
 import { StateMenuBuilder } from '../components/state-menu-builder';
 import { TaskContextMenu } from '../components/task-context-menu';
 import { BaseDialog } from '../components/base-dialog';
 import { getStateTransitionManager } from '../../services/task-update-coordinator';
+import { resolveDependencyMarker } from '../components/dependency-marker';
+import {
+  getEffectiveUrgency,
+  type UrgencyScoreContext,
+} from '../../utils/task-urgency';
 
 export class EmbeddedTaskItemRenderer {
+  private urgencyContext?: UrgencyScoreContext;
+
   constructor(
     private plugin: TodoTracker,
     private menuBuilder: StateMenuBuilder,
     private taskContextMenu: TaskContextMenu,
   ) {}
+
+  setUrgencyScoreContext(context?: UrgencyScoreContext): void {
+    this.urgencyContext = context;
+  }
 
   createTaskListItem(
     task: Task,
@@ -93,6 +105,46 @@ export class EmbeddedTaskItemRenderer {
       'aria-label',
       `Toggle task: ${task.text || task.state}`,
     );
+
+    const dependencyManager = this.plugin.taskDependencyManager ?? null;
+    const key = `${task.path}:${task.line}${
+      task.isTableTask && task.tableCell ? `:${task.tableCell.cellIndex}` : ''
+    }`;
+    const marker = task.completed
+      ? null
+      : resolveDependencyMarker(dependencyManager, key);
+    if (marker) {
+      // Immediately after the checkbox, before the text container: the same
+      // order the row already used for its lock, now extended to diagnostics.
+      li.classList.add('todoseq-task-blocked');
+      const icon = li.createSpan({
+        cls:
+          marker.kind === 'blocked'
+            ? 'todoseq-task-blocked-icon'
+            : 'todoseq-dependency-issue-icon',
+      });
+      if (marker.kind === 'issue') {
+        setIcon(icon, 'alert-triangle');
+        setTooltip(icon, marker.label);
+        icon.setAttribute('aria-label', marker.label);
+        icon.setAttribute('role', 'img');
+      } else {
+        setIcon(icon, 'lock');
+        setTooltip(icon, marker.label);
+        icon.setAttribute('aria-label', marker.label);
+        icon.setAttribute('role', 'button');
+        icon.setAttribute('tabindex', '0');
+        const showDetails = (event: Event): void => {
+          event.preventDefault();
+          event.stopPropagation();
+          new Notice(marker.details || marker.label, 8000);
+        };
+        icon.onclick = showDetails;
+        icon.onkeydown = (event: KeyboardEvent) => {
+          if (event.key === 'Enter' || event.key === ' ') showDetails(event);
+        };
+      }
+    }
 
     const wrapMode: 'dynamic' | boolean = params.wrapContent ?? 'dynamic';
     const isTrueWrapMode = wrapMode === true;
@@ -150,7 +202,7 @@ export class EmbeddedTaskItemRenderer {
 
       this.buildWrapDateInfoRows(task, params, contentWrapper);
 
-      const urgencyValue = task.urgency;
+      const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
       const showUrgency =
         params.showUrgency === true &&
         urgencyValue !== null &&
@@ -226,7 +278,7 @@ export class EmbeddedTaskItemRenderer {
         'todoseq-embedded-task-date-info-dynamic-wrap',
       );
 
-      const urgencyValue = task.urgency;
+      const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
       const showUrgency =
         params.showUrgency === true &&
         urgencyValue !== null &&
@@ -298,28 +350,30 @@ export class EmbeddedTaskItemRenderer {
         });
         setTooltip(fileEl, task.path);
 
+        const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
         if (
           params.showUrgency === true &&
-          task.urgency !== null &&
-          task.urgency !== undefined
+          urgencyValue !== null &&
+          urgencyValue !== undefined
         ) {
           const urgEl = li.createSpan({
             cls: 'todoseq-embedded-task-urgency',
-            text: `${task.urgency.toFixed(2)}`,
+            text: `${urgencyValue.toFixed(2)}`,
           });
-          setTooltip(urgEl, `Urgency: ${task.urgency.toFixed(2)}`);
+          setTooltip(urgEl, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
       } else {
+        const urgencyValue = getEffectiveUrgency(task, this.urgencyContext);
         if (
           params.showUrgency === true &&
-          task.urgency !== null &&
-          task.urgency !== undefined
+          urgencyValue !== null &&
+          urgencyValue !== undefined
         ) {
           const urgEl = li.createSpan({
             cls: 'todoseq-embedded-task-urgency',
-            text: `${task.urgency.toFixed(2)}`,
+            text: `${urgencyValue.toFixed(2)}`,
           });
-          setTooltip(urgEl, `Urgency: ${task.urgency.toFixed(2)}`);
+          setTooltip(urgEl, `Urgency: ${urgencyValue.toFixed(2)}`);
         }
       }
 
@@ -567,7 +621,21 @@ export class EmbeddedTaskItemRenderer {
             return;
           }
 
-          await this.updateTaskState(currentTask, newState);
+          const outcome = await this.updateTaskState(currentTask, newState);
+          if (outcome?.status === 'refused') {
+            const revertedChar = this.plugin.keywordManager.getCheckboxState(
+              currentTask.state,
+              this.plugin.keywordManager.getSettings(),
+            );
+            checkbox.checked = currentTask.completed;
+            checkbox.setAttribute('data-task', revertedChar);
+            li.setAttribute('data-task', revertedChar);
+            li.classList.toggle(
+              'todoseq-embedded-task-completed',
+              revertedChar === 'x' || revertedChar === '-',
+            );
+            return;
+          }
 
           const newCheckboxChar = this.plugin.keywordManager.getCheckboxState(
             newState,
@@ -774,10 +842,13 @@ export class EmbeddedTaskItemRenderer {
     }
   }
 
-  private async updateTaskState(task: Task, newState: string): Promise<void> {
+  private async updateTaskState(
+    task: Task,
+    newState: string,
+  ): Promise<TaskUpdateOutcome | void> {
     try {
       if (this.plugin.taskUpdateCoordinator) {
-        await this.plugin.taskUpdateCoordinator.updateTaskByPath(
+        return await this.plugin.taskUpdateCoordinator.updateTaskByPath(
           task.path,
           task.line,
           newState,
@@ -798,7 +869,9 @@ export class EmbeddedTaskItemRenderer {
       { type: 'wiki', regex: new RegExp(WIKI_LINK_REGEX) },
       { type: 'md', regex: new RegExp(MD_LINK_REGEX) },
       { type: 'url', regex: new RegExp(URL_REGEX) },
-      { type: 'tag', regex: TAG_PATTERN },
+      // A private copy: this scan advances lastIndex, and the exported pattern
+      // is used by search filters, which must not depend on what was rendered.
+      { type: 'tag', regex: new RegExp(TAG_PATTERN) },
     ];
 
     let i = 0;

@@ -1,12 +1,12 @@
 # Task Urgency
 
-The Urgency sorting feature in TODOseq helps you prioritize your tasks by calculating a numeric score for each task based on multiple factors. This approach is inspired by [Taskwarrior's urgency system](https://taskwarrior.org/docs/urgency/), where tasks are ranked according to their importance and timeliness.
+Urgency sorting ranks tasks by a calculated score, inspired by [Taskwarrior's urgency system](https://taskwarrior.org/docs/urgency/).
 
 ## Understanding Urgency
 
 Urgency is a calculated score that represents how important and time-sensitive a task is. When you select the "Urgency" sort option in the Task List view, tasks are ordered from highest to lowest urgency, putting the most critical tasks at the top of your list.
 
-The urgency score considers various aspects of your tasks:
+The score adds up contributions from:
 
 - **Due dates**: Tasks that are due today or overdue receive the highest urgency boost
 - **Priority**: High priority tasks (`[#A]`) are more urgent than medium (`[#B]`) or low (`[#C]`) priority tasks
@@ -16,6 +16,7 @@ The urgency score considers various aspects of your tasks:
 - **Task age**: Older tasks in daily note pages gain urgency over time using a linear scale (0.0 to 1.0) based on days since creation, with a maximum of 365 days
 - **Tags**: Tasks with tags receive a small urgency boost based on the number of tags (0.8 for 1 tag, 0.9 for 2 tags, 1.0 for 3+ tags)
 - **Waiting state**: Tasks in WAIT, WAITING, or custom waiting keywords have reduced urgency
+- **Blocking**: A task that holds up at least one incomplete dependent gains a flat boost
 
 ## How Urgency is Calculated
 
@@ -45,9 +46,26 @@ urgency.active.coefficient = 4.0           # state is an active keyword (DOING, 
 urgency.age.coefficient = 2.0              # if the page is a daily notes page, weight tasks on older pages higher
 urgency.tags.coefficient = 1.0             # the task has one or more tags (multiplied by tag factor)
 urgency.waiting.coefficient = -3.0         # the task is in a waiting keyword state (WAIT, WAITING, or custom waiting keywords)
+urgency.blocking.coefficient = 3.0         # the task blocks at least one incomplete dependent (0 disables)
 ```
 
-The highest coefficient (12.0) is assigned to deadline dates, meaning tasks with deadlines will always appear near the top of your urgency-sorted list. High priority tasks come next with a coefficient of 6.0, while waiting tasks actually reduce urgency with a negative coefficient (-3.0).
+Deadlines carry the highest coefficient (12.0), priorities follow (6.0), and waiting tasks reduce the score (-3.0).
+
+## Blocking Urgency
+
+A task that blocks an incomplete task receives the `urgency.blocking.coefficient` once, no matter how many dependents it has. The boost belongs to the prerequisite, not the dependent; the dependent keeps its own score. For example, with the default `+3.0`, a task with base urgency `1.00` that holds up a release task displays `4.00`.
+
+Only task-backed dependencies in the current ready graph qualify:
+
+- explicit `BLOCKER` references and restored `ARCHIVED_BLOCKER` references whose target is incomplete
+- parent, `ORDERED`, and checkbox constraints when those optional structural settings are enabled
+- a dependent that does not use `NOBLOCKING`
+
+Missing, ambiguous, completed, archived-only, and pending-validation references contribute nothing. Edges inside a dependency cycle are ignored, including self-references; an edge leaving or entering a cycle still qualifies. A task can be blocked itself and still earn the boost by holding up another task.
+
+Set `urgency.blocking.coefficient = 0` to disable the boost, or change it to tune how strongly prerequisites rise in urgency. The stored task score is unchanged: the boost is applied when urgency is sorted or displayed, and disappears as soon as the last qualifying dependent is completed or its reference is removed.
+
+The boost applies inside the existing urgency buckets and tie-breaks. Future-dated, completed, and hidden tasks keep the same visibility rules; the graph is still read from the full committed vault, so filtering the task list does not remove a prerequisite's boost.
 
 ## Tag Urgency Calculation
 
@@ -66,7 +84,7 @@ The tag urgency contribution is calculated as: `urgency.tags.coefficient × tag_
 - Task with 2 tags: `1.0 × 0.9 = 0.9` urgency contribution
 - Task with 3+ tags: `1.0 × 1.0 = 1.0` urgency contribution
 
-This approach provides diminishing returns for additional tags, encouraging focused tagging rather than tag spam.
+The second and third tag add less than the first, so a few tags carry most of the benefit.
 
 ## How Scheduled and Deadline Dates Are Calculated
 
@@ -208,15 +226,4 @@ For advanced users who want to fine-tune the urgency calculation, you can modify
 3. Adjust the coefficient values to match your workflow preferences
 4. Reload the TODOseq plugin or restart Obsidian for the changes to take effect
 
-Note that this is an advanced feature and the default coefficients are carefully balanced for most use cases. Changes to these values will only take effect after restarting the plugin.
-
-## Urgency in Practice
-
-The urgency system helps you focus on what's truly important by automatically surfacing tasks that:
-
-- Are due soon or overdue
-- Have high priority
-- Are actively being worked on
-- Have been waiting for attention
-
-By using urgency sorting, you can quickly identify which tasks need your immediate attention and which can wait.
+The defaults are balanced for most workflows; changing them is an advanced step. Older custom files that omit `urgency.blocking.coefficient` inherit the default `+3.0`.

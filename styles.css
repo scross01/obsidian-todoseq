@@ -2,7 +2,9 @@
   display: none;
 }
 
-/* TodoView theme-aligned styles. Inherit fonts/colors from the active Obsidian theme. */
+/* ============================================================================
+   Task List panel and toolbar
+   ============================================================================ */
 .todoseq-panel {
   color: var(--text-normal);
   display: flex;
@@ -14,6 +16,112 @@
 .todoseq-panel .todoseq-toolbar {
   display: flex;
   flex-direction: column;
+}
+
+.todoseq-panel .todoseq-issues-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-inline-start: auto;
+  margin-inline-end: 0.35rem;
+  color: var(--text-warning);
+}
+
+.todoseq-panel .todoseq-issues-label {
+  font-size: var(--font-ui-smaller);
+}
+
+.todoseq-panel .todoseq-issues-count {
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+}
+
+.todoseq-panel .todoseq-issues-panel {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 0.35rem 0.5rem;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.todoseq-panel .todoseq-issues-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.todoseq-panel .todoseq-issues-title {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold, 600);
+}
+
+.todoseq-panel .todoseq-issues-close {
+  flex: 0 0 auto;
+}
+
+.todoseq-panel .todoseq-issues-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.4;
+  padding: 0.35rem 0;
+}
+
+.todoseq-panel .todoseq-issue-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.3rem 1.4rem 0.3rem 0.25rem;
+  border-radius: var(--radius-s);
+  text-align: start;
+  cursor: default;
+}
+
+.todoseq-panel .todoseq-issue-row.is-clickable {
+  cursor: pointer;
+}
+
+.todoseq-panel .todoseq-issue-row.is-clickable:hover,
+.todoseq-panel .todoseq-issue-row.is-clickable:focus-visible {
+  background: var(--background-modifier-hover);
+}
+
+.todoseq-panel .todoseq-issue-meta {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.todoseq-panel .todoseq-issue-kind {
+  color: var(--text-warning);
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-semibold, 600);
+}
+
+.todoseq-panel .todoseq-issue-source {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
+.todoseq-panel .todoseq-issue-message {
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.todoseq-panel .todoseq-issue-open {
+  position: absolute;
+  right: 0.2rem;
+  top: 50%;
+  color: var(--text-muted);
+  transform: translateY(-50%);
 }
 
 /* Visually-hidden label for accessibility */
@@ -80,7 +188,9 @@
   font-size: 0.9em;
 }
 
-/* List layout */
+/* ============================================================================
+   Task List rows and interaction
+   ============================================================================ */
 .todoseq-panel .todoseq-task-list {
   font-family: var(--font-text);
   font-size: var(--font-text-size);
@@ -170,11 +280,11 @@
   font-size: 0.9em;
 }
 .todoseq-panel .todoseq-task-text.completed {
-  color: var(--text-faint);
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--background-primary));
   text-decoration: line-through;
 }
 
-/* Completed rows recede: keyword drops to faint and their meta (file info,
+/* Completed rows recede: keyword drops to muted and their meta (file info,
    date rows) drops a further step so completed clusters sit visually behind
    open work.
 
@@ -186,7 +296,12 @@
    continuously as tasks stream in. A `:has()` ban, and the reason, is pinned
    by tests/stylesheet-lint.test.ts. */
 .todoseq-panel .todoseq-task-item.completed .todo-task-keyword {
-  color: var(--text-faint);
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 55%,
+    var(--background-primary)
+  );
+  text-decoration: line-through;
 }
 .todoseq-panel .todoseq-task-item.completed .todoseq-task-file-info,
 .todoseq-panel .todoseq-task-item.completed .todoseq-task-date-container {
@@ -195,7 +310,11 @@
 
 /* Keyword toggle (TODO/DOING/DONE) */
 .todoseq-panel .todo-task-keyword {
-  color: var(--interactive-accent);
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 80%,
+    var(--text-normal)
+  );
   cursor: pointer;
   /* Bold, matching the weight the keyword carries in task capture (source
      entries). A lighter weight read as a different typeface and broke the
@@ -239,7 +358,9 @@
   border-radius: var(--input-radius);
 }
 
-/* Checkbox alignment */
+/* ============================================================================
+   Task checkboxes across views
+   ============================================================================ */
 .todoseq-panel .todoseq-task-checkbox {
   margin-right: var(--size-2-2);
   vertical-align: middle;
@@ -250,34 +371,10 @@
   top: -0.08em;
 }
 
-/* Editor checkbox styling for active tasks when NOT using themed styles */
-.cm-editor .cm-task-checkbox[data-task='/'] {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent, #7f6df2) 33%,
-    transparent
-  );
-}
-
-/* Checkbox styling for active tasks when NOT using themed styles */
-.todoseq-panel .todoseq-task-checkbox[data-task='/'] {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent, #7f6df2) 33%,
-    transparent
-  );
-}
-
-/* Reader view checkbox styling for active tasks */
-.markdown-preview-view .task-list-item-checkbox[data-task='/'] {
-  background-color: color-mix(
-    in srgb,
-    var(--interactive-accent, #7f6df2) 33%,
-    transparent
-  );
-}
-
-/* Embedded task list checkbox styling for active tasks */
+/* Active-task tint shared by the editor, task panel, reading view and embedded lists */
+.cm-editor .cm-task-checkbox[data-task='/'],
+.todoseq-panel .todoseq-task-checkbox[data-task='/'],
+.markdown-preview-view .task-list-item-checkbox[data-task='/'],
 .todoseq-embedded-task-checkbox[data-task='/'] {
   background-color: color-mix(
     in srgb,
@@ -334,6 +431,23 @@
 .todoseq-priority-badge.priority-low {
   background-color: var(--background-modifier-border);
   color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+/* Completed and archived rows mute the priority badge instead of keeping
+   its priority colour. Archived rows use a hollow chip so they recede more. */
+.todoseq-completed-task-text .todoseq-priority-badge,
+.todoseq-panel .todoseq-task-item.completed .todoseq-priority-badge,
+.todoseq-embedded-task-item.todoseq-embedded-task-completed
+  .todoseq-priority-badge {
+  background-color: var(--background-modifier-border);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.todoseq-archived-task-text .todoseq-priority-badge {
+  background-color: var(--background-primary);
+  color: var(--text-faint);
   box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 }
 
@@ -429,7 +543,9 @@
 
 /* Icon base for toolbar buttons rendered via CSS masks */
 
-/* Date display styling */
+/* ============================================================================
+   Task metadata and warning indicators
+   ============================================================================ */
 .todoseq-panel .todoseq-task-date-container {
   margin-top: var(--size-2-2);
   /* Theme-relative meta sizing: dates track the theme scale. */
@@ -601,7 +717,9 @@
   margin-left: 0;
 }
 
-/* Settings UI - Shared font size for messages */
+/* ============================================================================
+   Settings messages and validation
+   ============================================================================ */
 .todoseq-setting-item-error,
 .todoseq-setting-item-warning,
 .todoseq-setting-item-info,
@@ -632,7 +750,9 @@
   border-style: solid;
 }
 
-/* Smart date highlight — subtle outline and background on the active task line */
+/* ============================================================================
+   Editor and Reading view task formatting
+   ============================================================================ */
 .todoseq-smart-date-highlight {
   background-color: color-mix(
     in srgb,
@@ -649,7 +769,11 @@
 /* Task keyword formatting in editor and reading view */
 .todoseq-keyword-formatted {
   font-weight: var(--font-bold);
-  color: var(--interactive-accent);
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 80%,
+    var(--text-normal)
+  );
   font-size: 0.9rem; /* reduce size slightly */
   border-radius: 2px; /* Subtle rounding */
   cursor: pointer; /* Show hand/finger cursor like a link */
@@ -699,6 +823,75 @@
   font-size: 0.9rem;
   color: var(--text-muted);
   display: inline;
+}
+
+/* Task properties drawers - quiet metadata using theme variables only */
+:is(.cm-editor, .markdown-preview-view) .todoseq-properties-line {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+:is(.cm-editor, .markdown-preview-view) .todoseq-properties-key {
+  font-weight: var(--font-normal);
+  color: var(--text-faint);
+}
+
+.markdown-preview-view [data-properties-hidden] {
+  display: none;
+}
+
+/* Icon-only drawer toggle, matching Obsidian's heading fold indicator:
+   10px right-triangle in a 22px left gutter, revealed on hover. */
+.markdown-preview-view .todoseq-properties-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  margin-inline-start: -22px;
+  padding: 0 6px;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--collapse-icon-color, var(--nav-collapse-icon-color));
+  cursor: var(--cursor);
+  opacity: 0;
+  vertical-align: middle;
+}
+
+.markdown-preview-view
+  .todoseq-properties-host:hover
+  > .todoseq-properties-toggle,
+.markdown-preview-view .todoseq-properties-toggle:hover,
+.markdown-preview-view .todoseq-properties-toggle:focus-visible,
+.markdown-preview-view .todoseq-properties-toggle[aria-expanded='false'] {
+  opacity: 1;
+}
+
+.markdown-preview-view .todoseq-properties-toggle:focus-visible {
+  outline: 2px solid var(--interactive-accent, #7f6df2);
+  outline-offset: 2px;
+}
+
+.markdown-preview-view .todoseq-properties-toggle svg.svg-icon {
+  color: var(--collapse-icon-color, var(--nav-collapse-icon-color));
+}
+
+.markdown-preview-view .todoseq-properties-toggle.is-collapsed svg.svg-icon {
+  color: var(--collapse-icon-color-collapsed);
+}
+
+/* Touch devices have no hover to reveal the control. */
+@media (hover: none) {
+  .markdown-preview-view .todoseq-properties-toggle {
+    opacity: 1;
+  }
+}
+
+.markdown-preview-view .todoseq-properties-body[hidden] {
+  display: none;
 }
 
 /* Description line - editor and reader preview */
@@ -792,30 +985,39 @@
 
 /* Completed task text styling */
 :is(.markdown-preview-view, .cm-editor) .todoseq-completed-task-text {
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--background-primary));
   text-decoration: line-through;
-  opacity: 0.8;
 }
 
-/* Completed task keyword styling - applies strikethrough to the keyword itself */
+/* Completed task keyword styling - keeps the state hue, one step quieter */
 /* Works for both built-in (DONE, CANCELLED, CANCELED) and custom completed keywords */
-:is(.markdown-preview-view, .cm-editor) .todoseq-completed-keyword {
+/* The keyword class qualifier outranks the later quote keyword rule. */
+:is(.markdown-preview-view, .cm-editor)
+  .todoseq-keyword-formatted.todoseq-completed-keyword {
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 55%,
+    var(--background-primary)
+  );
   text-decoration: line-through;
-  opacity: 0.8;
 }
 
-/* Archived task styling - muted/dimmed appearance without strikethrough */
+/* Archived task styling - keeps the hue but recedes further than completed */
 /* Works for both built-in (ARCHIVED) and custom archived keywords */
-:is(.markdown-preview-view, .cm-editor) .todoseq-archived-keyword {
-  color: var(--interactive-accent);
+:is(.markdown-preview-view, .cm-editor)
+  .todoseq-keyword-formatted.todoseq-archived-keyword {
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 40%,
+    var(--background-primary)
+  );
   text-decoration: line-through;
-  opacity: 0.7;
 }
 
 /* Archived task text styling */
 :is(.markdown-preview-view, .cm-editor) .todoseq-archived-task-text {
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text-muted) 40%, var(--background-primary));
   text-decoration: line-through;
-  opacity: 0.7;
 }
 
 /* Table cell task keyword styling */
@@ -824,7 +1026,28 @@
   color: var(--interactive-accent);
 }
 
-/* Dropdown containers for search suggestions and options */
+/* Table tasks keep the same completed/archived ink ramp as plain task lines */
+:is(.cm-editor, .markdown-preview-view)
+  .todoseq-table-task-keyword.todoseq-completed-keyword {
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 55%,
+    var(--background-primary)
+  );
+}
+
+:is(.cm-editor, .markdown-preview-view)
+  .todoseq-table-task-keyword.todoseq-archived-keyword {
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 40%,
+    var(--background-primary)
+  );
+}
+
+/* ============================================================================
+   Search suggestions and options
+   ============================================================================ */
 .todoseq-dropdown {
   position: absolute;
   z-index: var(--layer-menu);
@@ -872,13 +1095,17 @@
   text-overflow: ellipsis;
 }
 
-/* Status bar item styling */
+/* ============================================================================
+   Status bar
+   ============================================================================ */
 .todoseq-status-bar {
   order: -1;
   margin-right: auto;
 }
 
-/* Embedded Task List Styles - New Implementation */
+/* ============================================================================
+   Embedded task list
+   ============================================================================ */
 
 /* Main container */
 .todoseq-embedded-task-list-container {
@@ -1021,6 +1248,21 @@
   height: 16px;
 }
 
+/* Obsidian's reading-view `.task-list-item-checkbox` rule offsets the box by
+   0.2em, while its source-view rule uses -0.1em. Embedded rows are flex rows,
+   so the reader offset drops the checkbox below the keyword and dependency
+   marker. Mirror the editor's vertical optical offset for this custom control
+   only; native Markdown task checkboxes keep Obsidian's own alignment. */
+.markdown-reading-view
+  .todoseq-embedded-task-list
+  .todoseq-embedded-task-checkbox,
+.markdown-preview-view
+  .todoseq-embedded-task-list
+  .todoseq-embedded-task-checkbox {
+  position: relative;
+  top: -0.1em;
+}
+
 /* Task text container */
 .todoseq-embedded-task-text-container {
   flex: 1;
@@ -1045,10 +1287,17 @@
 /* Task state */
 .todoseq-embedded-task-state {
   font-weight: var(--font-semibold);
+  /* Reporting surface: keywords stay uncoloured so embedded lists do not
+     compete with the accent-coloured capture surface in the same note. */
   color: var(--text-normal);
   font-family: var(--font-monospace);
   font-size: 0.9rem;
   white-space: nowrap; /* Prevent keyword wrapping */
+}
+
+.todoseq-embedded-task-completed .todoseq-embedded-task-state {
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--background-primary));
+  text-decoration: line-through;
 }
 
 /* Task text */
@@ -1129,7 +1378,7 @@
 }
 
 /* ============================================================================
-   Wrap Content Mode - Task text wrapping and file info on new row
+   Embedded task list wrapping and responsive layout
    ============================================================================ */
 
 /* Wrap content mode - task item stays as row but allows content to wrap */
@@ -1496,7 +1745,7 @@
 }
 
 /* ============================================================================
-   Floating Indicators - Subtask count and repeat icon on top-right
+   Embedded task list indicators and feedback
    ============================================================================ */
 
 /* Floating indicators container - positioned at top-right of task line */
@@ -1536,11 +1785,8 @@
 }
 
 /* Completed task styling - target completed (x) and canceled (-) states */
-.todoseq-embedded-task-item.todoseq-embedded-task-completed {
-  opacity: 0.6;
-}
-
 .todoseq-embedded-task-completed .todoseq-embedded-task-text {
+  color: color-mix(in srgb, var(--text-muted) 55%, var(--background-primary));
   text-decoration: line-through;
 }
 
@@ -1651,12 +1897,32 @@
   border-left-color: color-mix(in srgb, var(--color-orange) 50%, transparent);
 }
 
+/* ============================================================================
+   Task formatting in footnotes and nested quotes
+   ============================================================================ */
+
 /* Footnote task keyword styling */
 .cm-editor .todoseq-footnote-task-keyword {
   font-weight: var(--font-bold);
   color: var(--interactive-accent);
   font-size: 0.9em; /* use em for relative its immediate parent */
   border-radius: 2px;
+}
+
+.cm-editor .todoseq-footnote-task-keyword.todoseq-completed-keyword {
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 55%,
+    var(--background-primary)
+  );
+}
+
+.cm-editor .todoseq-footnote-task-keyword.todoseq-archived-keyword {
+  color: color-mix(
+    in srgb,
+    var(--text-accent, var(--interactive-accent)) 40%,
+    var(--background-primary)
+  );
 }
 
 /* Nested quote task keyword styling - consolidated using attribute selector */
@@ -1686,7 +1952,7 @@
 }
 
 /* ============================================================================
-   Collapsible Embedded Task List Styles
+   Embedded task list collapse controls
    ============================================================================ */
 
 /* Title styling when used as collapsible toggle */
@@ -2237,7 +2503,10 @@
   outline-offset: -1px;
 }
 
-.todoseq-date-picker-custom-repeat-buttons {
+/* Shared dialog action styling for custom repeat and saved search. Split a
+   rule if the dialogs diverge rather than layering an override. */
+.todoseq-date-picker-custom-repeat-buttons,
+.todoseq-saved-search-buttons {
   display: flex;
   justify-content: flex-end;
   gap: var(--size-4-2);
@@ -2245,7 +2514,8 @@
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.todoseq-date-picker-custom-repeat-cancel {
+.todoseq-date-picker-custom-repeat-cancel,
+.todoseq-saved-search-btn-cancel {
   padding: var(--size-4-1) var(--size-4-3);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-s);
@@ -2255,11 +2525,13 @@
   cursor: pointer;
 }
 
-.todoseq-date-picker-custom-repeat-cancel:hover {
+.todoseq-date-picker-custom-repeat-cancel:hover,
+.todoseq-saved-search-btn-cancel:hover {
   background: var(--background-modifier-hover);
 }
 
-.todoseq-date-picker-custom-repeat-save {
+.todoseq-date-picker-custom-repeat-save,
+.todoseq-saved-search-btn-save {
   padding: var(--size-4-1) var(--size-4-3);
   border: none;
   border-radius: var(--radius-s);
@@ -2269,7 +2541,8 @@
   cursor: pointer;
 }
 
-.todoseq-date-picker-custom-repeat-save:hover {
+.todoseq-date-picker-custom-repeat-save:hover,
+.todoseq-saved-search-btn-save:hover {
   background: color-mix(in srgb, var(--interactive-accent) 85%, white);
 }
 
@@ -2372,18 +2645,25 @@
   align-items: center;
 }
 
-.todoseq-dropdown .search-suggest-saved-item .suggestion-content {
+/* Saved-search and history rows share content, action and title styling */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-content,
+.todoseq-dropdown .search-suggest-history-item .suggestion-content {
   min-width: 0;
   overflow: hidden;
 }
 
-.todoseq-dropdown .search-suggest-saved-item .suggestion-aux {
+.todoseq-dropdown .search-suggest-saved-item .suggestion-aux,
+.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
   align-items: center;
   flex-shrink: 0;
 }
 
 .todoseq-dropdown
   .search-suggest-saved-item
+  .suggestion-aux
+  .search-suggest-icon,
+.todoseq-dropdown
+  .search-suggest-history-item
   .suggestion-aux
   .search-suggest-icon {
   display: flex;
@@ -2398,8 +2678,9 @@
   background-color: var(--background-modifier-hover);
 }
 
-/* Saved search title - single line with truncation (matches search option rows) */
-.todoseq-dropdown .search-suggest-saved-item .suggestion-title {
+/* Saved-search and history titles - single line with truncation */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-title,
+.todoseq-dropdown .search-suggest-history-item .suggestion-title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2415,34 +2696,6 @@
   align-items: center;
 }
 
-.todoseq-dropdown .search-suggest-history-item .suggestion-content {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.todoseq-dropdown
-  .search-suggest-history-item
-  .suggestion-aux
-  .search-suggest-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-/* History query text - single line with truncation */
-.todoseq-dropdown .search-suggest-history-item .suggestion-title {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .todoseq-dropdown .search-suggest-history-query {
   font-weight: var(--font-normal);
 }
@@ -2455,8 +2708,9 @@
   opacity: 0.8;
 }
 
-/* Hover action icons (edit/delete) - hidden by default, shown on hover */
-.todoseq-dropdown .search-suggest-saved-item .suggestion-aux {
+/* Row actions (edit/delete/save) - hidden by default; reveal rules follow */
+.todoseq-dropdown .search-suggest-saved-item .suggestion-aux,
+.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
   opacity: 0;
   transition: opacity 0.1s ease;
   max-height: 1em;
@@ -2562,6 +2816,10 @@
   border-width: 2px;
 }
 
+/* ============================================================================
+   Archive completion notice
+   ============================================================================ */
+
 /*
  * Archive-run completion notice (auto-run + manual run).
  * Obsidian renders notice content inline and styles `.notice button` with
@@ -2638,9 +2896,9 @@
   background: color-mix(in srgb, var(--interactive-accent) 75%, black);
 }
 
-/*
- * Auto-archive dialog
- */
+/* ============================================================================
+   Auto-archive dialog
+   ============================================================================ */
 
 .todoseq-archive-backdrop {
   position: fixed;
@@ -3046,41 +3304,11 @@
   justify-content: center;
 }
 
-.todoseq-saved-search-buttons {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--size-4-2);
-  padding-top: var(--size-4-2);
-  border-top: 1px solid var(--background-modifier-border);
-}
+/* ============================================================================
+   Saved search dialog actions
+   ============================================================================ */
 
-.todoseq-saved-search-btn-cancel {
-  padding: var(--size-4-1) var(--size-4-3);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  background: var(--background-primary);
-  color: var(--text-normal);
-  font-size: var(--font-ui-small);
-  cursor: pointer;
-}
-
-.todoseq-saved-search-btn-cancel:hover {
-  background: var(--background-modifier-hover);
-}
-
-.todoseq-saved-search-btn-save {
-  padding: var(--size-4-1) var(--size-4-3);
-  border: none;
-  border-radius: var(--radius-s);
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  font-size: var(--font-ui-small);
-  cursor: pointer;
-}
-
-.todoseq-saved-search-btn-save:hover {
-  background: color-mix(in srgb, var(--interactive-accent) 85%, white);
-}
+/* Shared footer and Cancel/Save styling lives with the custom repeat dialog above. */
 
 /* Delete button - positioned left of Cancel/Save */
 .todoseq-saved-search-btn-delete {
@@ -3098,13 +3326,11 @@
   background: color-mix(in srgb, var(--color-red) 10%, transparent);
 }
 
-/* History item save icon - hidden by default, shown on hover */
-.todoseq-dropdown .search-suggest-history-item .suggestion-aux {
-  opacity: 0;
-  transition: opacity 0.1s ease;
-  max-height: 1em;
-}
+/* ============================================================================
+   Search history save action
+   ============================================================================ */
 
+/* History item save action - revealed on hover */
 .todoseq-dropdown .search-suggest-history-item:hover .suggestion-aux {
   opacity: 1;
 }
@@ -3218,7 +3444,7 @@
   border-radius: var(--radius-s);
   background-color: var(--background-modifier-selection);
   font-family: var(--font-monospace);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3828,4 +4054,77 @@
 
 .is-phone .todoseq-dashboard-clickable {
   min-height: 24px;
+}
+
+/* ============================================================================
+   Task dependency markers across views
+   ============================================================================ */
+
+/* One status glyph before the keyword on every task surface. The lock marks
+   ordinary blocked state; the warning marks a source diagnostic that outranks
+   it. Both share the same optical alignment and hover surface so they read as
+   one system, and the row keeps normal text contrast (no dimming). The box is
+   exactly the glyph's size, so it starts flush after the checkbox with no
+   hidden left padding, and a small end margin supplies the gap to the keyword.
+   The fractional negative baseline seats the glyph optically on the keyword's
+   baseline instead of floating above it or dropping below it. */
+.todoseq-task-blocked-icon,
+.todoseq-dependency-issue-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  inline-size: var(--icon-xs);
+  block-size: var(--icon-xs);
+  margin-inline-end: 0.2em;
+  vertical-align: -0.0625em;
+  border-radius: var(--radius-s);
+  color: var(--text-muted);
+  cursor: help;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.todoseq-task-blocked-icon svg,
+.todoseq-dependency-issue-icon svg {
+  inline-size: var(--icon-xs);
+  block-size: var(--icon-xs);
+}
+
+/* The lock opens a notice. Expand only its pointer target with a pseudo-element,
+   so the 14px glyph keeps the keyword alignment and the dense row keeps its
+   height; the warning triangle stays a non-interactive image. */
+.todoseq-task-blocked-icon {
+  position: relative;
+  cursor: pointer;
+}
+
+.todoseq-task-blocked-icon::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  min-inline-size: 24px;
+  min-block-size: 24px;
+  transform: translate(-50%, -50%);
+}
+
+.todoseq-dependency-issue-icon {
+  color: var(--text-warning);
+}
+
+.todoseq-task-blocked-icon:hover {
+  background-color: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.todoseq-dependency-issue-icon:hover {
+  background-color: var(--background-modifier-hover);
+}
+
+.todoseq-task-blocked-icon:focus-visible,
+.todoseq-dependency-issue-icon:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
 }

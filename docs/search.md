@@ -1,6 +1,6 @@
 # Search Functionality
 
-The search field in the TODOseq Task List provides a powerful search system that allows you to quickly find and filter tasks across your entire vault. This guide covers all aspects of the search functionality, from basic filtering to advanced query syntax.
+The search field filters tasks across the vault as you type. This page covers the syntax, from plain words to prefixed and boolean queries.
 
 ![Search Options](./assets/todoseq-search-options-menu.png){.ts-img-detail .ts-img-dark}
 ![Search Options](./assets/todoseq-search-options-menu-light.png){.ts-img-detail .ts-img-light}
@@ -12,6 +12,43 @@ The search field in the TODOseq Task List provides a powerful search system that
 The search field is located in the Task List toolbar and provides live filtering as you type. Basic search matches the entered text against the task text, the task's `DESCRIPTION:` line, the file path, and the filename. Matching uses the displayed text as well as the raw line: typing the words you see still matches when a priority token or footnote reference sat between them, and the literal marker text remains searchable.
 
 Results follow live edits. Moving a task under a different heading or renaming its note updates `heading:` matches without a manual rescan.
+
+### Accents and Language-Specific Letters
+
+By default, search ignores accents and a few Latin letters that have no plain
+ASCII spelling, on **both** the query and the task text. `cafe` finds `café`,
+`lodz` finds `Łódź`, and `strasse` finds `Straße`. The same works in reverse:
+typing `café` finds a task that says `cafe`.
+
+| You can type | It also matches    |
+| ------------ | ------------------ |
+| `o`          | `ó`, `ö`, `ø`, `ǿ` |
+| `l`          | `ł`                |
+| `d`          | `đ`, `ð`           |
+| `h`          | `ħ`                |
+| `i`          | `ı`, `İ`           |
+| `ss`         | `ß`, `ẞ`           |
+| `ae`         | `æ`                |
+| `oe`         | `œ`                |
+| `th`         | `þ`                |
+
+Composed and decomposed spellings compare alike: `café` typed with one
+pre-composed character matches `cafe` plus a combining accent. The folding
+applies to unprefixed tasks and phrases, `content:`, `description:`, `heading:`,
+`file:`, `path:` segments, tag text, literal `state:` values, unquoted property
+keys and string values, and the autocomplete list. Matching remains
+case-insensitive as before; the A/a toolbar toggle turns **all** of this off and
+restores exact original spelling and case. Quoted property values are always
+exact and are not folded.
+
+This first release covers Latin accents and the letters listed above. It does
+not remove Greek, Cyrillic or Arabic marks, does not strip kana voicing marks,
+and does not transliterate between scripts; those characters still compare
+exactly apart from Unicode canonical equivalence. It is not a fuzzy search.
+
+Folding can make two previously distinct spellings match the same query. That is
+intended, and each task, tag, state or property key keeps its original spelling
+in the results and in the note.
 
 Searching without a prefix looks in the task line _and_ its description, so a task can match on either:
 
@@ -44,7 +81,7 @@ Click the "A/a" button in the toolbar to toggle case-sensitive matching.
 
 ## Advanced Search Syntax
 
-TODOseq supports sophisticated search queries with boolean logic and grouping.
+Queries can combine terms with boolean logic and grouping.
 
 ### Exact Phrase Search
 
@@ -55,16 +92,26 @@ Use double quotes to search for exact phrases:
 ```
 
 This will only match tasks containing the exact sequence "write documentation".
+The phrase must be a complete word sequence: `"star"` matches `star` but not
+`starfish`. Boundaries are Unicode-aware, so `"東京"` matches an isolated `東京`
+but not `東京都`, and `"C++"` matches only isolated `C++` — punctuation is
+literal. Prefix values remain substrings: `content:"東京"` still finds
+`東京都`.
+
+In the default mode the phrase is folded like any other search text. In strict
+mode it keeps original spelling and case. Because the boundary rule is not
+ASCII-based, strict mode now distinguishes `"café"` from `cafés` instead of
+treating the accented letter as a word separator.
 
 ### OR Logic
 
-Use `OR` (uppercase) to match either term:
+Use `OR` or `or` to match either term (case doesn't matter):
 
 ```txt
 meeting OR call
 ```
 
-This will match tasks containing "meeting" OR "call". A lowercase `or`/`and` is an ordinary search word, not an operator — quoting it ("or") matches tasks containing the word itself.
+This will match tasks containing "meeting" OR "call". To search for the literal word `or` or `and` in task text, quote it (`"or"`) — unquoted it is treated as an operator.
 
 ### AND Logic (Implicit)
 
@@ -74,7 +121,7 @@ Multiple terms without operators use implicit AND:
 meeting work
 ```
 
-This will match tasks containing BOTH "meeting" AND "work".
+This will match tasks containing BOTH "meeting" AND "work". An explicit `AND` or `and` works identically: `meeting AND work`.
 
 ### Exclusion (NOT Logic)
 
@@ -132,7 +179,7 @@ TODOseq supports filter keywords similar to Obsidian's general vault search for 
 
 ### Invalid Query Handling
 
-Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unknown `priority:` value, or a calendar-invalid date like `scheduled:2026-02-30`) show an error message instead of silently returning no results. Open-ended values — paths, filenames, tags, content, state keywords, quoted phrases — are not validated, because matching nothing is a legitimate outcome for them.
+Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unknown `priority:` or `blocked:` value, or a calendar-invalid date like `scheduled:2026-02-30`) show an error message instead of silently returning no results. Open-ended values — paths, filenames, tags, content, state keywords, quoted phrases — are not validated, because matching nothing is a legitimate outcome for them.
 
 ### Available Prefix Filters
 
@@ -143,6 +190,7 @@ Queries with structural errors (unbalanced parentheses, a dangling `OR`, an unkn
 | `tag:`         | Find tasks containing specific tags       | `tag:urgent`                |
 | `state:`       | Find tasks with specific states or groups | `state:active`              |
 | `priority:`    | Find tasks with specific priorities       | `priority:high`             |
+| `blocked:`     | Find blocked or unblocked tasks           | `blocked:true`              |
 | `content:`     | Find tasks with specific content          | `content:project`           |
 |                | _(the task line only)_                    |                             |
 | `description:` | Find tasks by their DESCRIPTION: line     | `description:meeting notes` |
@@ -199,6 +247,24 @@ The `state:` filter and state autocomplete suggestions follow the effective keyw
 
 Find tasks on pages marked as projects.
 
+### Tasks Without Tags
+
+Use `tag:none` to find tasks that have no tags at all:
+
+```txt
+tag:none
+```
+
+This is a search sentinel, not a literal `#none` tag, so a task tagged `#none`
+does not match it. Search the literal tag with `tag:#none`; quoting the value
+(`tag:"none"`) is still the sentinel, matching how `priority:none` and
+`scheduled:none` behave. Negation composes as usual, so `-tag:none` finds tasks
+that have at least one tag. The `tag:` autocomplete offers `none` alongside the
+vault's existing tags.
+
+Tags may contain multibyte characters and emoji, so `#🏠` and `#中文标签` count
+as tags here and in the dashboard's tag groups.
+
 ### State Group Keywords
 
 In addition to matching individual state keywords (e.g., `state:TODO`, `state:DOING`), the `state:` filter supports group keywords that match all tasks belonging to a keyword group. These group keywords are resolved dynamically based on your settings, so any custom keywords you have configured are included automatically.
@@ -246,7 +312,7 @@ Group keywords must be lowercase (`state:active`, `state:inactive`, `state:waiti
 
 ## Date Filter Expressions
 
-TODOseq provides powerful date-based filtering expressions.
+Dates can be filtered with the expressions below.
 
 ### Basic Date Expressions
 
@@ -518,13 +584,37 @@ priority:none
 
 Find tasks without priority assignments.
 
+## Blocked Filter
+
+Use `blocked:true` for incomplete tasks that are waiting on a dependency, and `blocked:false` for tasks that are actionable: no dependencies, all dependencies complete, or already completed. The values are lowercase and must be exactly `true` or `false`; uppercase, quoted, empty and other values are rejected.
+
+```txt
+blocked:true
+```
+
+Find tasks waiting on a dependency.
+
+```txt
+state:TODO blocked:false
+```
+
+Find actionable TODO tasks.
+
+```txt
+-blocked:true priority:high
+```
+
+Find high-priority tasks that are not blocked.
+
+Blocked status comes from `BLOCKER` references and is derived, never written to the note. Missing, ambiguous, excluded or temporarily unvalidated dependencies count as blocked while the task is incomplete. Completing a blocker releases its dependents immediately. See [Task Dependencies](/task-dependencies) for the reference rules.
+
 ## Property Search
 
-You can search for tasks based on page properties (frontmatter/YAML metadata). This allows you to filter tasks by the properties set on your markdown files, providing a powerful way to organize and find tasks based on document context.
+Tasks can be found by the frontmatter properties of their notes.
 
 ### Basic Property Search
 
-To search for tasks on pages with a specific property, use brackets with the property name and value separated by a colon. For example, to find all tasks on pages marked as a "Project", you would use `[type:Project]`. The property name and value are separated by a colon within the brackets. You can use quotes around either the property name or value for exact matching. Without quotes, the search will match partially (case insensitive by default).
+To search for tasks on pages with a specific property, use brackets with the property name and value separated by a colon. For example, to find all tasks on pages marked as a "Project", you would use `[type:Project]`. The property name and value are separated by a colon within the brackets. You can use quotes around either the property name or value for exact matching. Without quotes, the search matches partially and folds accents and the Latin letters listed under [Accents and Language-Specific Letters](#accents-and-language-specific-letters); every spelling of the key that folds to the query is included.
 
 ```txt
 [type:Project]
@@ -534,7 +624,7 @@ This syntax is consistent with Obsidian's native property search format, making 
 
 ### Key-Only Search
 
-You can also search for pages that have a specific property regardless of its value. Use `[type:]` or just `[type]` to find all pages with the `type` property set. This is useful when you want to see all tasks on pages of a certain category, regardless of their specific status or other property values.
+You can also search for pages that have a specific property regardless of its value. Use `[type:]` or just `[type]` to find all pages with the `type` property set. Use it to list tasks on pages of one category, whatever their status.
 
 ```txt
 [type:]
@@ -550,7 +640,7 @@ By default, property searches match partially. The search `[type:ject]` would ma
 [type:"Project"]
 ```
 
-Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar.
+Exact matching is case sensitive, while partial matching is case insensitive by default. You can also toggle case sensitivity using the A/a button in the toolbar. A quoted key selects that exact key spelling and bypasses the folded key comparison, so `["Résumé":cafe]` uses the literal `Résumé` key while its unquoted value still matches `Café` partially. Quoted values stay exact and are never folded, even when the global matching is case-insensitive; like a quoted key, they also select the key spelling exactly, so `[place:"Other"]` does not match a `Place` key.
 
 ### Negation
 
@@ -560,17 +650,19 @@ You can exclude pages with specific properties using the minus sign. For example
 -[type:Personal]
 ```
 
-This is particularly useful when you want to focus on work-related tasks and exclude personal ones.
-
 ### Null Values
 
-You can search for properties that exist but have no value using `[type:null]` or `[type:]`. This is different from searching for pages where the property doesn't exist at all. Null value matching is useful for finding pages where a property has been initialized but not yet filled in.
+Use `[type:null]` for an actual null value, `[type:"null"]` for the literal
+text `null`, and `[type:""]` for an exact empty string. These are three
+different filters. `[type]` and `[type:]` are presence checks and include empty
+strings, empty arrays and null, but exclude pages without the key.
 
 ```txt
 [type:null]
 ```
 
-This will match pages where the `type` property exists but has no value assigned to it.
+This matches pages where the `type` property is null. It does not match a page
+whose value is the text `null` or an empty string.
 
 ### OR Operator
 
@@ -624,13 +716,11 @@ This finds tasks on pages where "work" appears anywhere in the tags array.
 
 ### Property Search Cache
 
-TODOseq builds its own index of all properties across your vault for fast, efficient searching. This approach ensures that property searches work even for files that haven't been recently accessed, providing comprehensive coverage of your entire vault.
-
-The property search engine automatically updates when files change, ensuring that your search results are always current.
+TODOseq indexes properties across the vault, so a property search works even for notes that have not been opened recently. The index updates as files change.
 
 ## Combining Search Techniques
 
-TODOseq allows combining all search features for powerful, targeted filtering.
+Prefixes, phrases and boolean operators can be combined in one query.
 
 ### Complex Query Examples
 
@@ -770,10 +860,11 @@ Pressing Escape or clicking the clear button exits the saved search view, just l
 ### Search Matching Rules
 
 1. **Case Sensitivity**: Off by default, toggle with A/a button
-2. **Whitespace**: Multiple spaces are treated as single space
-3. **Punctuation**: Most punctuation is treated as literal characters
-4. **Order**: Search terms can appear in any order in results
-5. **Proximity**: Terms don't need to be adjacent unless using quotes
+2. **Accents**: Ignored in the default mode, including the Latin letter mappings above; the A/a toggle restores exact spelling
+3. **Whitespace**: Multiple spaces are treated as single space
+4. **Punctuation**: Most punctuation is treated as literal characters
+5. **Order**: Search terms can appear in any order in results
+6. **Proximity**: Terms don't need to be adjacent unless using quotes
 
 ## Property changes and collection views
 
@@ -783,7 +874,14 @@ Editing only a note's properties changes what property filters match without cha
 
 Property filters use one matching contract for the fast index and the metadata fallback. An unquoted value matches partially and ignores case, across every spelling of the key, so `[type:ject]` finds `Project` and `[type:Project]` also finds `project` and `Project backlog`. Quoting a value makes it exact and case-sensitive, and ignores whitespace before the quote: `[type: "Project"]` matches only the exact value `Project`.
 
-`[type]` and `[type:]` ask whether the key exists. They include keys whose value is empty, an empty array or null, and exclude notes without the key. `[type:null]` matches an actual null value, while `[type:""]` matches an exact empty string; the two are no longer conflated. Numeric and boolean values stay typed, so `[size:1]` does not match `12`.
+`[type]` and `[type:]` ask whether the key exists. They include keys whose value is empty, an empty array or null, and exclude notes without the key. `[type:null]` matches an actual null value, `[type:"null"]` matches that literal text, and `[type:""]` matches an exact empty string; the three are not conflated. Numeric and boolean values stay typed, so `[size:1]` does not match `12`.
+
+Unquoted values fold accents on both sides, so `[place:lodz]` finds `Łódź`,
+while `[place:"lodz"]` does not. Unquoted keys fold too: `[résumé:cafe]`
+searches the `résumé` and `resume` keys and finds the value `Café`. Quoting the
+key (`["résumé":cafe]`) restricts the search to that spelling. The fast index
+and the metadata fallback use this same contract, in the Task List, embedded
+task lists and dashboard cards.
 
 ## Combining filters and errors
 

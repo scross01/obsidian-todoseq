@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { TEST_VAULT_DIR, writeVaultMarkdown } from './vault-setup';
+import { parseCdpPort } from './process-owner';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -170,13 +171,11 @@ export function bootstrapFixtures(): void {
 }
 
 /**
- * Reset mutable per-test state without tearing down `.obsidian/` or the plugin
- * install: rewrite the markdown fixtures and restore baseline plugin settings.
- * The caller triggers Obsidian to pick up the file changes (e.g. a rescan).
+ * Restore only the baseline plugin settings file. Markdown content is reset
+ * through the live Obsidian vault API; this helper deliberately never writes
+ * fixture markdown.
  */
-export function resetMutableState(): void {
-  writeVaultMarkdown();
-
+export function restoreBaselinePluginSettings(): void {
   const dataDest = path.join(
     TEST_VAULT_DIR,
     '.obsidian',
@@ -190,11 +189,11 @@ export function resetMutableState(): void {
 /**
  * CDP port the launcher exposes for Playwright `connectOverCDP`. Overridable
  * via env. The default is deliberately uncommon: CDP tooling often assumes
- * 9222, and 9333 has been observed colliding with other local apps — a
- * collision is destructive here because the launcher kills whatever listens
- * on this port before relaunching.
+ * 9222, and 9333 has been observed colliding with other local apps. A
+ * collision is an error now; the harness refuses rather than killing whatever
+ * listens on this port.
  */
-export const CDP_PORT = parseInt(process.env.OBSIDIAN_CDP_PORT || '9334', 10);
+export const CDP_PORT = parseCdpPort(process.env.OBSIDIAN_CDP_PORT);
 
 /** Path to the Obsidian executable. Overridable via env (defaults to macOS app). */
 export const OBSIDIAN_PATH =

@@ -13,6 +13,29 @@ fixtures use `.ts` like real plugin content — but the harness must never
 associations would hand an opened `.ts` to a media player (e.g. IINA,
 "Cannot open file or stream") and other extensions to other apps.
 
+## Generating a fixture vault
+
+Write the same deterministic corpus the benchmarks and Obsidian profiling runs
+use:
+
+```bash
+npm run perf:fixture -- --size s --seed 4242 --today 2026-11-10 --out /tmp/todoseq-vault
+```
+
+- `--size` is one of the fixed presets `s` (250 tasks / 50 files), `m`
+  (2,500 / 500) or `l` (10,000 / 2,000); it defaults to `m`.
+- `--seed` defaults to `1337`; `--today` accepts a whole local `YYYY-MM-DD`
+  date and defaults to the local date. Supplying both makes byte-identical
+  output reproducible across machines.
+- `--out` is required; `--output` and `-o` are accepted equivalents.
+- `npm run generate-content` remains as a deprecated alias and prints a
+  migration warning. Its old `--files`/`--length`/`--tasks` counts are rejected
+  before anything is written: they have no exact mapping to the fixed presets.
+- Regeneration overwrites the generated paths but does not remove unrelated
+  files already in the target directory. It is not a cleanup command.
+
+`--help` on either entry point prints the supported options and writes nothing.
+
 ## Tier 1 — node benchmarks (`npm run perf:node`)
 
 Times the pure-logic hot paths over the generated vault, in-process, with
@@ -34,6 +57,7 @@ Scenarios (`scripts/perf/scenarios.ts`):
 | `classify-sort`              | `sortTasksWithThreeBlockSystem` for all 3 view modes × 4 future settings (every Task List refresh)       |
 | `search`                     | tokenize + parse + evaluate 6 realistic queries over the full task set (per-keystroke path)              |
 | `search-bulk`                | same 6 queries through the bulk `Search.filterTasks` facade — the Task List/embedded per-keystroke call  |
+| `search-international`       | accent folding and Unicode phrase boundaries: typing sequence, multi-term/boolean/tag/state cases        |
 | `dashboard-aggregate`        | `DashboardAggregator.aggregate` for all 6 group-by dimensions                                            |
 | `natural-date`               | `NaturalDateParser.parse` over a keystroke-sized corpus (smart-date path)                                |
 | `date-format`                | 6k `formatDateForDisplay`/`formatDateTooltip` calls over mixed relative/absolute spans (render hot path) |
@@ -41,6 +65,26 @@ Scenarios (`scripts/perf/scenarios.ts`):
 
 Artifact: `output/perf/node-<size>.json` (local-only, untracked) with the
 git SHA, node version, platform, and every scenario's numbers.
+
+### Blocking-density scenarios
+
+The same node suite also runs `scripts/perf/blocking.bench.ts`, which
+compares three property-drawer densities over the generated vault:
+`baseline` (no drawers), `occasional` (every tenth eligible task) and
+`heavy` (every eligible task, plus blockers and unknown properties). It
+measures `blocking-parse-<density>` and
+`blocking-dependency-<density>` for each density. It also measures
+`blocking-dependency-default-<density>` with the production-default structural
+gates; that scenario skips graph construction for the `baseline` density. The
+suite is report-only and has no thresholds.
+
+```bash
+PERF_SIZE=m PERF_ITERATIONS=30 npm run perf:node
+PERF_SIZE=l PERF_ITERATIONS=15 npm run perf:node
+```
+
+Artifact: `output/perf/blocking-<size>.json`, alongside the ordinary
+`node-<size>.json` result.
 
 ## Tier 2 — in-Obsidian profiling (`npm run perf:obsidian`)
 

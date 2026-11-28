@@ -26,6 +26,8 @@ export class TodoseqCodeBlockProcessor {
       plugin.settings,
       plugin.keywordManager,
       plugin.propertySearchEngine,
+      plugin.taskDependencyManager,
+      () => plugin.vaultScanner?.getUrgencyCoefficients().blocking ?? 0,
     );
     this.eventHandler = new EmbeddedTaskListEventHandler(
       plugin,
@@ -142,8 +144,11 @@ export class TodoseqCodeBlockProcessor {
       const allTasks = this.plugin.getTasks();
 
       // Filter, sort, and get count in a single operation
-      const { tasks: filteredTasks, totalCount } =
-        await this.manager.filterAndSortTasksWithCount(allTasks, params);
+      const {
+        tasks: filteredTasks,
+        totalCount,
+        urgencyContext,
+      } = await this.manager.filterAndSortTasksWithCount(allTasks, params);
 
       if (lifetime.disposed) return;
 
@@ -170,6 +175,7 @@ export class TodoseqCodeBlockProcessor {
         initialCollapsed,
         (id: string) => this.eventHandler.toggleCollapse(id),
         containerId,
+        urgencyContext,
       );
     } catch (error: unknown) {
       if (lifetime.disposed) return;
@@ -190,6 +196,8 @@ export class TodoseqCodeBlockProcessor {
         this.plugin as TodoTracker & { vaultScanner: VaultScanner }
       ).vaultScanner.getKeywordManager(),
       this.plugin.propertySearchEngine,
+      this.plugin.taskDependencyManager,
+      () => this.plugin.vaultScanner?.getUrgencyCoefficients().blocking ?? 0,
     );
     // Update event handler's manager reference
     this.eventHandler.setManager(this.manager);

@@ -1,6 +1,6 @@
 # Editor Integration
 
-TODOseq seamlessly integrates with Obsidian's Markdown editor, providing visual feedback and interactive controls for managing your tasks directly within your notes. This guide explains how tasks are displayed and how you can interact with them in the editor.
+TODOseq styles tasks and adds controls directly in Obsidian's Markdown editor. This page covers how tasks appear there and how to interact with them.
 
 For information about task display and interaction in Reader view (Reading/Preview mode), see the [Reader View documentation](reader.md).
 
@@ -9,11 +9,11 @@ For information about task display and interaction in Reader view (Reading/Previ
 
 ## Task Display in the Editor
 
-When you create tasks using TODOseq's keyword-based format, they appear in your Markdown editor with special styling that helps you quickly identify and manage them.
+Task lines are styled as you type, so they stand out from the prose around them.
 
 ### Visual Task Representation
 
-As you type or when you open a note containing tasks, TODOseq automatically applies visual styling to make tasks stand out:
+Styling applies as you type and when you open a note:
 
 ```markdown
 TODO [#A] Write documentation for new feature
@@ -27,7 +27,7 @@ DONE [#C] Fix critical bug in payment processing
 ![Editor Task Styling Example](./assets/todoseq-editor-task-styling-light.png){.ts-img-wide .ts-img-light}
 
 - **State keywords** (TODO, DOING, DONE, etc.) are highlighted with bold font and your theme's accent color
-- **Completed tasks** (DONE, CANCELED, CANCELLED) display with a line-through decoration
+- **Completed tasks** (DONE, CANCELED, CANCELLED) keep a faint version of the keyword accent, while the task title uses heavily muted text and a line-through decoration. Archived tasks fade one step further still. A priority badge on either line becomes a neutral chip instead of keeping its priority colour.
 - **Checkboxes** (when used) are synchronized with the task state
 - SCHEDULED and DEADLINE date lines are formatted with special styling (CLOSED and STARTED date lines too)
 - The styling is applied in real-time as you type
@@ -38,7 +38,7 @@ TODOseq provides several ways to interact with tasks directly in the editor:
 
 ### Clicking Task Keywords
 
-The most intuitive way to update task states is by clicking on the state keyword. Click on any state keyword (e.g., `TODO`) to cycle through the task states.
+Click a state keyword to cycle through its states.
 
 Tasks follow logical state sequences:
 
@@ -48,9 +48,7 @@ Tasks follow logical state sequences:
 
 ### Right-Click Context Menu
 
-For more control over task state transitions, right-click on any task keyword to see all available next states. A context menu appears showing all possible next states. Select the desired state from the menu.
-
-This is particularly useful when you want to jump to a specific state without cycling through all intermediate states.
+Right-click a keyword to pick a next state from a menu instead, without cycling through the ones in between.
 
 ### Keyboard Shortcut
 
@@ -84,13 +82,23 @@ When tasks use the checkbox format, you have additional interaction options:
 
 Clicking the checkbox toggles between empty `[ ]` and checked `[x]` states. The task keyword is automatically synchronized with the checkbox state.
 
+### Queued Task Updates
+
+State, priority, scheduled-date and deadline-date changes are saved one at a time per note. If another edit moves the task while a change is waiting, TODOseq follows the task's [ID or block anchor](task-ids.md) instead of trusting the old line. An anonymous task is followed while the row at its captured position still matches, or to the one row in the note with the same content; if the captured row changed and no unique match remains, the queued change is dropped and the note is left unchanged.
+
+### Table Cell Tasks
+
+State commands, checkbox toggles and context-menu changes work on tasks inside Markdown tables. A table task keeps its inline `<br>SCHEDULED:` and `<br>DEADLINE:` dates when its state changes, including repeaters and warning periods. Completing a recurring table task from the editor rolls the row to its next inactive state and advances the inline date without changing the other cells. If a table action cannot verify the target task, the editor shows the reason and leaves the table unchanged instead of failing silently. A date chosen from the table date picker is checked again immediately before the cell is written: if the task row was replaced while the picker was open, the date is not applied and the editor reports the failure. A task that moved to another row remains targetable by its unique content.
+
 ### Entering Scheduled and Deadline Dates
 
-TODOseq provides multiple ways to add scheduled and deadline dates to your tasks:
+TODOseq provides multiple ways to add scheduled and deadline dates to your tasks. When the picker opens it starts from the task's current date, repeater and warning period, and saving writes back the warning you selected, so changing a date keeps an existing warning unless you clear it.
 
 #### Manual Date Entry
 
 When adding a `SCHEDULED:` or `DEADLINE:` date after a task, the editor will autocomplete after the keyword with the required date format, e.g. `<2026-01-01>`, with the date auto-filled to the current date and selected for easy replacement or editing.
+
+Adding either date from the editor uses the same writing path as other task updates. The new line keeps the task's indentation and full quote prefix, stays in the normal date-line order, and leaves an existing block anchor on the task block. For a task inside a nested blockquote, the date is written at the task's own quote depth and is read back as that task's date; a date quoted more deeply than the task remains body text.
 
 ![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete.png){.ts-img-wide .ts-img-dark}
 ![Date Autocomplete Example](./assets/todoseq-editor-date-autocomplete-light.png){.ts-img-wide .ts-img-light}
@@ -188,15 +196,15 @@ This synchronization happens automatically as you interact with tasks in the edi
 
 ## Editor-Specific Features
 
-While many task interactions work similarly in both Edit mode and Reader view, the editor offers some unique capabilities:
+The editor adds a few things Reader view does not have:
 
 ### Real-time Styling
 
-Task formatting appears as you type in Edit mode. As soon as you type a valid task keyword, it receives styling immediately. This instant feedback helps you confirm that TODOseq recognizes your task syntax.
+A valid task keyword is styled as soon as you type it, which confirms TODOseq recognizes the line.
 
 ### Code Block Styling
 
-When "Include tasks inside code blocks" is enabled, TODOseq can apply styling to task keywords within code blocks in the editor. This makes tasks in code examples visually distinct. Note that code block styling is only applied in Edit mode; Reader view always displays code blocks without task formatting to preserve code readability.
+With **Include tasks inside code blocks** enabled, keywords inside code blocks are styled too. This applies in Edit mode only; Reader view always shows code blocks without task formatting.
 
 ### Tasks in Tables
 
@@ -277,11 +285,11 @@ The following limitations apply to Markdown table tasks:
 
 ### Cursor Position Awareness
 
-Editor interactions respect your cursor position. The Ctrl+Enter keyboard shortcut works based on where your cursor is placed, allowing you to toggle task states without precisely clicking on keywords.
+Ctrl+Enter acts on the task on the cursor's line, so you do not have to click the keyword.
 
 ### Command Palette Commands
 
-TODOseq provides several editor-specific commands to modify task that can be accessed through Obsidian's Command Palette (Ctrl/Cmd+P) and keyboard shortcuts. Task specific commands only appear when your cursor is on a valid task line
+Several editor commands are available in the Command Palette (Ctrl/Cmd+P) and can be bound to shortcuts. Task-specific commands appear only when the cursor is on a task line.
 
 See [Command Palette](command-palette.md) for more details.
 
@@ -293,4 +301,4 @@ If the recognized date has no line of its own yet, the first existing date line 
 
 ## Disabling or reloading the plugin
 
-Turning the plugin off or reloading it releases the editor interactions it added, including the right-click task keyword menu. Delayed editor setup and pending delayed task updates are cancelled with it, so they cannot reattach handlers or run after the plugin is gone. A file write that is already in progress is not rolled back by disabling the plugin.
+Turning the plugin off or reloading it removes the editor interactions it added, including the right-click keyword menu, and cancels delayed task updates that have not run yet. A file write already in progress is not rolled back.

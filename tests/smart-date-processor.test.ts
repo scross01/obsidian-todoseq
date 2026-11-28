@@ -300,6 +300,12 @@ describe('SmartDateProcessor', () => {
       expect(processor['isDateLine']('  CLOSED: [2026-05-18 Mon]')).toBe(true);
     });
 
+    it('should identify a same-depth nested quoted date line', () => {
+      expect(
+        processor['isDateLine']('> > SCHEDULED: <2026-05-18 Mon>'),
+      ).toBe(true);
+    });
+
     it('should not identify task line as a date line', () => {
       expect(processor['isDateLine']('TODO task tomorrow')).toBe(false);
     });

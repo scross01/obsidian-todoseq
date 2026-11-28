@@ -1,6 +1,6 @@
 # Experimental Features
 
-This page documents experimental features in TODOseq. These features are provided for advanced users who want to try cutting-edge functionality, but they come with important caveats.
+Experimental features are for trying new behaviour early. They are not fully polished and can change or disappear in a later version.
 
 ## ⚠️ Important Disclaimer
 
@@ -11,11 +11,11 @@ This page documents experimental features in TODOseq. These features are provide
 - Be changed significantly or removed entirely in future versions
 - Receive limited or no support
 
-Experimental features are provided as-is for users who want to test new capabilities. If you encounter issues with an experimental feature, you can disable it in settings to restore normal operation.
+If one causes trouble, turn it off in settings to return to normal.
 
 ## Org-Mode Support
 
-Org-mode support allows TODOseq to parse tasks from Org-mode files (`.org` extension), enabling you to use your existing Org-mode workflow within Obsidian.
+TODOseq can read tasks from Org files (`.org`), so an existing Org workflow keeps working in Obsidian.
 
 ### What It Does
 
@@ -34,7 +34,7 @@ When enabled, TODOseq will:
 3. Scroll to the "Experimental features" section
 4. Enable "Detect tasks in org mode files"
 
-Once enabled, `.org` files will be automatically included in vault scans.
+`.org` files are then included in vault scans.
 
 ### Supported Syntax
 
@@ -72,6 +72,22 @@ TODOseq recognizes standard Org-mode task syntax:
 * DONE Completed task
   CLOSED: [2026-02-10 Mon]
 ```
+
+**Property Drawers:**
+
+```org
+* TODO Write the research paper
+  :PROPERTIES:
+  :ID: paper-01
+  :BLOCKER: data-02
+  :END:
+```
+
+TODOseq reads `ID`, `BLOCKER`, `ARCHIVED_BLOCKER`, `ORDERED` and `NOBLOCKING`; other properties are preserved in the file and left uninterpreted. Org files use IDs for dependency references, with local `BLOCKER: previous-sibling` as an explicit relation. See [Task IDs and Anchors](task-ids.md) for the general use of IDs and anchors, and [Task Dependencies](task-dependencies.md) for syntax, Markdown block-link support and the optional hierarchy/checkbox settings. The same drawer syntax in a Markdown note also supports [Obsidian's native editor folding](task-dependencies.md#declaring-properties).
+
+Closed property drawers can also be collapsed in Reading view. Every task-owned property block, including empty and unclosed blocks, can be hidden with the **Hide task properties in Reading view** setting without changing the note.
+
+Org checkbox dependencies stay entry-local and stop at the next headline. Markdown checkbox dependencies cover the bounded task subtree instead, so the same visual nesting can produce different reasons across the two formats. This difference is intentional and both checkbox settings are off by default.
 
 ### Supported Keywords
 
@@ -128,7 +144,7 @@ If you encounter issues with Org-mode support, please report them on the [GitHub
 
 ## Checkbox Theming
 
-Checkbox theming allows TODOseq to display special checkbox markers in the markdown editor and task lists based on the active Obsidian theme styling to indicate task state visually.
+With a theme that styles checkboxes, TODOseq can show task state in the checkbox marker itself.
 
 ### What It Does
 
@@ -183,7 +199,7 @@ The following limitations apply to checkbox theming:
 
 ## Code File Comment Scanning
 
-Code file comment scanning allows TODOseq to detect tasks from TODO-style comments in programming language files across your vault.
+TODOseq can read tasks from TODO-style comments in source files.
 
 ### What It Does
 
@@ -203,7 +219,7 @@ When enabled, TODOseq will:
 3. Scroll to the "Experimental features" section
 4. Enable "Scan code files for comments"
 
-Once enabled, code files will be automatically included in vault scans.
+Code files are then included in vault scans.
 
 ### Supported File Types
 

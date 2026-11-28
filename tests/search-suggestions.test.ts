@@ -41,6 +41,18 @@ describe('Search Suggestions', () => {
       const filtered = SearchSuggestions.filterSuggestions('jour', suggestions);
       expect(filtered).toEqual(['Journal/']);
     });
+
+    it('folds accents and language-specific letters in suggestions', () => {
+      expect(
+        SearchSuggestions.filterSuggestions('lodz', ['Łódź', 'Lodz', 'Paris']),
+      ).toEqual(['Łódź', 'Lodz']);
+      expect(
+        SearchSuggestions.filterSuggestions('strasse', ['Straße']),
+      ).toEqual(['Straße']);
+      expect(SearchSuggestions.filterSuggestions('café', ['cafe'])).toEqual([
+        'cafe',
+      ]);
+    });
   });
 
   describe('SearchSuggestionDropdown filtering logic', () => {

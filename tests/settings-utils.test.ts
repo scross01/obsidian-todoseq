@@ -480,6 +480,20 @@ describe('settings-utils', () => {
       expect(getSettingsFingerprint(a)).toBe(getSettingsFingerprint(b));
     });
 
+    test('ignores the Reading-view property hide setting', () => {
+      const a = createBaseSettings({
+        hideTaskPropertiesInReadingView: false,
+      });
+      const b = createBaseSettings({
+        hideTaskPropertiesInReadingView: true,
+      });
+      expect(getSettingsFingerprint(a)).toBe(getSettingsFingerprint(b));
+    });
+
+    test('DefaultSettings.hideTaskPropertiesInReadingView is false', () => {
+      expect(DefaultSettings.hideTaskPropertiesInReadingView).toBe(false);
+    });
+
     test('returns empty string when JSON.stringify fails (circular ref)', () => {
       const circularArr: unknown[] = [];
       circularArr.push(circularArr);

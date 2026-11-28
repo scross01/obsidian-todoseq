@@ -153,7 +153,7 @@ describe('TaskUpdateCoordinator - rejection recovery in queues', () => {
       const p2 = coordinator.updateTaskState(task2, 'DONE', 'task-list');
 
       await expect(p1).rejects.toThrow(errorMessage);
-      await expect(p2).resolves.toBeUndefined();
+      await expect(p2).resolves.toEqual({ status: 'applied' });
 
       // Most important assertion: the second update actually executed
       // doAsyncWork (i.e., reached finalizeTaskState). Without the fix,
@@ -212,7 +212,7 @@ describe('TaskUpdateCoordinator - rejection recovery in queues', () => {
       const p2 = coordinator.updateTaskState(task, 'TODO', 'task-list');
 
       await expect(p1).rejects.toThrow(errorMessage);
-      await expect(p2).resolves.toBeUndefined();
+      await expect(p2).resolves.toEqual({ status: 'applied' });
 
       expect(finalizeSpy).toHaveBeenCalledTimes(2);
     });

@@ -157,6 +157,7 @@ describe('SearchSuggestionDropdown', () => {
       expect(dropdown.currentSuggestions).toContain('work');
       expect(dropdown.currentSuggestions).toContain('urgent');
       expect(dropdown.currentSuggestions).toContain('personal');
+      expect(dropdown.currentSuggestions).toContain('none');
     });
 
     it('shows state suggestions from settings', async () => {
@@ -358,6 +359,16 @@ describe('SearchSuggestionDropdown', () => {
   });
 
   describe('handleSelection', () => {
+    it('inserts the original accented suggestion unchanged', () => {
+      mockInput.value = 'path:lodz';
+      mockInput.selectionStart = 9;
+      mockInput.selectionEnd = 9;
+
+      dropdown.handleSelection('Łódź');
+
+      expect(mockInput.value).toBe('path:Łódź');
+    });
+
     it('replaces prefix value after colon', () => {
       mockInput.value = 'path:old value';
       mockInput.selectionStart = 8;

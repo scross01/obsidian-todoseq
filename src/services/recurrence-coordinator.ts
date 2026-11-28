@@ -9,6 +9,11 @@
 
 import { Task, WarningPeriodInfo } from '../types/task';
 import { getTaskKey } from '../utils/task-utils';
+import {
+  hasStableTaskIdentity,
+  selectTaskByStableIdentity,
+  taskIdentityMatches,
+} from '../utils/task-identity';
 import { TaskStateManager } from './task-state-manager';
 import { TaskUpdateCoordinator } from './task-update-coordinator';
 import { App, TFile } from 'obsidian';
@@ -48,6 +53,8 @@ export interface RecurrenceDateLineParser {
     line: string,
     indent: string,
   ) => 'scheduled' | 'deadline' | 'closed' | null;
+  /** Full-note parse used to prove which live row the recurrence targets. */
+  parseFile?: (content: string, path: string, file?: TFile) => Task[];
 }
 
 /**
@@ -302,6 +309,77 @@ export class RecurrenceCoordinator {
     };
   }
 
+  /** A completed recurring row may differ only by its checkbox state. */
+  private lineMatchesCapturedTask(line: string, task: Task): boolean {
+    if (line === task.rawText) return true;
+    const normalizeCheckbox = (value: string): string =>
+      value.replace(/\[[ xX]\]/g, '[ ]');
+    return normalizeCheckbox(line) === normalizeCheckbox(task.rawText);
+  }
+
+  /** Select one live row, requiring uniqueness when identity is absent. */
+  private selectCurrentTask(
+    candidates: readonly Task[],
+    task: Task,
+  ): Task | null {
+    const atLine = candidates.filter(
+      (candidate) => candidate.line === task.line,
+    );
+    if (
+      atLine.length === 1 &&
+      taskIdentityMatches(atLine[0], task) &&
+      (hasStableTaskIdentity(task) ||
+        candidates.filter((candidate) => candidate.text === task.text)
+          .length === 1)
+    ) {
+      return atLine[0];
+    }
+
+    const byIdentity = selectTaskByStableIdentity(candidates, task);
+    if (byIdentity) return byIdentity;
+
+    if (hasStableTaskIdentity(task)) return null;
+
+    const byText = candidates.filter((candidate) =>
+      taskIdentityMatches(candidate, task),
+    );
+    return byText.length === 1 ? byText[0] : null;
+  }
+
+  /**
+   * Resolve the live row. A parser without full-note parsing is a compatibility
+   * fixture only; production parsers always provide parseFile.
+   */
+  private resolveCurrentTask(
+    task: Task,
+    content: string,
+    parser: RecurrenceDateLineParser,
+  ): Task | null {
+    const scope = (candidate: Task): boolean =>
+      candidate.path === task.path &&
+      (candidate.tableCell?.cellIndex ?? null) ===
+        (task.tableCell?.cellIndex ?? null);
+
+    const file = this.app.vault.getAbstractFileByPath(task.path);
+    const parsed =
+      file instanceof TFile
+        ? parser.parseFile?.(content, task.path, file)
+        : parser.parseFile?.(content, task.path);
+    if (parsed) {
+      return this.selectCurrentTask(parsed.filter(scope), task);
+    }
+
+    const stored = this.selectCurrentTask(
+      (this.taskStateManager.getTasks() ?? []).filter(scope),
+      task,
+    );
+    if (stored) return stored;
+
+    if (hasStableTaskIdentity(task)) return null;
+    const capturedLine = content.split('\n')[task.line] ?? '';
+    return this.lineMatchesCapturedTask(capturedLine, task) ? task : null;
+  }
+
   /**
    * Perform recurrence update: advance dates and reset to inactive state.
    *
@@ -328,13 +406,6 @@ export class RecurrenceCoordinator {
       const content = await this.getFileContent(task.path);
       const lines = content.split('\n');
 
-      if (task.line >= lines.length) {
-        return {
-          success: false,
-          error: 'Task line out of bounds',
-        };
-      }
-
       // Get parser from vault scanner
       const vaultScanner = (
         this.app as unknown as {
@@ -342,12 +413,18 @@ export class RecurrenceCoordinator {
             getPlugin: (id: string) => {
               vaultScanner?: {
                 getParser: () => RecurrenceDateLineParser | null;
+                getParserForPath?: (
+                  path: string,
+                ) => RecurrenceDateLineParser | null;
               } | null;
             } | null;
           };
         }
       ).plugins.getPlugin('todoseq');
-      const parser = vaultScanner?.vaultScanner?.getParser();
+      const scanner = vaultScanner?.vaultScanner;
+      const parser = scanner?.getParserForPath
+        ? scanner.getParserForPath(task.path)
+        : scanner?.getParser();
 
       if (!parser) {
         return {
@@ -356,15 +433,22 @@ export class RecurrenceCoordinator {
         };
       }
 
-      // Rapid cycling inside the 50 ms recurrence window can stale the closure snapshot.
-      // Re-resolve when rawText diverges, keeping trigger's date/repeat fields.
-      const storedTask = this.taskStateManager.findTaskByPathAndLine(
-        task.path,
-        task.line,
-        task.tableCell?.cellIndex,
-      );
+      if (!parser.parseFile && task.line >= lines.length) {
+        return {
+          success: false,
+          error: 'Task line out of bounds',
+        };
+      }
+
+      // Rapid cycling inside the 50 ms recurrence window can stale the closure
+      // snapshot, and a queued same-file edit can move the row. Resolve by
+      // identity or content before writing, keeping the trigger's date fields.
+      const storedTask = this.resolveCurrentTask(task, content, parser);
       let taskForUpdate: Task = task;
-      if (storedTask && storedTask.rawText !== task.rawText) {
+      if (
+        storedTask &&
+        (storedTask.line !== task.line || storedTask.rawText !== task.rawText)
+      ) {
         // Trigger's date/repeat fields anchor the recurrence math; stored-task
         // content (rawText, state, tags, etc.) overlays on top so the
         // write-back reflects what the file actually shows now.
@@ -384,6 +468,22 @@ export class RecurrenceCoordinator {
         };
       }
 
+      if (taskForUpdate.line >= lines.length) {
+        return {
+          success: false,
+          error: 'Task line out of bounds',
+        };
+      }
+
+      if (!storedTask) {
+        // Never write at a captured line when the live note cannot prove the
+        // target. Failing here is safer than advancing a sibling.
+        return {
+          success: false,
+          error: 'Task moved before recurrence update',
+        };
+      }
+
       // Calculate next recurrence dates (pure math)
       const dateResult = this.calculateNextDates(taskForUpdate, lines, parser);
 
@@ -397,18 +497,33 @@ export class RecurrenceCoordinator {
       // Use TaskUpdateCoordinator to update the task
       // This ensures all updates go through the unified flow
       // Warning periods are determined here (preserves -Nd, strips --Nd)
-      await this.taskUpdateCoordinator.updateTaskRecurrence(taskForUpdate, {
-        // undefined means "this date is unchanged" and null means "delete";
-        // the writer relies on that distinction, so never coerce one to the
-        // other when forwarding the calculation result.
-        newScheduledDate: dateResult.newScheduledDate,
-        newDeadlineDate: dateResult.newDeadlineDate,
-        newScheduledRepeat: taskForUpdate.scheduledDateRepeat,
-        newDeadlineRepeat: taskForUpdate.deadlineDateRepeat,
-        newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod,
-        newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod,
-        newStateForRecurrence: defaultInactive,
-      });
+      const outcome = await this.taskUpdateCoordinator.updateTaskRecurrence(
+        taskForUpdate,
+        {
+          // undefined means "this date is unchanged" and null means "delete";
+          // the writer relies on that distinction, so never coerce one to the
+          // other when forwarding the calculation result.
+          newScheduledDate: dateResult.newScheduledDate,
+          newDeadlineDate: dateResult.newDeadlineDate,
+          newScheduledRepeat: taskForUpdate.scheduledDateRepeat,
+          newDeadlineRepeat: taskForUpdate.deadlineDateRepeat,
+          newScheduledWarningPeriod: dateResult.newScheduledWarningPeriod,
+          newDeadlineWarningPeriod: dateResult.newDeadlineWarningPeriod,
+          newStateForRecurrence: defaultInactive,
+        },
+      );
+
+      if (outcome.status !== 'applied') {
+        return {
+          success: false,
+          error:
+            outcome.status === 'failed'
+              ? (outcome.reason ?? 'Recurrence update failed')
+              : outcome.status === 'refused'
+                ? 'Recurrence update was refused'
+                : 'Task not found for recurrence update',
+        };
+      }
 
       return {
         success: true,

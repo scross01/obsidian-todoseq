@@ -14,6 +14,7 @@ import {
 import { TASK_VIEW_ICON } from '../../main';
 import { Task, DateRepeatInfo, WarningPeriodInfo } from '../../types/task';
 import { TaskTransferResult } from '../../services/task-writer';
+import { showReferenceRepairNotice } from '../components/reference-repair-notice';
 import { TaskClassification } from '../../utils/task-sort';
 import { Search } from '../../search/search';
 import {
@@ -40,6 +41,7 @@ import type { TaskStateTransitionManager } from '../../services/task-state-trans
 import {
   getStateTransitionManager,
   TaskUpdateCoordinator,
+  type TaskUpdateOutcome,
 } from '../../services/task-update-coordinator';
 import { TaskStateManager } from '../../services/task-state-manager';
 import { TaskElementCache } from './task-element-cache';
@@ -58,6 +60,12 @@ import {
   isTaskOnTodayDailyNote,
 } from '../../utils/daily-note-utils';
 import { readTaskBlockFromVault } from '../../utils/task-sub-bullets';
+import type { DependencyIssue } from '../../types/task-dependency';
+import {
+  getIssueKindLabel,
+  isActionableTaskIssue,
+  summarizeTaskIssues,
+} from '../components/task-issues';
 
 const INITIAL_LOAD_COUNT = 50;
 const LOAD_BATCH_SIZE = 30;
@@ -78,6 +86,12 @@ export class TaskListView extends ItemView {
   private optionsDropdown: SearchOptionsDropdown | null = null;
   private suggestionDropdown: SearchSuggestionDropdown | null = null;
   private taskListContainer: HTMLElement | null = null;
+  private issuesIndicatorEl: HTMLElement | null = null;
+  private issuesPanelEl: HTMLElement | null = null;
+  private issuesPanelOpen = false;
+  private readonly issuesPanelId = `todoseq-issues-panel-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
   private ariaLiveRegion: HTMLElement | null = null;
   private unsubscribeFromStateManager: (() => void) | null = null;
   private cachedVisibleTasks: Task[] = [];
@@ -222,6 +236,10 @@ export class TaskListView extends ItemView {
       {
         weekStartsOn: plugin.settings.weekStartsOn,
         migrateToTodayState: plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: plugin.settings.enforceBlockedTasks,
+        taskWriter: plugin.taskEditor,
+        dependencyManager: plugin.taskDependencyManager,
+        taskUpdateCoordinator: plugin.taskUpdateCoordinator,
       },
       plugin.app,
       this.taskStateManager,
@@ -235,6 +253,7 @@ export class TaskListView extends ItemView {
       (task) => this.openTaskLocationForRenderer(task),
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
       () => this.plugin?.taskStateManager ?? null,
+      () => this.plugin?.taskDependencyManager ?? null,
     );
     this.taskListFilter = new TaskListFilter(plugin, this.keywordManager);
     this.renderQueue = new ChunkedRenderQueue();
@@ -772,6 +791,44 @@ export class TaskListView extends ItemView {
     const searchResultsCount = searchResultsWarp.createSpan();
     searchResultsCount.setText('0 Of 0 tasks');
 
+    this.issuesIndicatorEl = searchResultsInfo.createDiv({
+      cls: 'todoseq-issues-indicator clickable-icon todoseq-hidden',
+      attr: {
+        role: 'button',
+        tabindex: '0',
+        'aria-label': 'Show task issues',
+        'aria-expanded': 'false',
+        'aria-controls': this.issuesPanelId,
+      },
+    });
+    setIcon(this.issuesIndicatorEl, 'alert-triangle');
+    this.issuesIndicatorEl.createSpan({
+      cls: 'todoseq-issues-label',
+      text: 'Issues',
+    });
+    this.issuesIndicatorEl.createSpan({ cls: 'todoseq-issues-count' });
+
+    const toggleIssues = (): void => this.toggleIssuesPanel();
+    this.issuesIndicatorEl.addEventListener('click', toggleIssues);
+    this.issuesIndicatorEl.addEventListener(
+      'keydown',
+      (event: KeyboardEvent) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          toggleIssues();
+        }
+      },
+    );
+
+    this.issuesPanelEl = toolbar.createDiv({
+      cls: 'todoseq-issues-panel todoseq-hidden',
+      attr: {
+        id: this.issuesPanelId,
+        role: 'region',
+        'aria-label': 'Task issues',
+      },
+    });
+
     // Right side: sort dropdown
     // const sortDropdown = searchResultsInfo.createEl('div');
     const select = searchResultsInfo.createEl('select', {
@@ -838,6 +895,155 @@ export class TaskListView extends ItemView {
 
     // Keep a reference for keyboard handlers to focus later
     this.searchInputEl = inputEl;
+  }
+
+  private getActionableIssues(): readonly DependencyIssue[] {
+    return (
+      this.plugin.taskDependencyManager
+        ?.getIssues()
+        .filter(isActionableTaskIssue) ?? []
+    );
+  }
+
+  private isIssuesPending(): boolean {
+    const manager = this.plugin.taskDependencyManager;
+    if (!manager) return true;
+    return !manager.isValidationReady() || !manager.getSnapshot().ready;
+  }
+
+  private setIssuesPanelOpen(open: boolean): void {
+    this.issuesPanelOpen = open;
+    this.issuesIndicatorEl?.setAttr('aria-expanded', String(open));
+    this.issuesPanelEl?.toggleClass('todoseq-hidden', !open);
+
+    if (open) {
+      this.renderIssuesPanel(this.getActionableIssues());
+      this.issuesPanelEl?.setAttr('tabindex', '-1');
+      this.issuesPanelEl?.focus();
+      return;
+    }
+
+    if (
+      this.issuesIndicatorEl &&
+      !this.issuesIndicatorEl.hasClass('todoseq-hidden')
+    ) {
+      this.issuesIndicatorEl.focus();
+    }
+  }
+
+  private toggleIssuesPanel(): void {
+    this.setIssuesPanelOpen(!this.issuesPanelOpen);
+  }
+
+  private refreshIssuesSurface(container: HTMLElement): void {
+    const indicator =
+      container.querySelector<HTMLElement>('.todoseq-issues-indicator') ??
+      this.issuesIndicatorEl;
+    if (!indicator) return;
+
+    const issues = this.getActionableIssues();
+    const summary = summarizeTaskIssues(issues);
+    indicator.toggleClass('todoseq-hidden', summary.total === 0);
+
+    const count = indicator.querySelector<HTMLElement>('.todoseq-issues-count');
+    if (count) count.setText(String(summary.total));
+
+    const label = `${summary.total} issue${summary.total === 1 ? '' : 's'}`;
+    indicator.setAttr('aria-label', `Show ${label}`);
+    setTooltip(indicator, label);
+
+    // Keep an open panel open when the last issue is fixed: the empty state is
+    // useful feedback and the panel's close control remains available.
+    if (this.issuesPanelOpen) this.renderIssuesPanel(issues);
+  }
+
+  private renderIssuesPanel(issues: readonly DependencyIssue[]): void {
+    const panel = this.issuesPanelEl;
+    if (!panel) return;
+    const hadFocus = panel.contains(activeDocument.activeElement);
+    panel.empty();
+
+    const header = panel.createDiv({ cls: 'todoseq-issues-header' });
+    header.createSpan({ cls: 'todoseq-issues-title', text: 'Task issues' });
+    const close = header.createDiv({
+      cls: 'todoseq-issues-close clickable-icon',
+      attr: {
+        role: 'button',
+        tabindex: '0',
+        'aria-label': 'Close task issues',
+      },
+    });
+    setIcon(close, 'x');
+    const closePanel = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.setIssuesPanelOpen(false);
+    };
+    close.addEventListener('click', closePanel);
+    close.addEventListener('keydown', (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') closePanel(event);
+    });
+
+    if (issues.length === 0) {
+      panel.createDiv({
+        cls: 'todoseq-issues-empty',
+        text: this.isIssuesPending()
+          ? 'Checking task diagnostics…'
+          : 'No task issues. Invalid properties and broken dependency references will appear here.',
+      });
+      if (hadFocus) panel.focus();
+      return;
+    }
+
+    for (const issue of issues) {
+      const task = issue.sourceKey
+        ? this.tasks.find(
+            (candidate) => getTaskKey(candidate) === issue.sourceKey,
+          )
+        : undefined;
+      const kindLabel = getIssueKindLabel(issue);
+      const sourceText = task
+        ? `${task.path}:${task.line + 1}`
+        : (issue.sourceKey ?? '');
+      const row = panel.createDiv({ cls: 'todoseq-issue-row' });
+
+      if (task) {
+        row.addClass('is-clickable');
+        row.setAttr('role', 'button');
+        row.setAttr('tabindex', '0');
+        row.setAttr(
+          'aria-label',
+          `${kindLabel}: ${issue.message}. Open ${sourceText}`,
+        );
+        const open = (event: Event): void => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.openTaskLocationForRenderer(task);
+        };
+        row.addEventListener('click', open);
+        row.addEventListener('keydown', (event: KeyboardEvent) => {
+          if (event.key === 'Enter' || event.key === ' ') open(event);
+        });
+      }
+
+      const meta = row.createDiv({ cls: 'todoseq-issue-meta' });
+      meta.createSpan({ cls: 'todoseq-issue-kind', text: kindLabel });
+      meta.createSpan({ cls: 'todoseq-issue-source', text: sourceText });
+      row.createDiv({ cls: 'todoseq-issue-message', text: issue.message });
+
+      if (task) {
+        const openIcon = row.createSpan({ cls: 'todoseq-issue-open' });
+        setIcon(openIcon, 'chevron-right');
+        openIcon.setAttr('aria-hidden', 'true');
+      }
+    }
+
+    if (hadFocus) panel.focus();
+  }
+
+  /** Open the Task List issue panel from the command palette. */
+  async showTaskIssues(): Promise<void> {
+    this.setIssuesPanelOpen(true);
   }
 
   /** Setup search suggestion dropdowns for prefix filter autocomplete */
@@ -1009,6 +1215,7 @@ export class TaskListView extends ItemView {
         'deadline',
         'closed',
         'started',
+        'blocked',
       ];
       if (
         validPrefixes.includes(prefixBase) ||
@@ -1429,6 +1636,24 @@ export class TaskListView extends ItemView {
           repeat ?? null,
           warningPeriod ?? null,
         ),
+      onCompleteAnyway: (task: Task) => {
+        const current =
+          this.taskStateManager.findTaskByPathAndLine(
+            task.path,
+            task.line,
+            task.tableCell?.cellIndex,
+          ) ?? task;
+        const target = this.stateManager.getNextCompletedOrArchivedState(
+          current.state,
+        );
+        return this.taskUpdateCoordinator?.updateTask({
+          task: current,
+          type: 'state',
+          source: 'task-list',
+          newState: target,
+          forceCompletion: true,
+        });
+      },
     };
   }
 
@@ -1548,7 +1773,10 @@ export class TaskListView extends ItemView {
   }
 
   // Cycle state via NEXT_STATE - delegates to taskUpdateCoordinator
-  private async updateTaskState(task: Task, nextState: string): Promise<void> {
+  private async updateTaskState(
+    task: Task,
+    nextState: string,
+  ): Promise<TaskUpdateOutcome | void> {
     if (!this.taskUpdateCoordinator) {
       console.error('TODOseq: TaskUpdateCoordinator not available');
       return;
@@ -1556,8 +1784,9 @@ export class TaskListView extends ItemView {
 
     try {
       // Use unified updateTaskState method - handles fresh lookup, optimistic update,
-      // file write, recurrence, line adjustment, and UI refresh
-      await this.taskUpdateCoordinator.updateTaskState(
+      // file write, recurrence, line adjustment, and UI refresh. The outcome is
+      // returned so the row's checkbox can restore itself after a refusal.
+      return await this.taskUpdateCoordinator.updateTaskState(
         task,
         nextState,
         'task-list',
@@ -1680,6 +1909,20 @@ export class TaskListView extends ItemView {
       case 'partial':
         new Notice('Task copied, but the original could not be updated');
         break;
+      case 'partial-references': {
+        const failed =
+          result.referenceRepairs?.reduce(
+            (total, report) => total + report.failed.length,
+            0,
+          ) ?? 0;
+        showReferenceRepairNotice(
+          this.plugin.taskEditor,
+          failed,
+          result.unreadablePaths,
+          result.referenceDiscoveryFailed,
+        );
+        break;
+      }
     }
   }
 
@@ -1957,6 +2200,7 @@ export class TaskListView extends ItemView {
             this.isCaseSensitive,
             this.plugin.settings,
             this.plugin.propertySearchEngine ?? undefined,
+            this.plugin.taskDependencyManager ?? undefined,
           );
         } catch {
           // If there's an error in parsing, fall back to simple search
@@ -2002,6 +2246,7 @@ export class TaskListView extends ItemView {
           (preSearchCount === 1 ? '' : 's'),
       );
     }
+    this.refreshIssuesSurface(container);
 
     // Display search error if present
     const searchErrorContainer = container.querySelector(
@@ -2658,6 +2903,13 @@ export class TaskListView extends ItemView {
       this.taskContextMenu.updateConfig({
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
+        // Settings updates rebuild this object. Omitting the coordinator here
+        // left the dependency menu reporting "not ready" after any settings
+        // change for the rest of the session.
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       });
     }
   }
@@ -2698,6 +2950,7 @@ export class TaskListView extends ItemView {
       (task) => this.openTaskLocationForRenderer(task),
       (task, evt) => this.taskContextMenu.showAtMouseEvent(task, evt),
       () => this.plugin?.taskStateManager ?? null,
+      () => this.plugin?.taskDependencyManager ?? null,
     );
 
     // Recreate context menu with updated task state manager reference
@@ -2745,6 +2998,10 @@ export class TaskListView extends ItemView {
       {
         weekStartsOn: this.plugin.settings.weekStartsOn,
         migrateToTodayState: this.plugin.settings.migrateToTodayState,
+        enforceBlockedTasks: this.plugin.settings.enforceBlockedTasks,
+        taskWriter: this.plugin.taskEditor,
+        dependencyManager: this.plugin.taskDependencyManager,
+        taskUpdateCoordinator: this.plugin.taskUpdateCoordinator,
       },
       this.plugin.app,
       this.taskStateManager,
@@ -2884,6 +3141,9 @@ export class TaskListView extends ItemView {
     this.searchInputEl = null;
     this.saveSearchBtn = null;
     this.taskListContainer = null;
+    this.issuesIndicatorEl = null;
+    this.issuesPanelEl = null;
+    this.issuesPanelOpen = false;
     await super.onClose?.();
   }
 

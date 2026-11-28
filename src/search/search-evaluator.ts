@@ -1,16 +1,16 @@
-import { SearchNode } from './search-types';
+import { SearchError, SearchNode } from './search-types';
 import { Task } from '../types/task';
 import { DateUtils } from '../utils/date-utils';
 import { PropertyEvaluator } from '../utils/property-evaluator';
 import { TodoTrackerSettings } from '../settings/settings-types';
-import { getFilename } from '../utils/task-utils';
-import { RegexCache } from '../utils/regex-cache';
+import { getFilename, getTaskKey } from '../utils/task-utils';
 import { TAG_PATTERN } from '../utils/patterns';
 import { PropertySearchEngine } from '../services/property-search-engine';
 import { KeywordManager } from '../utils/keyword-manager';
 import { KeywordGroup } from '../types/task';
 import { App, TFile } from 'obsidian';
 import type { PropertyQueryDescriptor } from './search-types';
+import { SearchTextCache } from './search-text';
 
 const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   active: 'activeKeywords',
@@ -19,28 +19,41 @@ const STATE_GROUP_MAP: Record<string, KeywordGroup> = {
   completed: 'completedKeywords',
 };
 
-/** Batch-local keyword resolution shared by every row in one search pass. */
+/**
+ * Dedicated matcher for `tag:` filters.
+ *
+ * Renderers advance the exported TAG_PATTERN while scanning a task's text, and
+ * `matchAll` copies the offset of the pattern it is given. Sharing that one
+ * made a tag filter skip every tag before the leftover offset — embedded lists
+ * reported "No tasks found" after rendering rows whose text ended in a tag.
+ */
+const TAG_FILTER_PATTERN = new RegExp(TAG_PATTERN.source, TAG_PATTERN.flags);
+
+/** Batch-local resolution shared by every row in one search pass. */
 export interface SearchBatchContext {
   /** Raw group alias -> normalized keyword sets (exact and lowercase). */
   stateGroupKeywords: Map<string, { exact: Set<string>; lower: Set<string> }>;
+  /** Pass-local folded-value and phrase-pattern cache. */
+  text: SearchTextCache;
+  /** Immutable dependency snapshot acquired once for this pass. */
+  blockedKeys: ReadonlySet<string> | null;
 }
 
 /**
- * A property filter node's engine query plus its resolution identity.
- * Engine results depend only on the query (never the task), so the bulk
- * path resolves each unique query once per batch.
+ * A property filter node's parsed descriptor plus its resolution identity.
+ * Engine results depend only on the descriptor (never the task), so the bulk
+ * path resolves each unique descriptor once per batch. The descriptor is
+ * transported verbatim: rebuilding it from a query string loses quoted-empty,
+ * literal-null and quoted-key intent.
  */
 interface PropertyEngineResolution {
-  /** Dedupe key: case-sensitivity class + engine query. */
+  /** Dedupe key derived from every descriptor field and the case mode. */
   key: string;
-  /** The engine query (e.g. `[type:Project]`). */
-  query: string;
+  descriptor: PropertyQueryDescriptor;
   effectiveCaseSensitive: boolean;
 }
 
 export class SearchEvaluator {
-  private static regexCache = new RegexCache();
-
   /** Get the app instance from settings.app (populated by Plugin.loadSettings). */
   private static getApp(settings?: TodoTrackerSettings): App | undefined {
     return (settings as TodoTrackerSettings & { app?: App })?.app;
@@ -77,18 +90,26 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
+    batchContext?: SearchBatchContext,
   ): Promise<boolean> {
+    const context = batchContext ?? this.createBatchContext();
     switch (node.type) {
       case 'term':
         return node.value
-          ? this.evaluateTerm(node.value, task, caseSensitive)
+          ? this.evaluateTerm(node.value, task, caseSensitive, context)
           : false;
       case 'phrase':
         return node.value
-          ? this.evaluatePhrase(node.value, task, caseSensitive)
+          ? this.evaluatePhrase(node.value, task, caseSensitive, context)
           : false;
       case 'prefix_filter':
-        return this.evaluatePrefixFilter(node, task, caseSensitive, settings);
+        return this.evaluatePrefixFilter(
+          node,
+          task,
+          caseSensitive,
+          settings,
+          context,
+        );
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
       case 'property_filter':
@@ -107,6 +128,7 @@ export class SearchEvaluator {
               caseSensitive,
               settings,
               propertySearchEngine,
+              context,
             )
           : false;
       case 'or':
@@ -117,6 +139,7 @@ export class SearchEvaluator {
               caseSensitive,
               settings,
               propertySearchEngine,
+              context,
             )
           : false;
       case 'not':
@@ -127,6 +150,7 @@ export class SearchEvaluator {
               caseSensitive,
               settings,
               propertySearchEngine,
+              context,
             )
           : false;
       default:
@@ -148,11 +172,10 @@ export class SearchEvaluator {
    *   - Every `async`/`await` boundary lives at the batch level, never per
    *     row: the facade awaits the *engine* (whose matching-file set does
    *     not depend on the task being evaluated), then runs one plain loop.
-   *   - `engineFiles` maps the dedupe key of every `property_filter` node
-   *     in the tree (`S|query` / `I|query`, built by buildPropertyQuery) to
-   *     its engine result — `null` when the engine failed, exactly like
-   *     the per-row catch. Absent key or absent map falls back to the
-   *     task's file metadata path.
+   *   - `engineFiles` maps the lossless resolution key of every
+   *     `property_filter` node in the tree to its engine result — `null`
+   *     when the engine failed, exactly like the per-row catch. Absent key
+   *     or absent map falls back to the task's file metadata path.
    *   - Behavior parity with `evaluate` is pinned by tests/search-bulk.test.ts.
    */
   static evaluateSync(
@@ -163,14 +186,15 @@ export class SearchEvaluator {
     engineFiles?: Map<string, Set<string> | null>,
     batchContext?: SearchBatchContext,
   ): boolean {
+    const context = batchContext ?? this.createBatchContext();
     switch (node.type) {
       case 'term':
         return node.value
-          ? this.evaluateTerm(node.value, task, caseSensitive)
+          ? this.evaluateTerm(node.value, task, caseSensitive, context)
           : false;
       case 'phrase':
         return node.value
-          ? this.evaluatePhrase(node.value, task, caseSensitive)
+          ? this.evaluatePhrase(node.value, task, caseSensitive, context)
           : false;
       case 'prefix_filter':
         return this.evaluatePrefixFilter(
@@ -178,7 +202,7 @@ export class SearchEvaluator {
           task,
           caseSensitive,
           settings,
-          batchContext,
+          context,
         );
       case 'range_filter':
         return this.evaluateRangeFilter(node, task, caseSensitive);
@@ -187,7 +211,7 @@ export class SearchEvaluator {
         if (!built) return false;
         const effectiveCaseSensitive = node.exact ? true : caseSensitive;
         const resolved = engineFiles?.get(
-          `${effectiveCaseSensitive ? 'S' : 'I'}|${built.query}`,
+          this.propertyResolutionKey(built.descriptor, effectiveCaseSensitive),
         );
         return this.evaluatePropertyFilterSync(
           node,
@@ -245,44 +269,79 @@ export class SearchEvaluator {
   static buildBatchContext(
     node: SearchNode,
     settings?: TodoTrackerSettings,
-  ): SearchBatchContext | undefined {
-    if (!settings) return undefined;
+    dependencyStatus?: { getBlockedKeys(): ReadonlySet<string> },
+  ): SearchBatchContext {
     const stateGroupKeywords = new Map<
       string,
       { exact: Set<string>; lower: Set<string> }
     >();
 
-    const walk = (n: SearchNode): void => {
-      if (
-        n.type === 'prefix_filter' &&
-        n.field === 'state' &&
-        n.value &&
-        STATE_GROUP_MAP[n.value]
-      ) {
-        const group = STATE_GROUP_MAP[n.value];
-        if (!stateGroupKeywords.has(n.value)) {
-          const keywords = new KeywordManager(settings).getKeywordsForGroup(
-            group,
-          );
-          stateGroupKeywords.set(n.value, {
-            exact: new Set(keywords),
-            lower: new Set(keywords.map((keyword) => keyword.toLowerCase())),
-          });
+    if (settings) {
+      const walk = (n: SearchNode): void => {
+        if (
+          n.type === 'prefix_filter' &&
+          n.field === 'state' &&
+          n.value &&
+          STATE_GROUP_MAP[n.value]
+        ) {
+          const group = STATE_GROUP_MAP[n.value];
+          if (!stateGroupKeywords.has(n.value)) {
+            const keywords = new KeywordManager(settings).getKeywordsForGroup(
+              group,
+            );
+            stateGroupKeywords.set(n.value, {
+              exact: new Set(keywords),
+              lower: new Set(keywords.map((keyword) => keyword.toLowerCase())),
+            });
+          }
         }
-      }
-      for (const child of n.children ?? []) walk(child);
-    };
+        for (const child of n.children ?? []) walk(child);
+      };
 
-    walk(node);
-    return stateGroupKeywords.size > 0 ? { stateGroupKeywords } : undefined;
+      walk(node);
+    }
+
+    return {
+      stateGroupKeywords,
+      text: new SearchTextCache(),
+      blockedKeys: dependencyStatus?.getBlockedKeys() ?? null,
+    };
+  }
+
+  /** Minimal context for a direct per-row evaluation without a batch pass. */
+  private static createBatchContext(): SearchBatchContext {
+    return {
+      stateGroupKeywords: new Map(),
+      text: new SearchTextCache(),
+      blockedKeys: null,
+    };
   }
 
   /**
-   * Walk the AST and collect every `property_filter` node's engine query,
-   * deduplicated by (effective case sensitivity | query). Engine results
-   * depend only on the query, never on the task, so one resolution per
-   * unique filter serves the whole batch — instead of one engine call per
-   * row per keystroke.
+   * Lossless identity for one property resolution. Every field that changes
+   * engine results participates, encoded as length-prefixed parts so keys,
+   * values and separators cannot run together into a collision.
+   */
+  private static propertyResolutionKey(
+    descriptor: PropertyQueryDescriptor,
+    effectiveCaseSensitive: boolean,
+  ): string {
+    const parts = [
+      effectiveCaseSensitive ? 'S' : 'I',
+      descriptor.kind,
+      descriptor.key,
+      descriptor.value,
+      descriptor.exact ? '1' : '0',
+      descriptor.keyExact ? '1' : '0',
+    ];
+    return parts.map((part) => `${part.length}:${part}`).join('');
+  }
+
+  /**
+   * Walk the AST and collect every `property_filter` node's descriptor,
+   * deduplicated by its full intent. Engine results depend only on the
+   * descriptor, never on the task, so one resolution per unique filter
+   * serves the whole batch — instead of one engine call per row per keystroke.
    */
   static collectEngineResolutions(
     node: SearchNode,
@@ -294,11 +353,14 @@ export class SearchEvaluator {
         const built = this.buildPropertyQuery(n);
         if (built) {
           const effectiveCaseSensitive = n.exact ? true : caseSensitive;
-          const key = `${effectiveCaseSensitive ? 'S' : 'I'}|${built.query}`;
+          const key = this.propertyResolutionKey(
+            built.descriptor,
+            effectiveCaseSensitive,
+          );
           if (!resolutions.has(key)) {
             resolutions.set(key, {
               key,
-              query: built.query,
+              descriptor: built.descriptor,
               effectiveCaseSensitive,
             });
           }
@@ -375,12 +437,14 @@ export class SearchEvaluator {
     term: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
-    const searchText = caseSensitive ? term : term.toLowerCase();
+    const searchText = caseSensitive ? term : context.text.fold(term);
+    if (!searchText) return false;
     const fields = this.getSearchableFields(task);
 
     return fields.some((fieldValue) => {
-      const target = caseSensitive ? fieldValue : fieldValue.toLowerCase();
+      const target = caseSensitive ? fieldValue : context.text.fold(fieldValue);
       return target.includes(searchText);
     });
   }
@@ -389,23 +453,21 @@ export class SearchEvaluator {
     phrase: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
-    // Escape regex special characters in the phrase
-    const escapedPhrase = this.escapeRegex(phrase);
-    const regexFlags = caseSensitive ? '' : 'i';
+    const searchText = caseSensitive ? phrase : context.text.fold(phrase);
+    if (!searchText) return false;
 
-    // Use word boundaries to ensure exact phrase matching
-    // Cache the compiled regex to avoid repeated compilation
-    const phraseRegex = this.regexCache.get(
-      `\\b${escapedPhrase}\\b`,
-      regexFlags,
-    );
-
+    // Complete-word phrase with Unicode outer boundaries. Default mode folds
+    // both sides; strict mode keeps original spelling and case.
+    const phraseRegex = context.text.phrase(phrase, caseSensitive);
     const fields = this.getSearchableFields(task);
 
-    return fields.some((fieldValue) => {
-      return phraseRegex.test(fieldValue);
-    });
+    return fields.some((fieldValue) =>
+      phraseRegex.test(
+        caseSensitive ? fieldValue : context.text.fold(fieldValue),
+      ),
+    );
   }
 
   private static async evaluateAnd(
@@ -414,6 +476,7 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
+    batchContext?: SearchBatchContext,
   ): Promise<boolean> {
     // Short-circuit: return false on first false
     for (const node of nodes) {
@@ -424,6 +487,7 @@ export class SearchEvaluator {
           caseSensitive,
           settings,
           propertySearchEngine,
+          batchContext,
         ))
       ) {
         return false;
@@ -438,6 +502,7 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
+    batchContext?: SearchBatchContext,
   ): Promise<boolean> {
     // Short-circuit: return true on first true
     for (const node of nodes) {
@@ -448,6 +513,7 @@ export class SearchEvaluator {
           caseSensitive,
           settings,
           propertySearchEngine,
+          batchContext,
         )
       ) {
         return true;
@@ -462,6 +528,7 @@ export class SearchEvaluator {
     caseSensitive: boolean,
     settings?: TodoTrackerSettings,
     propertySearchEngine?: PropertySearchEngine,
+    batchContext?: SearchBatchContext,
   ): Promise<boolean> {
     return !(await this.evaluate(
       node,
@@ -469,6 +536,7 @@ export class SearchEvaluator {
       caseSensitive,
       settings,
       propertySearchEngine,
+      batchContext,
     ));
   }
 
@@ -485,30 +553,42 @@ export class SearchEvaluator {
     if (!field || !value) {
       return false;
     }
+    const context = batchContext ?? this.createBatchContext();
 
     switch (field) {
       case 'path':
-        return this.evaluatePathFilter(value, task, caseSensitive);
+        return this.evaluatePathFilter(value, task, caseSensitive, context);
       case 'file':
-        return this.evaluateFileFilter(value, task, caseSensitive);
+        return this.evaluateFileFilter(value, task, caseSensitive, context);
       case 'tag':
-        return this.evaluateTagFilter(value, task, caseSensitive, node.exact);
+        return this.evaluateTagFilter(
+          value,
+          task,
+          caseSensitive,
+          node.exact,
+          context,
+        );
       case 'state':
         return this.evaluateStateFilter(
           value,
           task,
           caseSensitive,
           settings,
-          batchContext,
+          context,
         );
       case 'priority':
         return this.evaluatePriorityFilter(value, task, caseSensitive);
       case 'content':
-        return this.evaluateContentFilter(value, task, caseSensitive);
+        return this.evaluateContentFilter(value, task, caseSensitive, context);
       case 'description':
-        return this.evaluateDescriptionFilter(value, task, caseSensitive);
+        return this.evaluateDescriptionFilter(
+          value,
+          task,
+          caseSensitive,
+          context,
+        );
       case 'heading':
-        return this.evaluateHeadingFilter(value, task, caseSensitive);
+        return this.evaluateHeadingFilter(value, task, caseSensitive, context);
       case 'scheduled':
         return this.evaluateScheduledFilter(
           value,
@@ -527,20 +607,38 @@ export class SearchEvaluator {
         return this.evaluateClosedFilter(value, task, caseSensitive, settings);
       case 'started':
         return this.evaluateStartedFilter(value, task, caseSensitive, settings);
+      case 'blocked':
+        return this.evaluateBlockedFilter(value, task, context);
       default:
         return false;
     }
+  }
+
+  private static evaluateBlockedFilter(
+    value: string,
+    task: Task,
+    context: SearchBatchContext,
+  ): boolean {
+    if (!context.blockedKeys) {
+      throw new SearchError(
+        "Blocked status isn't available yet. Wait for the vault scan to finish, then try again.",
+      );
+    }
+    const blocked = context.blockedKeys.has(getTaskKey(task));
+    return value === 'true' ? blocked : !blocked;
   }
 
   private static evaluatePathFilter(
     value: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
     if (!task.path) return false;
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
-    const targetPath = caseSensitive ? task.path : task.path.toLowerCase();
+    const searchText = caseSensitive ? value : context.text.fold(value);
+    if (!searchText) return false;
+    const targetPath = caseSensitive ? task.path : context.text.fold(task.path);
 
     // Check if the path starts with the search value followed by a slash
     // This matches both immediate parent and subfolders
@@ -567,14 +665,18 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
     if (!task.path) return false;
 
     // Extract just the filename using shared utility
     const filename = getFilename(task.path);
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
-    const targetFilename = caseSensitive ? filename : filename.toLowerCase();
+    const searchText = caseSensitive ? value : context.text.fold(value);
+    if (!searchText) return false;
+    const targetFilename = caseSensitive
+      ? filename
+      : context.text.fold(filename);
 
     return targetFilename.includes(searchText);
   }
@@ -583,16 +685,28 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
-    exact?: boolean,
+    exact: boolean | undefined,
+    context: SearchBatchContext,
   ): boolean {
+    // `none` is the tag analogue of priority:none / date:none: it means the
+    // task has no tags at all. Put it before the raw-text guard so a tagless
+    // task is not rejected merely because its source line is unavailable.
+    if (value.toLowerCase() === 'none') {
+      return (task.tags?.length ?? 0) === 0;
+    }
+
     if (!task.rawText) return false;
 
-    const targetText = caseSensitive
-      ? task.rawText
-      : task.rawText.toLowerCase();
-
-    // Look for tag patterns with support for subtags (#context, #context/home, etc.)
-    const matches = targetText.match(TAG_PATTERN) || [];
+    // Extract from the original line, then fold each tag for comparison.
+    // `matchAll` copies the offset of the pattern it is given, so it must not
+    // be the exported TAG_PATTERN: renderers advance that one while scanning a
+    // task's text, and a stale offset silently skips the tags before it.
+    TAG_FILTER_PATTERN.lastIndex = 0;
+    const matches = [...task.rawText.matchAll(TAG_FILTER_PATTERN)].map(
+      (match) => match[0],
+    );
+    const fold = (text: string) =>
+      caseSensitive ? text : context.text.fold(text);
 
     if (exact) {
       // Exact match behavior for quoted searches
@@ -601,41 +715,26 @@ export class SearchEvaluator {
       if (normalizedValue.startsWith('#')) {
         normalizedValue = normalizedValue.slice(1);
       }
-      const searchText = caseSensitive
-        ? normalizedValue
-        : normalizedValue.toLowerCase();
+      const searchText = fold(normalizedValue);
+      if (!searchText) return false;
 
-      return matches.some((tag) => {
-        const tagContent = tag.slice(1); // Remove #
-        const normalizedTag = caseSensitive
-          ? tagContent
-          : tagContent.toLowerCase();
-        return normalizedTag === searchText;
-      });
-    } else {
-      // Unquoted behavior - exact match if starts with #, prefix match otherwise
-      if (value.startsWith('#')) {
-        // Exact match on the full tag including the #
-        const searchText = caseSensitive ? value : value.toLowerCase();
-        return matches.some((tag) => {
-          const normalizedTag = caseSensitive ? tag : tag.toLowerCase();
-          return normalizedTag === searchText;
-        });
-      } else {
-        // Prefix match behavior for unquoted searches without #
-        const searchText = caseSensitive ? value : value.toLowerCase();
-        return matches.some((tag) => {
-          const tagContent = tag.slice(1); // Remove #
-          const normalizedTag = caseSensitive
-            ? tagContent
-            : tagContent.toLowerCase();
-          return (
-            normalizedTag === searchText ||
-            normalizedTag.startsWith(searchText + '/')
-          );
-        });
-      }
+      return matches.some((tag) => fold(tag.slice(1)) === searchText);
     }
+
+    // Unquoted behavior - exact match if starts with #, prefix match otherwise
+    if (value.startsWith('#')) {
+      const searchText = fold(value);
+      return matches.some((tag) => fold(tag) === searchText);
+    }
+
+    const searchText = fold(value);
+    if (!searchText) return false;
+    return matches.some((tag) => {
+      const tagContent = fold(tag.slice(1));
+      return (
+        tagContent === searchText || tagContent.startsWith(searchText + '/')
+      );
+    });
   }
 
   private static evaluateStateFilter(
@@ -645,9 +744,10 @@ export class SearchEvaluator {
     settings?: TodoTrackerSettings,
     batchContext?: SearchBatchContext,
   ): boolean {
+    const context = batchContext ?? this.createBatchContext();
     const group = STATE_GROUP_MAP[value];
     if (group && settings) {
-      const resolved = batchContext?.stateGroupKeywords.get(value);
+      const resolved = context.stateGroupKeywords.get(value);
       const taskState = caseSensitive ? task.state : task.state.toLowerCase();
       if (resolved) {
         return caseSensitive
@@ -660,10 +760,12 @@ export class SearchEvaluator {
       );
     }
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
-    const taskState = caseSensitive ? task.state : task.state.toLowerCase();
+    const searchText = caseSensitive ? value : context.text.fold(value);
+    const taskState = caseSensitive
+      ? task.state
+      : context.text.fold(task.state);
 
-    return taskState === searchText;
+    return searchText !== '' && taskState === searchText;
   }
 
   private static evaluatePriorityFilter(
@@ -694,11 +796,13 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
     if (!task.text) return false;
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
-    const targetText = caseSensitive ? task.text : task.text.toLowerCase();
+    const searchText = caseSensitive ? value : context.text.fold(value);
+    if (!searchText) return false;
+    const targetText = caseSensitive ? task.text : context.text.fold(task.text);
 
     return targetText.includes(searchText);
   }
@@ -708,13 +812,15 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
     if (!task.description) return false;
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
+    const searchText = caseSensitive ? value : context.text.fold(value);
+    if (!searchText) return false;
     const target = caseSensitive
       ? task.description
-      : task.description.toLowerCase();
+      : context.text.fold(task.description);
 
     return target.includes(searchText);
   }
@@ -724,13 +830,15 @@ export class SearchEvaluator {
     value: string,
     task: Task,
     caseSensitive: boolean,
+    context: SearchBatchContext,
   ): boolean {
     if (!task.parentHeading) return false;
 
-    const searchText = caseSensitive ? value : value.toLowerCase();
+    const searchText = caseSensitive ? value : context.text.fold(value);
+    if (!searchText) return false;
     const target = caseSensitive
       ? task.parentHeading
-      : task.parentHeading.toLowerCase();
+      : context.text.fold(task.parentHeading);
 
     return target.includes(searchText);
   }

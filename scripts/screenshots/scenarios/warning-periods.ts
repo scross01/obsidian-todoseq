@@ -1,9 +1,6 @@
 import { defineScript } from 'obsidian-demo-recorder';
-import {
-  WARNING_PERIOD_SEEDS,
-  waitForPlugin,
-  waitForTaskListView,
-} from './helpers';
+import { waitForPlugin, waitForTaskListView } from './helpers';
+import { WARNING_PERIOD_SEEDS } from './seeds/warning-period.ts';
 
 /**
  * Docs scenarios for warning periods (docs/warning-periods.md, and the Warning

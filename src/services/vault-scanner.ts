@@ -2,11 +2,12 @@ import { TFile, TAbstractFile } from 'obsidian';
 import { Task, WarningPeriodInfo } from '../types/task';
 import { TaskParser } from '../parser/task-parser';
 import { ParserRegistry } from '../parser/parser-registry';
-import { ParserConfig } from '../parser/types';
+import { ITaskParser, ParserConfig } from '../parser/types';
 import { TodoTrackerSettings } from '../settings/settings-types';
 import { taskComparator } from '../utils/task-sort';
 import TodoTracker from '../main';
 import {
+  getDefaultCoefficients,
   parseUrgencyCoefficients,
   UrgencyCoefficients,
 } from '../utils/task-urgency';
@@ -17,6 +18,8 @@ import { KeywordManager } from '../utils/keyword-manager';
 import { ChangeTracker } from './change-tracker';
 import { EventEmitter } from '../utils/event-emitter';
 import { yieldToEventLoop } from '../utils/event-loop';
+import { collectStructuralEntries } from '../utils/task-structure-entries';
+import type { StructuralEntry } from '../types/task-structure';
 
 // Define the event types that VaultScanner will emit
 export interface VaultScannerEvents {
@@ -43,7 +46,7 @@ export class VaultScanner
   private _rescanRequested = false;
   private _isInitializing = true; // Track Obsidian initialization state
   private _hasCompletedInitialScan = false; // Track if the first scan has completed
-  private urgencyCoefficients!: UrgencyCoefficients;
+  private urgencyCoefficients: UrgencyCoefficients = getDefaultCoefficients();
   private regexCache = new RegexCache();
   private parserRegistry: ParserRegistry;
   private keywordManager: KeywordManager;
@@ -54,6 +57,14 @@ export class VaultScanner
    * scan's older snapshots overwriting newer per-file publications.
    */
   private activeScanDirtyPaths: Set<string> | null = null;
+  /** Plugin writes currently between addSkip and completion. */
+  private inFlightWritePaths = new Set<string>();
+  /** Memory-only structural publication, keyed by path. */
+  private structuralEntriesByPath = new Map<
+    string,
+    readonly StructuralEntry[]
+  >();
+  private structureRevision = 0;
 
   constructor(
     private plugin: TodoTracker,
@@ -105,6 +116,32 @@ export class VaultScanner
     return this.keywordManager;
   }
 
+  /** Current coefficients, including the synchronous default before startup loads. */
+  getUrgencyCoefficients(): Readonly<UrgencyCoefficients> {
+    return this.urgencyCoefficients;
+  }
+
+  /** Monotonic revision for published structural entries. */
+  getStructureRevision(): number {
+    return this.structureRevision;
+  }
+
+  getStructuralEntries(): ReadonlyMap<string, readonly StructuralEntry[]> {
+    return this.structuralEntriesByPath;
+  }
+
+  private publishStructure(
+    path: string,
+    entries: readonly StructuralEntry[],
+  ): void {
+    this.structuralEntriesByPath.set(path, entries);
+    this.structureRevision++;
+  }
+
+  private removeStructure(path: string): void {
+    if (this.structuralEntriesByPath.delete(path)) this.structureRevision++;
+  }
+
   /**
    * Load urgency coefficients from urgency.ini file
    */
@@ -126,7 +163,11 @@ export class VaultScanner
       return;
     }
     this._isScanning = true;
-    this.activeScanDirtyPaths = new Set<string>();
+    // A write may already be in flight when the scan starts. Keep those paths
+    // dirty for this pass so the scan cannot publish the pre-write snapshot.
+    this.activeScanDirtyPaths = new Set(this.inFlightWritePaths);
+    this.structuralEntriesByPath.clear();
+    this.structureRevision++;
 
     const startTime = performance.now();
 
@@ -166,7 +207,10 @@ export class VaultScanner
         if (newTasks.length > 0 && !hasEmittedInitialBatch) {
           const initialTasks = this.reconcileWithCurrentState(newTasks);
           initialTasks.sort(taskComparator);
-          this.taskStateManager.setTasks(initialTasks);
+          this.taskStateManager.setTasksFromScan(
+            initialTasks,
+            this.activeScanDirtyPaths ?? [],
+          );
           // UI elements will now mount instantly while the rest of the vault continues
           // to scan invisibly in the background.
           hasEmittedInitialBatch = true;
@@ -199,7 +243,10 @@ export class VaultScanner
       // before publication: a path whose newer state was published while
       // this pass was reading must win over the scan's older snapshot.
       const reconciledTasks = this.reconcileWithCurrentState(newTasks);
-      this.taskStateManager.setTasks(reconciledTasks);
+      this.taskStateManager.setTasksFromScan(
+        reconciledTasks,
+        this.activeScanDirtyPaths ?? [],
+      );
 
       // Emit events for backward compatibility
       this.emit('tasks-changed', reconciledTasks);
@@ -278,6 +325,11 @@ export class VaultScanner
     return false;
   }
 
+  /** Public dependency-graph seam for the scanner's exclusion policy. */
+  isPathExcluded(filePath: string): boolean {
+    return this.isExcluded(filePath);
+  }
+
   /**
    * Check if a file path should be excluded based on Obsidian's userIgnoreFilters
    *
@@ -347,14 +399,28 @@ export class VaultScanner
 
       if (!parser) {
         // No parser registered for this extension, return empty
+        this.removeStructure(file.path);
         return [];
       }
 
       // Fast-path rejection: if the file text doesn't contain any task keywords natively,
       // skip expensive line-by-line regex parsing completely.
       if (!parser.hasAnyKeyword(content)) {
+        this.removeStructure(file.path);
         return [];
       }
+
+      const format =
+        file.extension.toLowerCase() === 'org' ? 'org' : 'markdown';
+      this.publishStructure(
+        file.path,
+        collectStructuralEntries(
+          content,
+          file.path,
+          format,
+          this.keywordManager,
+        ),
+      );
 
       // Parse tasks using the matched parser
       const fileTasks = parser.parseFile(content, file.path, file);
@@ -426,6 +492,15 @@ export class VaultScanner
     return this.parserRegistry.getParser('markdown') as TaskParser | null;
   }
 
+  /** Get the registered parser for a vault path without scanning the file. */
+  getParserForPath(filePath: string): ITaskParser | null {
+    const fileName = filePath.slice(filePath.lastIndexOf('/') + 1);
+    const dot = fileName.lastIndexOf('.');
+    return this.parserRegistry.getParserForExtension(
+      dot >= 0 ? fileName.slice(dot + 1) : '',
+    );
+  }
+
   // Update settings and update existing parsers with new configuration
   async updateSettings(
     newSettings: TodoTrackerSettings,
@@ -434,11 +509,18 @@ export class VaultScanner
     this.settings = newSettings;
     // Clear regex cache when settings change (userIgnoreFilters may have changed)
     this.regexCache.clear();
+    const previousCoefficients = { ...this.urgencyCoefficients };
     // Use provided urgency coefficients or reload them if not provided
     if (urgencyCoefficients) {
       this.urgencyCoefficients = urgencyCoefficients;
     } else {
       await this.loadUrgencyCoefficients();
+    }
+    if (this.haveUrgencyCoefficientsChanged(previousCoefficients)) {
+      // Sorting and embedded scores are derived from this scalar, so direct
+      // updateSettings() callers (settings UI and the list dropdown) must not
+      // leave an open embed on the old coefficient.
+      this.plugin.lifecycleManager?.scheduleDependencySurfaceRefresh?.();
     }
 
     // Create a new KeywordManager with the updated settings
@@ -464,6 +546,14 @@ export class VaultScanner
     }
   }
 
+  private haveUrgencyCoefficientsChanged(
+    previous: Readonly<UrgencyCoefficients>,
+  ): boolean {
+    return (
+      Object.keys(this.urgencyCoefficients) as (keyof UrgencyCoefficients)[]
+    ).some((key) => previous[key] !== this.urgencyCoefficients[key]);
+  }
+
   /**
    * Reconcile one file from persisted truth after a failed plugin write.
    *
@@ -478,17 +568,19 @@ export class VaultScanner
   async reconcileFileAfterFailedWrite(
     filePath: string,
     file: TFile | null,
-    publish: boolean,
+    publish: boolean | (() => boolean),
   ): Promise<Task[] | null> {
+    const shouldPublish = (): boolean =>
+      typeof publish === 'function' ? publish() : publish;
     if (this.isExcluded(filePath)) {
       return null;
     }
     if (file === null) {
-      if (!publish) return null;
+      if (!shouldPublish()) return null;
       const updatedTasks = this.taskStateManager
         .getTasks()
         .filter((task) => task.path !== filePath);
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [filePath]);
       this.emit('tasks-changed', updatedTasks);
       return [];
     }
@@ -499,15 +591,21 @@ export class VaultScanner
         (task) => !this.keywordManager.isArchived(task.state),
       );
 
-      if (publish) {
+      if (shouldPublish()) {
         const currentTasks = this.taskStateManager.getTasks();
         const updatedTasks = currentTasks.filter(
           (task) => task.path !== file.path,
         );
         updatedTasks.push(...nonArchivedTasks);
         updatedTasks.sort(taskComparator);
-        this.taskStateManager.setTasks(updatedTasks);
+        this.taskStateManager.setTasksForPaths(updatedTasks, [filePath]);
         this.emit('tasks-changed', updatedTasks);
+      } else {
+        // A successor owns the visible projection. Still commit persisted
+        // truth so dependency checks and queued resolution see the write.
+        this.taskStateManager.setCommittedTasksForPaths(nonArchivedTasks, [
+          filePath,
+        ]);
       }
 
       return nonArchivedTasks;
@@ -580,9 +678,17 @@ export class VaultScanner
       const fileTasksBefore = currentTasks.filter(
         (task) => task.path === file.path,
       );
+      const committedBefore = this.taskStateManager
+        .getCommittedTasks()
+        .filter((task) => task.path === file.path);
 
-      // Skip update if tasks haven't actually changed (identity comparison by path, line, rawText)
-      if (this.tasksIdentical(fileTasksBefore, nonArchivedTasks)) {
+      // Skip only when both the UI projection and committed truth already
+      // match the scan. A persisted write may match the optimistic UI while
+      // committed dependency state still needs to advance.
+      if (
+        this.tasksIdentical(fileTasksBefore, nonArchivedTasks) &&
+        this.tasksIdentical(committedBefore, nonArchivedTasks)
+      ) {
         return;
       }
 
@@ -594,7 +700,7 @@ export class VaultScanner
       updatedTasks.sort(taskComparator);
 
       // Update and emit after all checks
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [file.path]);
       this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner processIncrementalChange error', err);
@@ -614,9 +720,15 @@ export class VaultScanner
    */
   addSkipIncrementalChange(filePath: string): void {
     this.skipIncrementalChanges.set(filePath, Date.now());
+    this.inFlightWritePaths.add(filePath);
     // A plugin write during a full scan is invisible to that scan's reads,
     // so the scan must publish the current central state for this path.
     this.activeScanDirtyPaths?.add(filePath);
+  }
+
+  /** Mark a plugin write complete so the next scan can read its result. */
+  completeFileWrite(filePath: string): void {
+    this.inFlightWritePaths.delete(filePath);
   }
 
   /**
@@ -685,7 +797,40 @@ export class VaultScanner
     );
   }
 
-  // Compare two task arrays for equality (path, line, rawText, scheduledDate, deadlineDate, subtaskCount, subtaskCompletedCount)
+  private static stringListsEqual(
+    a: readonly string[] | undefined,
+    b: readonly string[] | undefined,
+  ): boolean {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Dependency and property data lives beside the task line, so a drawer-only
+   * edit leaves rawText unchanged. Compare it explicitly or a BLOCKER added or
+   * removed in the drawer is discarded as an unchanged file.
+   */
+  private static taskPropertiesEqual(a: Task, b: Task): boolean {
+    return (
+      a.id === b.id &&
+      a.ordered === b.ordered &&
+      a.noblocking === b.noblocking &&
+      a.embedReference === b.embedReference &&
+      VaultScanner.stringListsEqual(a.blockedBy, b.blockedBy) &&
+      VaultScanner.stringListsEqual(a.archivedBlockers, b.archivedBlockers) &&
+      JSON.stringify(a.properties ?? null) ===
+        JSON.stringify(b.properties ?? null) &&
+      JSON.stringify(a.propertyIssues ?? null) ===
+        JSON.stringify(b.propertyIssues ?? null)
+    );
+  }
+
+  // Compare two task arrays for equality, including metadata that lives outside
+  // the task line such as dates, properties and dependency references.
   private tasksIdentical(before: Task[], after: Task[]): boolean {
     if (before.length !== after.length) {
       return false;
@@ -718,7 +863,8 @@ export class VaultScanner
           a.deadlineWarningPeriod,
         ) ||
         b.subtaskCount !== a.subtaskCount ||
-        b.subtaskCompletedCount !== a.subtaskCompletedCount
+        b.subtaskCompletedCount !== a.subtaskCompletedCount ||
+        !VaultScanner.taskPropertiesEqual(b, a)
       ) {
         return false;
       }
@@ -730,13 +876,14 @@ export class VaultScanner
   async processFileDelete(file: TFile): Promise<void> {
     try {
       this.activeScanDirtyPaths?.add(file.path);
+      this.removeStructure(file.path);
       const currentTasks = this.taskStateManager.getTasks();
       const updatedTasks = currentTasks.filter(
         (task) => task.path !== file.path,
       );
 
       updatedTasks.sort(taskComparator);
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [file.path]);
       this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner processFileDelete error', err);
@@ -755,6 +902,7 @@ export class VaultScanner
       const newPath = file.path;
       this.activeScanDirtyPaths?.add(oldPath);
       this.activeScanDirtyPaths?.add(newPath);
+      this.removeStructure(oldPath);
 
       let renamedTasks: Task[] = [];
       if (!this.isExcluded(newPath)) {
@@ -771,7 +919,7 @@ export class VaultScanner
       updatedTasks.push(...renamedTasks);
 
       updatedTasks.sort(taskComparator);
-      this.taskStateManager.setTasks(updatedTasks);
+      this.taskStateManager.setTasksForPaths(updatedTasks, [oldPath, newPath]);
       this.emit('tasks-changed', updatedTasks);
     } catch (err) {
       console.error('VaultScanner processFileRename error', err);

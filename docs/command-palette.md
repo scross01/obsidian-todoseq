@@ -1,15 +1,18 @@
 # Command Palette
 
-TODOseq provides several commands that can be accessed through Obsidian's Command Palette. These commands allow you to interact with the plugin without using the mouse or opening settings.
+TODOseq adds the commands below to Obsidian's Command Palette. Each can also be given a hotkey.
 
 ## Available Commands
 
 - TODOseq: Show task list
+- TODOseq: Show task issues
 - TODOseq: Open task list in new tab
 - TODOseq: Rescan vault
+- TODOseq: Retry failed task reference repairs
 - TODOseq: Archive completed tasks
 - TODOseq: Undo last archive run
 - TODOseq: Toggle task state _(editor only)_
+- TODOseq: Complete blocked task _(editor only)_
 - TODOseq: Cycle task state _(editor only)_
 - TODOseq: Copy task to today _(editor only)_
 - TODOseq: Move task to today _(editor only)_
@@ -28,15 +31,29 @@ TODOseq provides several commands that can be accessed through Obsidian's Comman
 
 Opens the TODOseq Task List view. By default, Task List view is opened in the right sidebar.
 
+### Show task issues
+
+Opens the Task List and reveals its Issues panel. Each row names a problem found while building the dependency index and links to its source task; select a row to jump to that task.
+
+The same panel opens from the **Issues** count in the Task List toolbar. Diagnostics are session-local and update as the index rebuilds. See [Task Dependencies](task-dependencies.md#completion-enforcement-and-task-actions).
+
 ### Open task list in new tab
 
-Opens the TODOseq Task List view in a new tab in the main workspace area. This is useful when you want to view the task list alongside your notes, rather than in a side panel.
+Opens the Task List in a new main-area tab, so it can sit beside your notes.
 
 ### Rescan vault
 
-Manually triggers a full vault scan to update the task list with the latest changes.
+Runs a full vault scan.
 
-A full rescan is not typically required, unless the vault level setting for Excluded files has been updated. General file changes (create, modify, delete) trigger automatic incremental updates.
+A rescan is only needed after changing the vault-level Excluded files setting; creating, editing and deleting files update the list automatically.
+
+### Retry failed task reference repairs
+
+Retries the reference links that a copy, move or migrate could not rewrite, without repeating the transfer itself. The notice reports how many links were repaired, or how many still could not be updated.
+
+**Availability**: Only while repairs are pending for the current session.
+
+See [Moving and copying tasks](task-dependencies.md#moving-and-copying-tasks) for when a link repair can fail.
 
 ### Archive completed tasks
 
@@ -59,6 +76,14 @@ Toggle the state of the task at the current cursor position in the Markdown edit
 - `DONE` → `TODO` (cycles back)
 
 **Default Shortcut**: `Ctrl + Enter`
+
+### Complete blocked task
+
+Completes the task at the cursor even though a dependency still blocks it, moving it to its next completed or archived state. This is the command-palette equivalent of **Complete anyway** in the task context menu.
+
+**Availability**: Only when the cursor is on an incomplete task that is currently blocked.
+
+See [Completion enforcement and task actions](task-dependencies.md#completion-enforcement-and-task-actions).
 
 ### Cycle task state
 
@@ -112,7 +137,7 @@ DEADLINE: <2026-01-16>
 
 ### Add description
 
-Add a description line to the task at the current cursor position. If the task already has a description, the cursor moves to the end of the existing description text for editing.
+Add a description line to the task at the current cursor position. If the task already has a description, the cursor moves to the end of the existing description text for editing. An existing description is reused whether it is unquoted at any indentation or quoted at any blockquote depth with `>` in the first column, so the command does not add a duplicate line.
 
 ```txt
 TODO example task

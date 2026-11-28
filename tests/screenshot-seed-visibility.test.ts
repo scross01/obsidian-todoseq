@@ -1,4 +1,4 @@
-import { WARNING_PERIOD_SEEDS } from '../scripts/screenshots/scenarios/helpers';
+import { WARNING_PERIOD_SEEDS } from '../scripts/screenshots/scenarios/seeds/warning-period';
 import { extractDateMetadata } from '../src/utils/date-repeater';
 import {
   getEffectiveVisibilityDate,

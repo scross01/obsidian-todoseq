@@ -43,6 +43,20 @@ function lineAt(css: string, index: number): number {
   return css.slice(0, index).split('\n').length;
 }
 
+/** Declarations of the rule whose selector list contains `selector`. */
+function declarationsForSelector(css: string, selector: string): string | null {
+  for (const { start, end } of rulePreludes(css)) {
+    const prelude = css
+      .slice(start, end)
+      .split(',')
+      .map((part) => part.trim().replace(/\s+/g, ' '));
+    if (!prelude.includes(selector)) continue;
+    const bodyStart = end + 1;
+    return css.slice(bodyStart, css.indexOf('}', bodyStart));
+  }
+  return null;
+}
+
 describe('stylesheet lint', () => {
   const css = fs.readFileSync(STYLES_PATH, 'utf8');
   // Only selectors count. The comment explaining the ban names `:has()`, and
@@ -95,6 +109,155 @@ describe('stylesheet lint', () => {
       expect(selectors).toContain(
         '.markdown-preview-view .todoseq-scheduled-line',
       );
+    });
+  });
+
+  describe('readable text tokens', () => {
+    it('uses the text-safe accent for keyword ink', () => {
+      const readableAccent =
+        /color:\s*color-mix\(\s*in srgb,\s*var\(--text-accent,\s*var\(--interactive-accent\)\)\s*80%,\s*var\(--text-normal\)/s;
+      expect(selectors).toMatch(
+        new RegExp(
+          `\\.todoseq-keyword-formatted\\s*\\{[^}]*${readableAccent.source}`,
+          's',
+        ),
+      );
+      expect(selectors).toMatch(
+        new RegExp(
+          `\\.todoseq-panel \\.todo-task-keyword\\s*\\{[^}]*${readableAccent.source}`,
+          's',
+        ),
+      );
+    });
+
+    it('does not paint completed text with the faint token', () => {
+      expect(selectors).not.toMatch(
+        /\.todoseq-panel \.todoseq-task-text\.completed\s*\{[^}]*color:\s*var\(--text-faint/s,
+      );
+      expect(selectors).not.toMatch(
+        /\.todoseq-panel \.todoseq-task-item\.completed \.todo-task-keyword\s*\{[^}]*color:\s*var\(--text-faint/s,
+      );
+    });
+
+    it('blends completed keyword ink into the background', () => {
+      const completedAccent =
+        /color:\s*color-mix\(\s*in srgb,\s*var\(--text-accent,\s*var\(--interactive-accent\)\)\s*55%,\s*var\(--background-primary\)/s;
+      for (const selector of [
+        '\\.todoseq-completed-keyword',
+        '\\.todoseq-panel \\.todoseq-task-item\\.completed \\.todo-task-keyword',
+        '\\.todoseq-table-task-keyword\\.todoseq-completed-keyword',
+        '\\.todoseq-footnote-task-keyword\\.todoseq-completed-keyword',
+      ]) {
+        expect(selectors).toMatch(
+          new RegExp(`${selector}\\s*\\{[^}]*${completedAccent.source}`, 's'),
+        );
+      }
+    });
+
+    it('blends archived keyword ink further into the background', () => {
+      const archivedAccent =
+        /color:\s*color-mix\(\s*in srgb,\s*var\(--text-accent,\s*var\(--interactive-accent\)\)\s*40%,\s*var\(--background-primary\)/s;
+      for (const selector of [
+        '\\.todoseq-archived-keyword',
+        '\\.todoseq-table-task-keyword\\.todoseq-archived-keyword',
+        '\\.todoseq-footnote-task-keyword\\.todoseq-archived-keyword',
+      ]) {
+        expect(selectors).toMatch(
+          new RegExp(`${selector}\\s*\\{[^}]*${archivedAccent.source}`, 's'),
+        );
+      }
+    });
+
+    it('leaves embedded task-state keywords uncolored', () => {
+      expect(selectors).toMatch(
+        /\.todoseq-embedded-task-state\s*\{[^}]*color:\s*var\(--text-normal\)/s,
+      );
+      expect(selectors).not.toMatch(
+        /\.todoseq-embedded-task-state\s*\{[^}]*color:[^;]*(?:--text-accent|--interactive-accent)/s,
+      );
+      expect(selectors).toMatch(
+        /\.todoseq-embedded-task-completed \.todoseq-embedded-task-state\s*\{[^}]*color:\s*color-mix\(\s*in srgb,\s*var\(--text-muted\)\s*55%,\s*var\(--background-primary\)/s,
+      );
+      expect(selectors).not.toMatch(
+        /\.todoseq-embedded-task-completed \.todoseq-embedded-task-state\s*\{[^}]*color:[^;]*(?:--text-accent|--interactive-accent)/s,
+      );
+    });
+
+    it('qualifies state keyword ink so later context rules cannot override it', () => {
+      for (const selector of [
+        '\\.todoseq-keyword-formatted\\.todoseq-completed-keyword',
+        '\\.todoseq-keyword-formatted\\.todoseq-archived-keyword',
+      ]) {
+        expect(selectors).toMatch(new RegExp(`${selector}\\s*\\{`, 's'));
+      }
+    });
+
+    it('mutes priority badges on completed and archived task rows', () => {
+      for (const selector of [
+        '.todoseq-completed-task-text .todoseq-priority-badge',
+        '.todoseq-panel .todoseq-task-item.completed .todoseq-priority-badge',
+        '.todoseq-embedded-task-item.todoseq-embedded-task-completed .todoseq-priority-badge',
+      ]) {
+        const declarations = declarationsForSelector(selectors, selector);
+        expect(declarations).not.toBeNull();
+        expect(declarations).toMatch(
+          /background-color:\s*var\(--background-modifier-border\);/,
+        );
+        expect(declarations).toMatch(/color:\s*var\(--text-muted\);/);
+        expect(declarations).toMatch(/box-shadow:\s*none;/);
+      }
+
+      const archivedDeclarations = declarationsForSelector(
+        selectors,
+        '.todoseq-archived-task-text .todoseq-priority-badge',
+      );
+      expect(archivedDeclarations).not.toBeNull();
+      expect(archivedDeclarations).toMatch(
+        /background-color:\s*var\(--background-primary\);/,
+      );
+      expect(archivedDeclarations).toMatch(/color:\s*var\(--text-faint\);/);
+      expect(archivedDeclarations).toMatch(
+        /box-shadow:\s*inset 0 0 0 1px var\(--background-modifier-border\);/,
+      );
+    });
+
+    it('fades completed title ink', () => {
+      const completedInk =
+        /color:\s*color-mix\(\s*in srgb,\s*var\(--text-muted\)\s*55%,\s*var\(--background-primary\)/s;
+      for (const selector of [
+        '\\.todoseq-panel \\.todoseq-task-text\\.completed',
+        '\\.todoseq-completed-task-text',
+        '\\.todoseq-embedded-task-completed \\.todoseq-embedded-task-text',
+      ]) {
+        expect(selectors).toMatch(
+          new RegExp(`${selector}\\s*\\{[^}]*${completedInk.source}`, 's'),
+        );
+      }
+    });
+
+    it('fades archived title ink further than completed', () => {
+      const archivedInk =
+        /color:\s*color-mix\(\s*in srgb,\s*var\(--text-muted\)\s*40%,\s*var\(--background-primary\)/s;
+      expect(selectors).toMatch(
+        new RegExp(
+          `\\.todoseq-archived-task-text\\s*\\{[^}]*${archivedInk.source}`,
+          's',
+        ),
+      );
+    });
+
+    it('does not stack opacity on completed or archived text', () => {
+      for (const selector of [
+        '\\.todoseq-completed-task-text',
+        '\\.todoseq-completed-keyword',
+        '\\.todoseq-archived-task-text',
+        '\\.todoseq-archived-keyword',
+        '\\.todoseq-embedded-task-item\\.todoseq-embedded-task-completed',
+      ]) {
+        expect(selectors).not.toMatch(
+          new RegExp(`${selector}\\s*\\{[^}]*opacity:`, 's'),
+        );
+      }
     });
   });
 });

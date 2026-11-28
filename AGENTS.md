@@ -19,6 +19,16 @@ This file provides guidance to agents when working with code in this repository.
 - **CHANGELOG entries are user-facing**: concise (one or two sentences) and written from the user's perspective — describe the fixed behaviour or the new capability, never the implementation (no internals like timers, frames, parsers, or refactors).
 - **Detailed behaviour descriptions belong in `docs/`, not `CHANGELOG.md`**: the CHANGELOG is a summary; the full, precise description of how something behaves (edge cases, modes, settings interactions, examples) goes in the relevant `docs/` page. Every change to user-visible behaviour must update `docs/` in the same PR — and implementation plans (improve skill) must include that docs update as an explicit step.
 
+## Notifications
+
+- Use an Obsidian `Notice` for a user-initiated action outcome, a blocking
+  failure, or a one-time run summary with an action.
+- Do not use a `Notice` for typing, scanning, background validation, progress,
+  or repeated refresh failures. Use an inline marker, tooltip or quiet summary
+  surface instead; log recoverable failures with `console.debug`.
+- Persistent state belongs in the UI, not in a toast. If a new diagnostic needs
+  attention, give it a stable control or panel and keep the default quiet.
+
 ## Commit Hygiene
 
 Never stage or commit these local-only working files:
@@ -43,7 +53,6 @@ git commit -F .git-commit-msg-tmp.txt
 rm .git-commit-msg-tmp.txt
 ```
 
-Trailers: `🤖 Generated with Codebuff` and `Co-Authored-By: Codebuff <noreply@codebuff.com>`.
 Do not `git push` unless the user asks.
 
 ## Build & Test
